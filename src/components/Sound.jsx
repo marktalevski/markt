@@ -2,8 +2,7 @@
 // The logic class is the design's own code; View is its template as JSX.
 import React from 'react';
 import { DCLogic, page, sty, BASE } from '../lib/dc.js';
-import { squid, SQUID_W, SQUID_H, SQUID_IDLES, SQUID_REACTS, SQUID_MOVES, SQUID_SLOW, SQUID_FAST } from '../lib/squid.js';
-import { drawSquid } from '../lib/squid-draw.js';
+import { squid, squidCells, SQUID_W, SQUID_H, SQUID_IDLES, SQUID_REACTS, SQUID_MOVES, SQUID_SLOW, SQUID_FAST } from '../lib/squid.js';
 import { deckGeo, deckGeoV, deckScale, isPhone, DECK_KEYS, padOf } from '../lib/deck.js';
 
 const PAGE = 'sound';
@@ -194,6 +193,8 @@ class Component extends DCLogic {
   // the track list on the centre screen: where each row sits (shared by the drawing and the row buttons over it)
   // the screen's top bar (now playing, and the squid's stage) is this much taller than its text needs, so the squid has room to swim about
   stripEx(G) { return G.phone ? 16 : 30; }
+  // the squid's pixel size on the screen: as big as the strip allows
+  sqPx(G) { return G.phone ? 2.5 : 3; }
   rowsOf(G) { const [sx, sy, sw, sh] = G.scr, ex = this.stripEx(G), n = this.albums[this.state.album].tracks.length, top = sy + 66 + ex, rh = clamp((sh - 70 - ex) / Math.max(1, n), 15, 44); return Array.from({ length: n }, (_, k) => [sx + 4, top + k * rh, sw - 8, rh]); }
   t = 0; live = 0; mx = 0; pf = 0; labs = {}; S = [0, 1, 2, 3, 4, 5, 6, 7].map(() => ({ on: 0, k: 0, yp: 300, y0: 300, tp: -9 }));
   albums = ALBUMS.map((a, ai) => { const tracks = a.tracks.map((tr, ti) => ({ ...tr, id: ai + '-' + ti, ai, ti, env: envOf(tr) })); return { ...a, tracks, mix: mixOf(tracks) }; });
@@ -488,13 +489,13 @@ class Component extends DCLogic {
       const stH = 50 + this.stripEx(G), tsz = stH - 18, tmid = sy + stH / 2, tx = sx + 10 + tsz + 12, fT = G.phone ? 12.5 : 14, fN = G.phone ? 13 : 16, fR = G.phone ? 8.5 : 9.5,
         tbT = tmid - (.72 * fT + fN + 5) / 2 + .72 * fT, tbN = tbT + fN + 5;
       thumb(sx + 10, tmid - tsz / 2, tsz); ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
-      if (c) { ctx.font = '500 ' + fT + 'px ' + mono; ctx.fillStyle = cy ? AC.accL : '#e9edf0'; glow(NEON_C, 6); const ttl = c.tr.title.toUpperCase(), room = sx + sw - tx - (G.phone ? SQUID_W * 2 + 22 : 146), tw = ctx.measureText(ttl).width; this.kTxtR = tx + Math.max(Math.min(tw, room), G.phone ? 0 : 150);
+      if (c) { ctx.font = '500 ' + fT + 'px ' + mono; ctx.fillStyle = cy ? AC.accL : '#e9edf0'; glow(NEON_C, 6); const ttl = c.tr.title.toUpperCase(), room = sx + sw - tx - SQUID_W * this.sqPx(G) - 24, tw = ctx.measureText(ttl).width;
         ctx.save(); ctx.beginPath(); ctx.rect(tx, tbT - fT, room, fT * 1.5); ctx.clip(); if (tw <= room) ctx.fillText(ttl, tx, tbT); else { const L = tw + 36, o = (t * 28) % L; ctx.fillText(ttl, tx - o, tbT); ctx.fillText(ttl, tx - o + L, tbT); } ctx.restore(); noGlow();
         // the time, under the title: where you are, then what is left (and PAUSED when it is)
         ctx.textAlign = 'left'; ctx.font = '400 ' + fN + 'px ' + mich; ctx.fillStyle = '#f2f2f0'; const tnow = fmtDur(pos) + '.' + (Math.floor(pos * 10) % 10); ctx.fillText(tnow, tx, tbN); const tnw = ctx.measureText(tnow).width;
         ctx.font = '400 ' + fR + 'px ' + mono; ctx.fillStyle = cy ? NEON_M : PM; ctx.fillText('-' + fmtDur(Math.max(0, c.tr.dur - pos)) + (c.paused ? '   PAUSED' : ''), tx + tnw + 10, tbN);
         ctx.fillStyle = 'rgba(255,255,255,.1)'; ctx.fillRect(sx + 10, sy + 50 + this.stripEx(G), sw - 20, 1.5); ctx.fillStyle = cy ? NEON_M : kc; glow(NEON_M, 6); ctx.fillRect(sx + 10, sy + 50 + this.stripEx(G), (sw - 20) * u, 1.5); noGlow(); }
-      else { this.kTxtR = tx + 180; ctx.font = '400 ' + fT + 'px ' + mich; ctx.fillStyle = '#e9edf0'; ctx.fillText('STANDBY', tx, G.phone ? tmid + fT * .36 : tbT); if (!G.phone) { ctx.font = '400 ' + fR + 'px ' + mono; ctx.fillStyle = PM; ctx.fillText('PRESS ▶ OR PICK A PIECE BELOW', tx, tbN); }
+      else { ctx.font = '400 ' + fT + 'px ' + mich; ctx.fillStyle = '#e9edf0'; ctx.fillText('STANDBY', tx, G.phone ? tmid + fT * .36 : tbT); if (!G.phone) { ctx.font = '400 ' + fR + 'px ' + mono; ctx.fillStyle = PM; ctx.fillText('PRESS ▶ OR PICK A PIECE BELOW', tx, tbN); }
         ctx.fillStyle = 'rgba(255,255,255,.1)'; ctx.fillRect(sx + 10, sy + 50 + this.stripEx(G), sw - 20, 1); }
       ctx.textBaseline = 'middle'; ctx.textAlign = 'right'; ctx.font = '400 7.5px ' + mono; ctx.fillStyle = PM; const tot = al.tracks.reduce((a2, q) => a2 + q.dur, 0); ctx.fillText(al.tracks.length + ' PIECES · ' + fmtDur(tot), sx + sw - 12, sy + 59 + this.stripEx(G));
       this.rowsOf(G).forEach(([rx, ry, rw, rh], k) => { const tr = al.tracks[k], on = c && c.tr.id === tr.id, hv = this.rowHov === k, mid = ry + rh / 2;
@@ -510,35 +511,23 @@ class Component extends DCLogic {
       ctx.restore(); ctx.globalAlpha = 1 - fo; ctx.strokeStyle = cy ? AC.a(.45) : 'rgba(255,255,255,.08)'; ctx.lineWidth = 1; rr(sx + .5, sy + .5, sw - 1, sh - 1, 4.5); ctx.stroke();
       // the squid, on the right of the now-playing strip: resting, dancing while a piece plays, or off on a pad's little turn. Its notes and
       // stars take the edge's ink while it is lit
-      { const hp = this.padHov, mode = hp != null ? this.kReact : playing ? 'dance' : 'sleep', kp = 2, kw = SQUID_W * kp, sEx = this.stripEx(G), ky = sy + 50 + sEx - SQUID_H * kp - 2;
-        // the free stretch of the strip he dances along: from just past the text to the right edge
-        const xMax = sx + sw - 10 - kw, xMin = Math.min((this.kTxtR || sx + 200) + 8, xMax); if (this.kX == null) this.kX = xMax; this.kX = clamp(this.kX, xMin, xMax);
-        // the dance: a run of moves picked at random (never one twice running), each a few beats long; a slide glides him somewhere new,
-        // and every so often he strikes a pose. The beat only runs while a piece plays
+      { const hp = this.padHov, mode = hp != null ? this.kReact : playing ? 'dance' : 'sleep', kp = this.sqPx(G), kw = SQUID_W * kp, sEx = this.stripEx(G), ky = sy + 50 + sEx - SQUID_H * kp - 2;
+        // she keeps to one spot at the strip's right end and dances there
+        const kx = sx + sw - 12 - kw;
+        // the dance: a run of moves picked at random (never one twice running), each a few beats long, and every so often she strikes a pose.
+        // The beat only runs while a piece plays
         let dO = {}; if (mode === 'dance') { const bpm = this.kTempo(dt); this.kB = (this.kB || 0) + dt * bpm / 60;
-          if (!this.kMv || this.kB >= SQUID_MOVES[this.kMv]) { this.kB = 0; this.kN = (this.kN || 0) + 1; const pool = Object.keys(SQUID_MOVES).filter(m => m !== this.kMv && m !== 'pose' && (m !== 'trio' || xMax - xMin > kw * 2.2)); if (this.kMv !== 'slide') pool.push('slide', 'slide');
+          if (!this.kMv || this.kB >= SQUID_MOVES[this.kMv]) { this.kB = 0; this.kN = (this.kN || 0) + 1; const pool = Object.keys(SQUID_MOVES).filter(m => m !== this.kMv && m !== 'pose');
             // slow music: more of the slow moves (and fewer fast ones); fast music the other way round
             const slow = clamp((105 - bpm) / 30, 0, 1), fast = clamp((bpm - 115) / 25, 0, 1);
             [...pool].forEach(m => { const w = SQUID_SLOW.includes(m) ? 1 + 3 * slow : SQUID_FAST.includes(m) ? 1 + 2 * fast - .8 * slow : 1; for (let q = 1; q < Math.round(w); q++) pool.push(m); if (w < .5) pool.splice(pool.indexOf(m), 1); });
-            this.kMv = this.kN % 7 === 0 ? 'pose' : pool[Math.floor(Math.random() * pool.length)];
-            // a slide glides him well across; hops, sways, shimmies and jump-spins carry him a little way; the rest stay put
-            this.kX0 = this.kX; let x1 = this.kX; if (this.kMv === 'slide') { let n = 0; while (n++ < 20 && Math.abs(x1 - this.kX) < (xMax - xMin) * .3) x1 = xMin + Math.random() * (xMax - xMin); }
-            else if (['hop', 'sway', 'shimmy', 'jumpspin'].includes(this.kMv)) x1 = clamp(this.kX + (Math.random() < .5 ? -1 : 1) * (xMax - xMin) * (.15 + Math.random() * .2), xMin, xMax);
-            this.kX1 = x1; this.kDir = x1 >= this.kX ? 1 : -1; }
-          { const u = clamp(this.kB / SQUID_MOVES[this.kMv], 0, 1), e2 = u * u * (3 - 2 * u); this.kX = clamp(this.kX0 + ((this.kX1 ?? this.kX0) - this.kX0) * e2, xMin, xMax); }
-          dO = { move: this.kMv, mp: this.kB, dir: this.kDir }; }
-        const ink = this.rimCol() || (hp != null ? (hp < 4 ? LAB[hp] : hp < 7 ? cols[hp] : '#ffd84a') : '#ffd84a'), kx = Math.round(this.kX);
+            this.kMv = this.kN % 7 === 0 ? 'pose' : pool[Math.floor(Math.random() * pool.length)]; }
+          dO = { move: this.kMv, mp: this.kB }; }
+        const ink = this.rimCol() || (hp != null ? (hp < 4 ? LAB[hp] : hp < 7 ? cols[hp] : '#ffd84a') : '#ffd84a');
         const P = squid(mode, t, { tau: t - (this.kAt ?? t), lv: clamp(this.live || 0, 0, 1), ink, ...dO });
-        // in a trio two copies dance beside it, a little fainter
-        const at = mode === 'dance' && this.kMv === 'trio' ? [[0, 1]].concat([-1, 1].map(d => [d * kw * .95, .55]).filter(([d]) => kx + d >= xMin - kw * .6 && kx + d <= sx + sw - kw + 4)) : [[0, 1]];
-        ctx.save(); ctx.beginPath(); ctx.rect(sx + 2, sy + 2, sw - 4, 48 + sEx); ctx.clip();
-        // the squid itself, drawn as on the Freediving page: the pose moves and squashes it, turns it (to face where it swims, upside down, in
-        // spins), swings its tentacles out, sets its face, and its arms stream as it swims or leaps; the sparkles round it are soft dots
-        const sv = clamp(Math.abs(P.by - 11) / 4, 0, 1) * .9, lift = a => clamp(a + .35, 0, 1.4) * .7, face = { shut: P.eyes === 'shut', liftL: lift(P.aL), liftR: lift(P.aR) };
-        at.forEach(([d, al]) => { ctx.globalAlpha = (1 - fo) * al;
-          ctx.save(); ctx.translate(kx + d + kw / 2 + (P.bx - 11 + P.px) * kp, sy + 31 + sEx / 2 + (P.by - 11 + P.py) * kp); ctx.scale(P.rx / 6.3 * (P.flip ? -1 : 1), P.ry / 5.9 * (P.flipY ? -1 : 1));
-          drawSquid(ctx, 0, 0, .82, t, P.v ?? sv, 'rgb(244,138,172)', P.rot + P.edx * .06, P.eyes === 'happy' ? 1 : 0, face); ctx.restore();
-          P.fx.forEach(([q, r, col]) => { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(kx + d + (q + .5) * kp, ky + (r + .5) * kp, kp * .62, 0, TAU); ctx.fill(); }); });
+        // drawn in square pixels, each cell's edges rounded to whole screen pixels so no seams show between them
+        ctx.save(); ctx.beginPath(); ctx.rect(sx + 2, sy + 2, sw - 4, 48 + sEx); ctx.clip(); ctx.globalAlpha = 1 - fo;
+        squidCells(P, t).forEach(([q, r, col]) => { const x0 = Math.round(kx + q * kp), y0 = Math.round(ky + r * kp); ctx.fillStyle = col; ctx.fillRect(x0, y0, Math.round(kx + (q + 1) * kp) - x0, Math.round(ky + (r + 1) * kp) - y0); });
         ctx.restore(); ctx.globalAlpha = 1 - fo; } }
     // the volume fader, standing beside the screen
     { const V = G.vol, lo = G.lo, hi = G.hi; this.volHold = clamp(this.volHold ?? lo, lo, hi); this.volY = this.volY == null ? this.volHold : this.volY + (this.volHold - this.volY) * Math.min(1, dt * (this.volDrag ? 30 : 10));

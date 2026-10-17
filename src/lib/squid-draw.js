@@ -1,6 +1,6 @@
 // The squid from the Freediving page: a pointed mantle with fins on top, big eyes, six short arms and two long tentacles that stream out with
-// speed and pulse when it's idle; pink with dark outlines. Freediving draws it swimming down the rope and the Sound deck draws it dancing on
-// its screen, both from here. drawSquid(ctx, x, y, s, t, v, col, rot, happy, o): s its scale, t time, v how fast it's moving (arms stream),
+// speed and pulse when it's idle; pink with dark outlines. Freediving draws it swimming down the rope (the Sound deck
+// has its own pixel version, in squid.js). drawSquid(ctx, x, y, s, t, v, col, rot, happy, o): s its scale, t time, v how fast it's moving (arms stream),
 // col its fill, rot its turn, happy (^^ eyes and a blush); o.shut closes its eyes, o.liftL / o.liftR (0..1.4) swing a tentacle out
 export function drawSquid(ctx, x, y, s, t, v, col, rot = 0, happy = 0, o = {}) {
     const ga = ctx.globalAlpha; ctx.save(); ctx.translate(x, y); ctx.scale(s, s); ctx.translate(0, -6); ctx.rotate(rot + v * .1 * Math.cos(rot)); ctx.translate(0, 6); ctx.lineCap = 'round'; ctx.lineJoin = 'round';

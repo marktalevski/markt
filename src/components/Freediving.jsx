@@ -305,7 +305,7 @@ class Component extends DCLogic {
   waveY(x, k, t) { return k * 16 + Math.sin(x * .011 + t * .6 + k * 1.3) * 7 * (1 - k * .25) + Math.sin(x * .029 - t * .9 + k * 2) * 3; }
   wallX(m, W) { return W - 64 - 14 * Math.sin(m * .35) - 8 * Math.sin(m * 1.1 + 1); }
 
-  // the little squid (drawn by the shared squid-draw module, which the Sound deck uses too)
+  // the little squid (drawn by the squid-draw module)
   drawOcto(ctx, x, y, s, t, v, col, rot = 0, happy = 0) { drawSquid(ctx, x, y, s, t, v, col, rot, happy); }
   drawBuoy(ctx, x, y, s, t) {
     ctx.save(); ctx.translate(x, y); ctx.scale(s, s); ctx.rotate(Math.sin(t * 1.1) * .06);
