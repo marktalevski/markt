@@ -1,4 +1,4 @@
-// The Sound page's DJ deck (after a Pioneer Opus-Quad): a controller running off the bottom of the screen, so only its top shows.
+// The Sound page's DJ deck (after a Pioneer Opus-Quad): a controller running edge to edge and off the bottom of the screen, so only its top shows.
 // Left deck: a jog wheel that scrubs, with the volume fader and play / pause beside it. Middle: the album clock (a flip counter in a tall display, the album names rolling round it), the main
 // screen (now playing over the album's track list). Right deck: six numbered knobs (a combination
 // lock, for something to come) in a row under the beat pads, square, four wide and two tall: the four pages, three for the pages still to come
@@ -22,7 +22,7 @@ export function deckGeo(W, H) {
 // the deck at its own size (what the drawing uses, under a scale of deckScale(W)): W and H are the screen's, divided by deckScale
 export function deckGeoV(W, H) {
   if (isPhone(W, H)) return deckPhone(W, H);
-  const hV = Math.round(clamp(H * .4, 220, 330)), x0 = 12, x1 = W - 12, w = x1 - x0, y0 = H - hV, cyM = y0 + hV / 2;
+  const hV = Math.round(clamp(H * .4, 220, 330)), x0 = 0, x1 = W, w = x1 - x0, y0 = H - hV, cyM = y0 + hV / 2;
   // the mixer in the middle, a deck either side of it; the right deck is the wider, so its row of six knobs has room
   const L = Math.round(clamp(w * .27, 230, 360)), Rr = Math.round(clamp(w * .32, 260, 420)), Mw = w - L - Rr, mx0 = x0 + L, mx1 = mx0 + Mw;
   // left deck: the jog wheel, a whole circle, as large as the deck allows
@@ -51,7 +51,7 @@ export const padOf = (G, k) => { const i = DECK_KEYS.indexOf(k === 'ink' ? 'home
 // is no play button). Below: the beat pads, four wide and two tall, as large as the width allows. The jog wheel, volume fader (the phone has its own), play button and the combination knobs are left off; their
 // positions sit off the edge of the screen so the drawing and the hit areas skip them
 function deckPhone(W, H) {
-  const hV = Math.round(clamp(H * .52, 360, 490)), x0 = 8, x1 = W - 8, w = x1 - x0, y0 = H - hV, pad = 12, gap = 8, off = -4000;
+  const hV = Math.round(clamp(H * .52, 360, 490)), x0 = 0, x1 = W, w = x1 - x0, y0 = H - hV, pad = 12, gap = 8, off = -4000;
   const s = Math.floor(Math.min((w - 2 * pad - 3 * gap) / 4, 96)), gy = H - 12 - (2 * s + gap), gx = x0 + Math.round((w - (4 * s + 3 * gap)) / 2);
   const cell = n => [gx + (n % 4) * (s + gap), gy + Math.floor(n / 4) * (s + gap), s, s];
   const pads = [0, 1, 2, 3].map(cell), cpads = [4, 5, 6].map(cell), spare = cell(7);

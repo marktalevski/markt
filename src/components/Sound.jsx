@@ -457,7 +457,8 @@ class Component extends DCLogic {
       if (cy) { ctx.globalAlpha = 1 - fo; ctx.fillStyle = 'rgba(0,0,0,.3)'; for (let q = gy + 1; q < gy + gh; q += 2) ctx.fillRect(gx, q, gw, 1); } ctx.restore(); ctx.globalAlpha = 1 - fo;
       ctx.strokeStyle = cy ? AC.a(.45) : 'rgba(255,255,255,.08)'; ctx.lineWidth = 1; rr(gx + .5, gy + .5, gw - 1, gh - 1, 4.5); ctx.stroke(); };
     // the album clock's tall display: the flip counter (a real element) sits in the middle of it and the album names roll through it
-    glass(G.clockScr, (gx, gy, gw, gh) => { ctx.fillStyle = AC.a(.05); ctx.fillRect(gx, gy, gw, gh); ctx.font = '400 6.5px ' + mono; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = cy ? NEON_M : PM; ctx.fillText('ALBUM', gx + gw / 2, gy + 9); });
+    glass(G.clockScr, (gx, gy, gw, gh) => { ctx.fillStyle = AC.a(.05); ctx.fillRect(gx, gy, gw, gh); // its label, lit like the counter so it reads as the display's title
+      ctx.font = '500 9px ' + mich; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = cy ? NEON_M : NEON_C; glow(cy ? NEON_M : NEON_C, 8); ctx.fillText('ALBUM', gx + gw / 2, gy + 12); noGlow(); });
     { const [kx, ky, kw, kh] = G.clock; ctx.fillStyle = '#060708'; rr(kx - 3, ky - 2, kw + 6, kh + 6, 8); ctx.fill(); }
     // the six numbered knobs: a dark well, the numbers 0..9 round it, a raised cap with a pointer that clicks to each number; the number it
     // points at is lit. When the combination is set they all flash once
@@ -495,7 +496,7 @@ class Component extends DCLogic {
         ctx.textAlign = 'left'; ctx.font = '400 ' + fN + 'px ' + mich; ctx.fillStyle = '#f2f2f0'; const tnow = fmtDur(pos) + '.' + (Math.floor(pos * 10) % 10); ctx.fillText(tnow, tx, tbN); const tnw = ctx.measureText(tnow).width;
         ctx.font = '400 ' + fR + 'px ' + mono; ctx.fillStyle = cy ? NEON_M : PM; ctx.fillText('-' + fmtDur(Math.max(0, c.tr.dur - pos)) + (c.paused ? '   PAUSED' : ''), tx + tnw + 10, tbN);
         ctx.fillStyle = 'rgba(255,255,255,.1)'; ctx.fillRect(sx + 10, sy + 50 + this.stripEx(G), sw - 20, 1.5); ctx.fillStyle = cy ? NEON_M : kc; glow(NEON_M, 6); ctx.fillRect(sx + 10, sy + 50 + this.stripEx(G), (sw - 20) * u, 1.5); noGlow(); }
-      else { ctx.font = '400 ' + fT + 'px ' + mich; ctx.fillStyle = '#e9edf0'; ctx.fillText('STANDBY', tx, G.phone ? tmid + fT * .36 : tbT); if (!G.phone) { ctx.font = '400 ' + fR + 'px ' + mono; ctx.fillStyle = PM; ctx.fillText('PRESS ▶ OR PICK A PIECE BELOW', tx, tbN); }
+      else { ctx.font = '400 ' + fT + 'px ' + mich; ctx.fillStyle = '#e9edf0'; ctx.fillText('STANDBY', tx, tmid + fT * .36);
         ctx.fillStyle = 'rgba(255,255,255,.1)'; ctx.fillRect(sx + 10, sy + 50 + this.stripEx(G), sw - 20, 1); }
       ctx.textBaseline = 'middle'; ctx.textAlign = 'right'; ctx.font = '400 7.5px ' + mono; ctx.fillStyle = PM; const tot = al.tracks.reduce((a2, q) => a2 + q.dur, 0); ctx.fillText(al.tracks.length + ' PIECES · ' + fmtDur(tot), sx + sw - 12, sy + 59 + this.stripEx(G));
       this.rowsOf(G).forEach(([rx, ry, rw, rh], k) => { const tr = al.tracks[k], on = c && c.tr.id === tr.id, hv = this.rowHov === k, mid = ry + rh / 2;
