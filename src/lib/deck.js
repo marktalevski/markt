@@ -9,7 +9,7 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 // the deck needs about this much width; on a narrower screen (a phone) it is laid out at this width and the whole thing scaled down to fit,
 // rather than squeezing its three panels into each other. deckScale is that factor (1 on wider screens)
-export const DECK_MIN_W = 820;
+export const DECK_MIN_W = 920;
 // a phone held upright gets a deck of its own instead (deckPhone): taller, the screen and pads big enough to use
 export const isPhone = (W, H) => W < 640 && H >= W * 1.15;
 export const deckScale = (W, H) => isPhone(W, H ?? Infinity) ? 1 : Math.min(1, W / DECK_MIN_W);
@@ -24,7 +24,7 @@ export function deckGeoV(W, H) {
   if (isPhone(W, H)) return deckPhone(W, H);
   const hV = Math.round(clamp(H * .4, 220, 330)), x0 = 0, x1 = W, w = x1 - x0, y0 = H - hV, cyM = y0 + hV / 2;
   // the mixer in the middle, a deck either side of it; the right deck is the wider, so its row of six knobs has room
-  const L = Math.round(clamp(w * .27, 230, 360)), Rr = Math.round(clamp(w * .32, 260, 420)), Mw = w - L - Rr, mx0 = x0 + L, mx1 = mx0 + Mw;
+  const L = Math.round(clamp(w * .25, 220, 340)), Rr = Math.round(clamp(w * .32, 260, 420)), Mw = w - L - Rr, mx0 = x0 + L, mx1 = mx0 + Mw;
   // left deck: the jog wheel, a whole circle, as large as the deck allows
   // (the volume fader and play / pause stand in a column at the deck's right edge)
   const jr = Math.round(clamp(Math.min((hV - 18) / 2 - 12, (L - 70) / 2 - 18), 56, 170)), jog = [x0 + 14 + (L - 70) / 2, y0 + hV / 2, jr];

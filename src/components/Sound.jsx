@@ -194,7 +194,7 @@ class Component extends DCLogic {
   // the screen's top bar (now playing, and the squid's stage) is this much taller than its text needs, so the squid has room to swim about
   stripEx(G) { return G.phone ? 16 : 30; }
   // the squid's pixel size on the screen: as big as the strip allows
-  sqPx(G) { return G.phone ? 2.5 : 3; }
+  sqPx(G) { return G.phone || G.scr[2] < 320 ? 2.5 : 3; }
   rowsOf(G) { const [sx, sy, sw, sh] = G.scr, ex = this.stripEx(G), n = this.albums[this.state.album].tracks.length, top = sy + 66 + ex, rh = clamp((sh - 70 - ex) / Math.max(1, n), 15, 44); return Array.from({ length: n }, (_, k) => [sx + 4, top + k * rh, sw - 8, rh]); }
   t = 0; live = 0; mx = 0; pf = 0; labs = {}; S = [0, 1, 2, 3, 4, 5, 6, 7].map(() => ({ on: 0, k: 0, yp: 300, y0: 300, tp: -9 }));
   albums = ALBUMS.map((a, ai) => { const tracks = a.tracks.map((tr, ti) => ({ ...tr, id: ai + '-' + ti, ai, ti, env: envOf(tr) })); return { ...a, tracks, mix: mixOf(tracks) }; });
@@ -496,7 +496,7 @@ class Component extends DCLogic {
         ctx.textAlign = 'left'; ctx.font = '400 ' + fN + 'px ' + mich; ctx.fillStyle = '#f2f2f0'; const tnow = fmtDur(pos) + '.' + (Math.floor(pos * 10) % 10); ctx.fillText(tnow, tx, tbN); const tnw = ctx.measureText(tnow).width;
         ctx.font = '400 ' + fR + 'px ' + mono; ctx.fillStyle = cy ? NEON_M : PM; ctx.fillText('-' + fmtDur(Math.max(0, c.tr.dur - pos)) + (c.paused ? '   PAUSED' : ''), tx + tnw + 10, tbN);
         ctx.fillStyle = 'rgba(255,255,255,.1)'; ctx.fillRect(sx + 10, sy + 50 + this.stripEx(G), sw - 20, 1.5); ctx.fillStyle = cy ? NEON_M : kc; glow(NEON_M, 6); ctx.fillRect(sx + 10, sy + 50 + this.stripEx(G), (sw - 20) * u, 1.5); noGlow(); }
-      else { ctx.font = '400 ' + fT + 'px ' + mich; ctx.fillStyle = '#e9edf0'; ctx.fillText('STANDBY', tx, tmid + fT * .36);
+      else { ctx.font = '400 ' + fT + 'px ' + mich; ctx.fillStyle = '#e9edf0'; const room = sx + sw - tx - SQUID_W * this.sqPx(G) - 18; ctx.save(); ctx.beginPath(); ctx.rect(tx, sy, room, 50 + this.stripEx(G)); ctx.clip(); ctx.fillText('STANDBY', tx, tmid + fT * .36); ctx.restore();
         ctx.fillStyle = 'rgba(255,255,255,.1)'; ctx.fillRect(sx + 10, sy + 50 + this.stripEx(G), sw - 20, 1); }
       ctx.textBaseline = 'middle'; ctx.textAlign = 'right'; ctx.font = '400 7.5px ' + mono; ctx.fillStyle = PM; const tot = al.tracks.reduce((a2, q) => a2 + q.dur, 0); ctx.fillText(al.tracks.length + ' PIECES · ' + fmtDur(tot), sx + sw - 12, sy + 59 + this.stripEx(G));
       this.rowsOf(G).forEach(([rx, ry, rw, rh], k) => { const tr = al.tracks[k], on = c && c.tr.id === tr.id, hv = this.rowHov === k, mid = ry + rh / 2;
