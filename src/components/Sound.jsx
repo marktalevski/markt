@@ -53,6 +53,8 @@ const ALBUMS = [
 ];
 // cyberpunk accents for the stark style: neon magenta and cyan
 const NEON_M = '#ff2bd6', NEON_C = '#00e5ff';
+// a few milliseconds of silence, looped alongside a playing piece on older iPhones (see mediaOn)
+const SILENT_WAV = 'data:audio/wav;base64,UklGRuwAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YcgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==';
 // arriving, each menu dot opens out into its beat pad over DOT_OPEN.dur seconds, starting at t0 + i * step (i in DECK_KEYS order); padReady(i) is
 // when pad i is fully formed. The controller's fold-out is timed from these too
 const DOT_OPEN = { t0: 1.45, step: .06, dur: .35 }, padReady = i => DOT_OPEN.t0 + i * DOT_OPEN.step + DOT_OPEN.dur;
@@ -240,24 +242,29 @@ class Component extends DCLogic {
     if (import.meta.env.DEV) window.__sound = this; // a handle for checking the page in development; not in the built site
     this.raf = requestAnimationFrame(this.tick);
   }
-  componentWillUnmount() { if (this.silentEl) this.silentEl.pause(); cancelAnimationFrame(this.raf); removeEventListener('resize', this.onResize); removeEventListener('wheel', this.onWheel); removeEventListener('keydown', this.onKey); document.removeEventListener('fullscreenchange', this.onFsc); removeEventListener('pointermove', this.onFMove); removeEventListener('click', this.onFClick); removeEventListener('click', this.onWClick); removeEventListener('pointerdown', this.onFDown); removeEventListener('touchstart', this.onTS); removeEventListener('touchend', this.onTE); removeEventListener('pointermove', this.onPM); this.stopNodes(); try { this.ac && this.ac.close(); } catch (e) {} }
+  componentWillUnmount() { this.mediaOff(); cancelAnimationFrame(this.raf); removeEventListener('resize', this.onResize); removeEventListener('wheel', this.onWheel); removeEventListener('keydown', this.onKey); document.removeEventListener('fullscreenchange', this.onFsc); removeEventListener('pointermove', this.onFMove); removeEventListener('click', this.onFClick); removeEventListener('click', this.onWClick); removeEventListener('pointerdown', this.onFDown); removeEventListener('touchstart', this.onTS); removeEventListener('touchend', this.onTE); removeEventListener('pointermove', this.onPM); this.stopNodes(); try { this.ac && this.ac.close(); } catch (e) {} }
   componentDidUpdate(prev) { if (prev.style !== this.props.style) { this.t = 0; this.disp = null; this.listBottom = 0; } }
   step(d) { this.goAlbum(this.state.album + d)(); }
   goAlbum = a => () => { a = clamp(a, 0, this.albums.length - 1); if (a === this.state.album) return; this.albDir = a > this.state.album ? 1 : -1; if (this.strip && this.cur) this.stop(); this.flipPrev = this.state.album; this.flipT0 = this.t; this.setState({ album: a, hover: null }); };
   trById(id) { const [a, b] = id.split('-').map(Number); return this.albums[a].tracks[b]; }
   // ---- sound
-  // iPhones mute Web Audio while the ring / silent switch is on (but not media playback), so the page says it is playing media: Safari 17+
-  // takes navigator.audioSession, older ones switch over when an <audio> element plays alongside (here a silent loop, started on this tap)
-  unmuteIOS() {
+  // iPhones mute Web Audio while the ring / silent switch is on (but not media playback), so while a piece plays the page says it is playing
+  // media: Safari 17+ takes navigator.audioSession, older ones switch over while an <audio> element plays alongside (a silent loop). Only for
+  // pieces, not the knobs' clicks or the kick pad, so those never interrupt music playing in another app; released on pause and stop
+  mediaOn() {
     try { if (navigator.audioSession) { navigator.audioSession.type = 'playback'; return; } } catch (e) {}
-    if (this.silentEl || !/iP(hone|ad|od)|Macintosh/.test(navigator.userAgent) || !('ontouchend' in document)) return;
-    try { const n = 4410, b = new DataView(new ArrayBuffer(44 + n * 2)), w = (o, t) => [...t].forEach((c, i) => b.setUint8(o + i, c.charCodeAt(0)));
-      w(0, 'RIFF'); b.setUint32(4, 36 + n * 2, true); w(8, 'WAVEfmt '); b.setUint32(16, 16, true); b.setUint16(20, 1, true); b.setUint16(22, 1, true); b.setUint32(24, 44100, true); b.setUint32(28, 88200, true); b.setUint16(32, 2, true); b.setUint16(34, 16, true); w(36, 'data'); b.setUint32(40, n * 2, true);
-      const el = new Audio(URL.createObjectURL(new Blob([b.buffer], { type: 'audio/wav' }))); el.loop = true; el.setAttribute('playsinline', ''); el.play().catch(() => {}); this.silentEl = el; } catch (e) {}
+    if (!/iP(hone|ad|od)|Macintosh/.test(navigator.userAgent) || !('ontouchend' in document)) return;
+    try { const el = this.silentEl || (this.silentEl = new Audio(SILENT_WAV)); el.loop = true; el.setAttribute('playsinline', '');
+      // play() is refused outside a tap (a jog drag, the next piece starting by itself); the next play tries again
+      if (el.paused) el.play().catch(() => {}); } catch (e) {}
   }
-  ensureAC() { this.unmuteIOS(); if (!this.ac) { const AC = window.AudioContext || window.webkitAudioContext; this.ac = new AC(); this.an = this.ac.createAnalyser(); this.an.fftSize = 512; this.vol = this.ac.createGain(); this.an.connect(this.vol); this.vol.connect(this.ac.destination); this.anBuf = new Float32Array(512); } if (this.ac.state === 'suspended') this.ac.resume(); }
+  mediaOff() {
+    try { if (navigator.audioSession) navigator.audioSession.type = 'auto'; } catch (e) {}
+    if (this.silentEl) this.silentEl.pause();
+  }
+  ensureAC() { if (!this.ac) { const AC = window.AudioContext || window.webkitAudioContext; this.ac = new AC(); this.an = this.ac.createAnalyser(); this.an.fftSize = 512; this.vol = this.ac.createGain(); this.an.connect(this.vol); this.vol.connect(this.ac.destination); this.anBuf = new Float32Array(512); } if (this.ac.state === 'suspended') this.ac.resume(); }
   play(tr, off = 0) {
-    this.stopNodes(); this.ensureAC(); const ac = this.ac, now = ac.currentTime, out = ac.createGain(); out.gain.value = 0; out.connect(this.an);
+    this.stopNodes(); this.ensureAC(); this.mediaOn(); const ac = this.ac, now = ac.currentTime, out = ac.createGain(); out.gain.value = 0; out.connect(this.an);
     const N = { out, list: [] }, on = this.props.synth ?? true;
     if (tr.buf) { const s = ac.createBufferSource(); s.buffer = tr.buf; s.connect(out); out.gain.value = 1; s.start(now, off); N.list.push(s); N.file = 1; }
     else if (on && tr.kind === 'field') { const nb = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate), d = nb.getChannelData(0); let b = 0; for (let i = 0; i < d.length; i++) { b = .97 * b + .03 * (Math.random() * 2 - 1); d[i] = b * 4 + (Math.random() * 2 - 1) * .12; }
@@ -271,8 +278,8 @@ class Component extends DCLogic {
     this.setState({ playing: tr.id, paused: false });
   }
   stopNodes() { const c = this.cur; if (!c || !c.N) return; c.N.list.forEach(n => { try { n.stop(); } catch (e) {} }); try { c.N.out.disconnect(); } catch (e) {} c.N = { list: [] }; }
-  stop() { this.stopNodes(); this.cur = null; this.live = 0; if (this.state.playing) this.setState({ playing: null, paused: false }); }
-  toggle() { const c = this.cur; if (!c) return; if (c.paused) this.play(c.tr, c.off); else { c.off = this.ac.currentTime - c.t0; this.stopNodes(); c.paused = true; this.setState({ paused: true }); } }
+  stop() { this.stopNodes(); this.mediaOff(); this.cur = null; this.live = 0; if (this.state.playing) this.setState({ playing: null, paused: false }); }
+  toggle() { const c = this.cur; if (!c) return; if (c.paused) this.play(c.tr, c.off); else { c.off = this.ac.currentTime - c.t0; this.stopNodes(); this.mediaOff(); c.paused = true; this.setState({ paused: true }); } }
   click(tr) { if (this.cur && this.cur.tr.id === tr.id) this.toggle(); else this.play(tr); }
   posOf() { const c = this.cur; if (!c) return 0; if (this.jog) return this.jog.pos; if (this.scrub) return clamp(this.scrub.x / this.wvOf(), 0, 1) * c.tr.dur; return c.paused ? c.off : clamp(this.ac.currentTime - c.t0, 0, c.tr.dur); }
   audioTick() { const c = this.cur; if (!c || c.paused) return; const ac = this.ac, now = ac.currentTime, pos = now - c.t0, tr = c.tr;
