@@ -51,16 +51,19 @@ const { title, noindex } = Astro.props;
   </head>
   <body>
     <script is:inline>
-      // arriving from another page: its last frame, over everything, until this page has drawn (a few frames after its canvas appears, or,
-      // on a page without a canvas, after it marks itself data-page-ready)
+      // arriving from another page: its last frame, over everything, until this page says it has drawn its own first frame (window.__ready,
+      // which each page calls once it has), or at the latest after a few seconds. The picture is decoded before the first paint, so it is
+      // there from the very first frame
+      window.__ready = () => {};
       try {
         const j = JSON.parse(sessionStorage.getItem('page-cover') || 'null'); sessionStorage.removeItem('page-cover');
         if (j && Date.now() - j.t < 10000) {
-          const i = new Image(); i.id = 'page-cover'; i.alt = ''; i.src = j.src; i.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:2147483000;pointer-events:none;transition:opacity .15s';
+          const i = new Image(); i.id = 'page-cover'; i.alt = ''; i.decoding = 'sync'; i.src = j.src; i.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:2147483000;pointer-events:none;transition:opacity .15s';
           document.body.appendChild(i);
-          const t0 = performance.now(), off = () => { i.style.opacity = '0'; setTimeout(() => i.remove(), 200); };
-          let seen = 0; const chk = () => { if (document.querySelector('canvas, [data-page-ready]')) seen++; if (seen > 3 || performance.now() - t0 > 5000) off(); else requestAnimationFrame(chk); };
-          requestAnimationFrame(chk);
+          let gone = false; const off = () => { if (gone) return; gone = true; i.style.opacity = '0'; setTimeout(() => i.remove(), 200); };
+          // a frame after the page's own first frame, so that frame is on screen before the cover lifts off it
+          window.__ready = () => requestAnimationFrame(() => requestAnimationFrame(off));
+          setTimeout(off, 4000);
         }
       } catch (e) {}
     </script>

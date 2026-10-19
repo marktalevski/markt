@@ -3,6 +3,7 @@
 import React from 'react';
 import { DCLogic, page, sty, BASE } from '../lib/dc.js';
 import { deckGeo, padOf } from '../lib/deck.js';
+import { navAt, NAV_Y } from '../lib/nav.js';
 import { ropeX } from '../lib/rope.js';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -575,7 +576,7 @@ class Component extends DCLogic {
     if (this.tapReveal('freediving')) return;
     const { W, H, cx, cy, R } = this.geo, SY = Math.max(H * .26, 190);
     // strokes draw the surface, buoy and flag first, then carry on up into their menu dots
-    const LX = ropeX(W), BS = clamp(W / 900, .75, 1), NX = k => W - 316 + { home: 26, freediving: 78, sound: 130, journal: 182, c4: 224, c5: 256, c6: 288 }[k], NY = 28;
+    const LX = ropeX(W), BS = clamp(W / 900, .75, 1), NX = k => navAt(W, k)[0], NY = NAV_Y;
     const bz = (A, C1, C2, B, n) => { const o = []; for (let i = 1; i <= n; i++) { const u = i / n, a = (1 - u) ** 3, b = 3 * (1 - u) ** 2 * u, c = 3 * (1 - u) * u * u, dd = u ** 3; o.push([a * A[0] + b * C1[0] + c * C2[0] + dd * B[0], a * A[1] + b * C1[1] + c * C2[1] + dd * B[1]]); } return o; };
     // start off-screen like the Freediving page's surface, so the line reaches the left edge
     const surf = k => { const o = []; for (let x = -20; x <= W - 6; x += 9) o.push([x, SY + this.waveY(x - LX, k, 0)]); return o; };
@@ -695,6 +696,7 @@ class Component extends DCLogic {
         sig = innerWidth + 'x' + innerHeight + ':' + this.shapeName + ':' + (this.fadeC || []).join() + ':' + this.hov + this.hovI + (this.hovPg.sound || 0) + (this.hovPg.journal || 0);
       if (still && this.stillSig === sig) return; this.stillSig = still ? sig : null; }
     this.draw();
+    if (!this.readied) { this.readied = true; window.__ready && window.__ready(); }
   };
 
   draw() {
@@ -939,7 +941,7 @@ class Component extends DCLogic {
     if (G != null && this.navFrom) ['sound', 'journal', 'c4', 'c5', 'c6', 'freediving', 'ink'].forEach((k, i) => { const f = this.navFrom[k]; if (!f) return; const toSnd = /\/sound\//.test(this.dest || ''), P0 = f.p, kk = easeIO(clamp((G - .15 - i * .07) / 1.4, 0, 1));
       // to Sound each dot waits where it is while the strokes fade (Sound then drops it onto its beat pad); anywhere else it rises to the menu at the top
       if (toSnd) { ctx.globalAlpha = 1; ctx.fillStyle = `rgb(${f.col[0]},${f.col[1]},${f.col[2]})`; ctx.beginPath(); ctx.arc(P0[0], P0[1], /^c\d/.test(k) ? 5.5 : 8, 0, 6.2832); ctx.fill(); return; }
-      const P1 = toSnd ? sndDrop(k, W, H) : [W - 316 + { sound: 130, journal: 182, c4: 224, c5: 256, c6: 288, freediving: 78, ink: 26 }[k], 28], C1 = toSnd ? [P0[0], P0[1] + (P1[1] - P0[1]) * .45] : [P0[0], P0[1] - 90], C2 = toSnd ? [P1[0], P1[1] - 90] : [P1[0], P1[1] + 70], bz = u => { const a = (1 - u) ** 3, b = 3 * (1 - u) ** 2 * u, c = 3 * (1 - u) * u * u, d = u ** 3; return [a * P0[0] + b * C1[0] + c * C2[0] + d * P1[0], a * P0[1] + b * C1[1] + c * C2[1] + d * P1[1]]; };
+      const P1 = toSnd ? sndDrop(k, W, H) : navAt(W, k), C1 = toSnd ? [P0[0], P0[1] + (P1[1] - P0[1]) * .45] : [P0[0], P0[1] - 90], C2 = toSnd ? [P1[0], P1[1] - 90] : [P1[0], P1[1] + 70], bz = u => { const a = (1 - u) ** 3, b = 3 * (1 - u) ** 2 * u, c = 3 * (1 - u) * u * u, d = u ** 3; return [a * P0[0] + b * C1[0] + c * C2[0] + d * P1[0], a * P0[1] + b * C1[1] + c * C2[1] + d * P1[1]]; };
       const col = `rgb(${f.col[0]},${f.col[1]},${f.col[2]})`, tail = Math.max(0, kk - .35); ctx.strokeStyle = col; ctx.lineCap = 'round';
       for (let q = 0; q < 24; q++) { const u0 = tail + (kk - tail) * q / 24, u1 = tail + (kk - tail) * (q + 1) / 24, a0 = bz(u0), a1 = bz(u1); ctx.globalAlpha = .85 * (q / 24) * Math.sin(Math.PI * Math.min(1, kk * 1.15)); ctx.lineWidth = 1.5 + 3.5 * q / 24; ctx.beginPath(); ctx.moveTo(a0[0], a0[1]); ctx.lineTo(a1[0], a1[1]); ctx.stroke(); }
       const p = bz(kk); ctx.globalAlpha = 1; ctx.fillStyle = col; ctx.beginPath(); ctx.arc(p[0], p[1], 7 + (/^c\d/.test(k) ? -1.5 : 1) * kk, 0, 6.2832); ctx.fill(); });

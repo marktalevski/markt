@@ -248,6 +248,7 @@ class Component extends DCLogic {
     }
     if (this.props.motion ?? true) this.t += dt;
     this.draw(this.t);
+    if (!this.readied) { this.readied = true; window.__ready && window.__ready(); }
   };
 
   layout(dt) {
@@ -706,7 +707,7 @@ class Component extends DCLogic {
       counter: f >= 0 ? `${pad(f + 1)} / ${pad(list.length)}` : '',
       goSurface: this.goSurface, goHome: this.goHome,
       navOff: () => this.setState({ navHov: null }),
-      nav: Object.fromEntries([['home', '홈', 'Home'], ['freediving', '프리다이빙', 'Freediving'], ['sound', '소리', 'Sound'], ['journal', '일기', 'Journal']].map(([k, ko, en]) => { const h = this.state.navHov === k, st = on => ({ a: on ? 1 : 0, y: on ? '0px' : '8px', b: on ? '0px' : '3px' }), E = h ? { a: 0, y: '-6px', b: '3px' } : st(true), K = st(h); return [k, { bp: h ? '28%' : '100%', en: E.a, enY: E.y, enB: E.b, ko: K.a, koY: K.y, koB: K.b, on: () => { if (this.state.navHov !== k) this.setState({ navHov: k }); }, go: this.goPage(k) }]; }))
+      nav: Object.fromEntries([['home', '홈', 'Home'], ['freediving', '프리다이빙', 'Freediving'], ['sound', '소리', 'Sound'], ['journal', '일기', 'Journal']].map(([k, ko, en]) => { const h = this.state.navHov === k, st = on => ({ a: on ? 1 : 0, y: on ? '0px' : '8px', b: on ? '0px' : '3px' }), E = st(h), K = st(false); return [k, { bp: h ? '28%' : '100%', en: E.a, enY: E.y, enB: E.b, ko: K.a, koY: K.y, koB: K.b, on: () => { if (this.state.navHov !== k) this.setState({ navHov: k }); }, go: this.goPage(k) }]; }))
     };
   }
 }
@@ -821,7 +822,7 @@ function View(v) {
       {"\n\n  "}
       <nav aria-label="Pages" style={sty("position:absolute;right:12px;top:12px;display:flex;flex-direction:row;align-items:flex-start;z-index:5")}>
         {"\n    "}
-        <a href={BASE + "?from=dive"} onClick={v.goHome} aria-label="Home" data-navk="home" onMouseEnter={v.nav?.home?.on} onMouseLeave={v.navOff} onFocus={v.nav?.home?.on} onBlur={v.navOff} style={sty("display:flex;flex-direction:column;align-items:center;gap:8px;width:52px;height:156px;padding:8px 0 0;box-sizing:border-box;border:0;background:none;color:inherit;text-decoration:none;cursor:pointer;font-family:'Newsreader', Georgia, serif;font-size:13px;line-height:1")}>
+        <a href={BASE + "?from=dive"} onClick={v.goHome} aria-label="Home" data-navk="home" onMouseEnter={v.nav?.home?.on} onMouseLeave={v.navOff} onFocus={v.nav?.home?.on} onBlur={v.navOff} style={sty("display:flex;flex-direction:column;align-items:center;gap:8px;width:24px;height:156px;padding:8px 0 0;box-sizing:border-box;border:0;background:none;color:inherit;text-decoration:none;cursor:pointer;font-family:'Newsreader', Georgia, serif;font-size:13px;line-height:1")}>
           <span data-navdot="1" style={sty("width:16px;height:16px;border-radius:50%;background:rgb(20,20,20);flex:none")} />
           <span style={sty("position:relative;display:block;width:100%;height:116px")}>
             <span lang="en" data-lab="nav" aria-hidden="true" style={sty(`position:absolute;left:50%;top:0;writing-mode:vertical-rl;text-orientation:sideways;white-space:nowrap;font-family:Papyrus, 'Papyrus-Regular', 'Newsreader', Georgia, serif;font-weight:400;font-size:19px;letter-spacing:.02em;background-image:linear-gradient(to bottom, rgb(20,20,20) 0%, rgb(20,20,20) 20%, currentColor 60%, currentColor 100%);background-size:100% 300%;background-repeat:no-repeat;background-position:0 ${v.nav?.home?.bp ?? ''};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;transition:opacity .55s ease, transform .7s cubic-bezier(.2,.7,.2,1), filter .55s ease, background-position 1.1s cubic-bezier(.3,.6,.2,1);opacity:${v.nav?.home?.en ?? ''};transform:translateX(-50%) translateY(${v.nav?.home?.enY ?? ''});filter:blur(${v.nav?.home?.enB ?? ''})`)}>
@@ -833,7 +834,7 @@ function View(v) {
           </span>
         </a>
         {"\n    "}
-        <button type="button" onClick={v.goSurface} aria-current="page" aria-label="Freediving, current page, back to the surface" data-navk="freediving" onMouseEnter={v.nav?.freediving?.on} onMouseLeave={v.navOff} onFocus={v.nav?.freediving?.on} onBlur={v.navOff} style={sty("display:flex;flex-direction:column;align-items:center;gap:8px;width:52px;height:156px;padding:8px 0 0;box-sizing:border-box;border:0;background:none;color:inherit;text-decoration:none;cursor:pointer;font-family:'Newsreader', Georgia, serif;font-size:13px;line-height:1")}>
+        <button type="button" onClick={v.goSurface} aria-current="page" aria-label="Freediving, current page, back to the surface" data-navk="freediving" onMouseEnter={v.nav?.freediving?.on} onMouseLeave={v.navOff} onFocus={v.nav?.freediving?.on} onBlur={v.navOff} style={sty("display:flex;flex-direction:column;align-items:center;gap:8px;width:24px;height:156px;padding:8px 0 0;box-sizing:border-box;border:0;background:none;color:inherit;text-decoration:none;cursor:pointer;font-family:'Newsreader', Georgia, serif;font-size:13px;line-height:1")}>
           <span data-navdot="1" style={sty("width:16px;height:16px;border-radius:50%;background:rgb(24,88,224);flex:none")} />
           <span style={sty("position:relative;display:block;width:100%;height:116px")}>
             <span lang="en" data-lab="nav" aria-hidden="true" style={sty(`position:absolute;left:50%;top:0;writing-mode:vertical-rl;text-orientation:sideways;white-space:nowrap;font-family:Papyrus, 'Papyrus-Regular', 'Newsreader', Georgia, serif;font-weight:400;font-size:19px;letter-spacing:.02em;background-image:linear-gradient(to bottom, rgb(24,88,224) 0%, rgb(24,88,224) 20%, currentColor 60%, currentColor 100%);background-size:100% 300%;background-repeat:no-repeat;background-position:0 ${v.nav?.freediving?.bp ?? ''};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;transition:opacity .55s ease, transform .7s cubic-bezier(.2,.7,.2,1), filter .55s ease, background-position 1.1s cubic-bezier(.3,.6,.2,1);opacity:${v.nav?.freediving?.en ?? ''};transform:translateX(-50%) translateY(${v.nav?.freediving?.enY ?? ''});filter:blur(${v.nav?.freediving?.enB ?? ''})`)}>
@@ -845,7 +846,7 @@ function View(v) {
           </span>
         </button>
         {"\n    "}
-        <a href={BASE + "sound/"} onClick={v.nav?.sound?.go} aria-label="Sound" data-navk="sound" onMouseEnter={v.nav?.sound?.on} onMouseLeave={v.navOff} onFocus={v.nav?.sound?.on} onBlur={v.navOff} style={sty("display:flex;flex-direction:column;align-items:center;gap:8px;width:52px;height:156px;padding:8px 0 0;box-sizing:border-box;border:0;background:none;color:inherit;text-decoration:none;cursor:pointer;font-family:'Newsreader', Georgia, serif;font-size:13px;line-height:1")}>
+        <a href={BASE + "sound/"} onClick={v.nav?.sound?.go} aria-label="Sound" data-navk="sound" onMouseEnter={v.nav?.sound?.on} onMouseLeave={v.navOff} onFocus={v.nav?.sound?.on} onBlur={v.navOff} style={sty("display:flex;flex-direction:column;align-items:center;gap:8px;width:24px;height:156px;padding:8px 0 0;box-sizing:border-box;border:0;background:none;color:inherit;text-decoration:none;cursor:pointer;font-family:'Newsreader', Georgia, serif;font-size:13px;line-height:1")}>
           <span data-navdot="1" style={sty("width:16px;height:16px;border-radius:50%;background:rgb(232,34,44);flex:none")} />
           <span style={sty("position:relative;display:block;width:100%;height:116px")}>
             <span lang="en" data-lab="nav" aria-hidden="true" style={sty(`position:absolute;left:50%;top:0;writing-mode:vertical-rl;text-orientation:sideways;white-space:nowrap;font-family:Papyrus, 'Papyrus-Regular', 'Newsreader', Georgia, serif;font-weight:400;font-size:19px;letter-spacing:.02em;background-image:linear-gradient(to bottom, rgb(232,34,44) 0%, rgb(232,34,44) 20%, currentColor 60%, currentColor 100%);background-size:100% 300%;background-repeat:no-repeat;background-position:0 ${v.nav?.sound?.bp ?? ''};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;transition:opacity .55s ease, transform .7s cubic-bezier(.2,.7,.2,1), filter .55s ease, background-position 1.1s cubic-bezier(.3,.6,.2,1);opacity:${v.nav?.sound?.en ?? ''};transform:translateX(-50%) translateY(${v.nav?.sound?.enY ?? ''});filter:blur(${v.nav?.sound?.enB ?? ''})`)}>
@@ -857,7 +858,7 @@ function View(v) {
           </span>
         </a>
         {"\n    "}
-        <a href={BASE + "journal/"} onClick={v.nav?.journal?.go} aria-label="Journal" data-navk="journal" onMouseEnter={v.nav?.journal?.on} onMouseLeave={v.navOff} onFocus={v.nav?.journal?.on} onBlur={v.navOff} style={sty("display:flex;flex-direction:column;align-items:center;gap:8px;width:52px;height:156px;padding:8px 0 0;box-sizing:border-box;border:0;background:none;color:inherit;text-decoration:none;cursor:pointer;font-family:'Newsreader', Georgia, serif;font-size:13px;line-height:1")}>
+        <a href={BASE + "journal/"} onClick={v.nav?.journal?.go} aria-label="Journal" data-navk="journal" onMouseEnter={v.nav?.journal?.on} onMouseLeave={v.navOff} onFocus={v.nav?.journal?.on} onBlur={v.navOff} style={sty("display:flex;flex-direction:column;align-items:center;gap:8px;width:24px;height:156px;padding:8px 0 0;box-sizing:border-box;border:0;background:none;color:inherit;text-decoration:none;cursor:pointer;font-family:'Newsreader', Georgia, serif;font-size:13px;line-height:1")}>
           <span data-navdot="1" style={sty("width:16px;height:16px;border-radius:50%;background:rgb(255,196,0);flex:none")} />
           <span style={sty("position:relative;display:block;width:100%;height:116px")}>
             <span lang="en" data-lab="nav" aria-hidden="true" style={sty(`position:absolute;left:50%;top:0;writing-mode:vertical-rl;text-orientation:sideways;white-space:nowrap;font-family:Papyrus, 'Papyrus-Regular', 'Newsreader', Georgia, serif;font-weight:400;font-size:19px;letter-spacing:.02em;background-image:linear-gradient(to bottom, rgb(255,196,0) 0%, rgb(255,196,0) 20%, currentColor 60%, currentColor 100%);background-size:100% 300%;background-repeat:no-repeat;background-position:0 ${v.nav?.journal?.bp ?? ''};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;transition:opacity .55s ease, transform .7s cubic-bezier(.2,.7,.2,1), filter .55s ease, background-position 1.1s cubic-bezier(.3,.6,.2,1);opacity:${v.nav?.journal?.en ?? ''};transform:translateX(-50%) translateY(${v.nav?.journal?.enY ?? ''});filter:blur(${v.nav?.journal?.enB ?? ''})`)}>
@@ -871,15 +872,15 @@ function View(v) {
         {"\n    "}
         <span aria-hidden="true" style={sty("display:flex;flex-direction:row;align-items:flex-start")}>
           {"\n      "}
-          <span data-navk="c4" style={sty("width:32px;height:32px;display:grid;place-items:center")}>
+          <span data-navk="c4" style={sty("width:16px;height:32px;display:grid;place-items:center")}>
             <span data-navdot="1" style={sty("width:11px;height:11px;border-radius:50%;background:rgb(255,118,18)")} />
           </span>
           {"\n      "}
-          <span data-navk="c5" style={sty("width:32px;height:32px;display:grid;place-items:center")}>
+          <span data-navk="c5" style={sty("width:16px;height:32px;display:grid;place-items:center")}>
             <span data-navdot="1" style={sty("width:11px;height:11px;border-radius:50%;background:rgb(22,168,82)")} />
           </span>
           {"\n      "}
-          <span data-navk="c6" style={sty("width:32px;height:32px;display:grid;place-items:center")}>
+          <span data-navk="c6" style={sty("width:16px;height:32px;display:grid;place-items:center")}>
             <span data-navdot="1" style={sty("width:11px;height:11px;border-radius:50%;background:rgb(138,64,214)")} />
           </span>
           {"\n    "}

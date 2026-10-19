@@ -21,7 +21,8 @@ const SERIF = "'Newsreader', Georgia, serif", SANS = "'Geist', sans-serif", MONO
 const NAV = [['home', 'Home', 'rgb(20,20,20)'], ['freediving', 'Freediving', 'rgb(24,88,224)'], ['sound', 'Sound', 'rgb(232,34,44)'], ['journal', 'Journal', 'rgb(255,196,0)']];
 
 class Component extends DCLogic {
-  state = { books: null, vw: innerWidth, vh: innerHeight, fade: 1, sel: null, navHov: null, sec: 0, notchData: [] };
+  // arriving under the last page's picture (see Base.astro) there is no fade in from blank paper: the picture gives way straight to the page
+  state = { books: null, vw: innerWidth, vh: innerHeight, fade: document.getElementById('page-cover') ? 0 : 1, sel: null, navHov: null, sec: 0, notchData: [] };
   scrollRef = React.createRef(); bodyRef = React.createRef(); fillRef = React.createRef();
   componentDidMount() {
     const books = load().books; let sv = null; try { sv = localStorage.getItem(KEY); } catch (e) {}
@@ -33,7 +34,7 @@ class Component extends DCLogic {
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { this.mKey = null; this.measure(); });
     this.fadeT = setTimeout(() => this.setState({ fade: 0 }), 80);
   }
-  componentDidUpdate() { this.measure(); }
+  componentDidUpdate() { this.measure(); if (this.state.books && !this.readied) { this.readied = true; window.__ready && window.__ready(); } }
   componentWillUnmount() { clearTimeout(this.fadeT); clearTimeout(this.pickT); removeEventListener('resize', this.onR); removeEventListener('keydown', this.onK); }
   // a new book: the text lifts away, the column goes back to the top, and the new book's text rises in
   pick(slug) {
@@ -99,7 +100,7 @@ class Component extends DCLogic {
     const shelf = books.map((x, i) => { const on = x.slug === sel;
       return { kind: GOUACHE[x.kind] ? x.kind : 'other', title: x.title, first: i === 0, w: Math.round(stackW - (narrow ? 0 : 14)), h: Math.round(barH * (SPINE_H[x.kind] || 1)), bg: (GOUACHE[x.kind] || ['#888'])[0], rad: SPINE_R[x.kind] || '3px', tx: on ? (narrow ? -12 : -40) : 0, z: on ? 3 : 1, pick: () => this.pick(x.slug) }; });
     return {
-      scrollRef: this.scrollRef, bodyRef: this.bodyRef, fillRef: this.fillRef, onScroll: this.onScroll, blocks: this.bc.blocks, ready: !!this.state.books,
+      scrollRef: this.scrollRef, bodyRef: this.bodyRef, fillRef: this.fillRef, onScroll: this.onScroll, blocks: this.bc.blocks,
       railL: lm, railT: 28, railH, rule,
       notches: this.state.notchData.map((n, i) => ({ y: n.y, label: n.label, c: rule, o: i === 0 ? 0 : 1, go: () => { const sc = this.scrollRef.current; if (sc) sc.scrollTo({ top: Math.max(0, n.top - 30), behavior: 'smooth' }); } })),
       cupR: Math.round(stackW * .14), shelf, colW, colL: lm, stackW, stackR, sfs,
@@ -181,7 +182,7 @@ function View(v) {
   const mask = `linear-gradient(to bottom, transparent 0, #000 ${v.fadeTop}px, #000 calc(100% - ${v.fadeBot}px), transparent 100%)`;
   return (
     <>
-    <div data-page-ready={v.ready ? '1' : undefined} style={sty("position:fixed;inset:0;overflow:hidden;background:#fafafa;color:#111;font-family:'Geist', sans-serif;-webkit-font-smoothing:antialiased")}>
+    <div style={sty("position:fixed;inset:0;overflow:hidden;background:#fafafa;color:#111;font-family:'Geist', sans-serif;-webkit-font-smoothing:antialiased")}>
       <div ref={v.scrollRef} onScroll={v.onScroll} data-read="1" style={sty(`position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;-webkit-mask-image:${mask};mask-image:${mask}`)}>
         <div ref={v.bodyRef} style={sty(`width:${v.colW}px;margin-left:${v.colL}px;box-sizing:border-box;padding:${v.padTop}px 0 ${v.padBot}px 28px`)}>
           {(v.blocks || []).map((k, i) => (

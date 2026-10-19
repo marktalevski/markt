@@ -311,6 +311,7 @@ class Component extends DCLogic {
     // the volume fader sets the master gain; squared, so the fader moves through loudness the way the ear hears it (half way down is half as loud)
     if (this.vol) this.vol.gain.setTargetAtTime(Math.pow(this.volume ?? 1, 2), this.ac.currentTime, .05);
     this.audioTick(); this.draw(dt); this.flipTick(); this.wheelTick(dt);
+    if (!this.readied) { this.readied = true; window.__ready && window.__ready(); }
   };
   // the album clock beside the screen: the flip counter in its display, and the album names rolling through the display round it. The
   // current album's name sits just off the counter: below it when it rolled in from below (scrolling on), above it when it came from above
@@ -577,7 +578,6 @@ class Component extends DCLogic {
     ctx.restore(); ctx.font = '400 11px Michroma, sans-serif';
     // arriving / leaving, each page is a dot: arriving, the dots fly in from where the last page left them and open out into their beat pads;
     // leaving, the pads close back into dots, which the next page picks up
-    const OFF = { home: 26, freediving: 78, sound: 130, journal: 182, c4: 224, c5: 256, c6: 288 };
     const bz = (P0, P1, C1, C2, u2) => { const a = (1 - u2) ** 3, b = 3 * (1 - u2) ** 2 * u2, c2 = 3 * (1 - u2) * u2 * u2, d = u2 ** 3; return [a * P0[0] + b * C1[0] + c2 * C2[0] + d * P1[0], a * P0[1] + b * C1[1] + c2 * C2[1] + d * P1[1]]; };
     this.dotPos = {};
     const dc = this.dotsCtx || ctx;
