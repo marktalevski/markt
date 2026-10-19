@@ -60,7 +60,7 @@ const planeWind = (sd, ph) => Array.from({ length: 15 }, (_, q) => { const u = q
 // the Muay Thai bag hangs from its ring at BAG_HOOK and has just been kicked from the left, so it's tipped by BAG_SWING (radians, the bottom to the right)
 const BAG_HOOK = [0, -1.27], BAG_SWING = -.1, BAG_ROT = ([x, y, w]) => { const dx = x - BAG_HOOK[0], dy = y - BAG_HOOK[1], c = Math.cos(BAG_SWING), s = Math.sin(BAG_SWING); return [BAG_HOOK[0] + dx * c - dy * s, BAG_HOOK[1] + dx * s + dy * c, w]; };
 // its coloured lines, before the swing: red, yellow and blue are strips of tape wrapped round its middle, slanting alternately like a criss-cross
-// repair, each ending at the bag's edge (Sound and Freediving's dots on the left, Journal's on the right); orange, green and purple are speed
+// repair, each ending at the bag's edge (Sound and Freediving's dots on the left, Library's on the right); orange, green and purple are speed
 // streaks trailing behind it as it swings to the right: arcs about the hook, longer lower down where the bag moves fastest, running in to just
 // short of its left side so their dots lead into it
 const BAG_TAPE = (yc, slope, toLeft) => Array.from({ length: 13 }, (_, q) => { const a = toLeft ? q / 12 * Math.PI : Math.PI - q / 12 * Math.PI, x = Math.cos(a) * .37; return [x, yc + Math.sin(a) * .09 + slope * x]; });
@@ -346,7 +346,7 @@ function shapeOf(name, cx, cy, R) {
       longfins: [{ li: 5, path: [[.1, -.35], [.1, .1], [.1, .55], [.1, .95]].map(p => finPt(-.4, .16, p)) }, { li: 4, path: [[-.1, -.35], [-.1, .1], [-.1, .55], [-.1, .95]].map(p => finPt(.4, -.16, p)) },
         { li: 6, path: [[.3, -.55], [.32, -.3], [.39, -.1], [.49, .5], [.57, .9], [.66, 1.06]].map(p => finPt(.4, -.16, p)) }],
       // hangul (마크, a name stamp): red cuts the stamp's square, clockwise from its top left corner (Sound's dot ends there); the others write
-      // the letters over the red: purple ㅏ's upright, yellow its arm (Journal's dot at the tip), green ㅋ's top and side, orange ㅋ's middle bar
+      // the letters over the red: purple ㅏ's upright, yellow its arm (Library's dot at the tip), green ㅋ's top and side, orange ㅋ's middle bar
       // (right to left, so its dot sits clear of green), blue the ㅡ (Freediving's dot at its right end). Points close to each corner keep it square
       hangul: [{ li: 1, path: SEAL_SQ }, { li: 6, path: [[.3, -.92], [.3, -.64], [.3, -.36], [.3, -.1]] }, { li: 2, path: [[.3, -.5], [.45, -.5], [.6, -.5], [.74, -.5]] },
         { li: 5, path: [[-.8, .1], [-.2, .1], [.4, .1], [.68, .1], [.72, .12], [.72, .3], [.72, .54]] }, { li: 4, path: [[.62, .33], [.14, .33], [-.34, .33], [-.8, .33]] },
@@ -599,13 +599,13 @@ class Component extends DCLogic {
     this.navFrom = {}; ['journal', 'c5', 'c6'].forEach(k => { const h = this.heads && this.heads[k]; if (h) this.navFrom[k] = { p: h.p.slice(), col: h.col }; });
     this.go = 0;
   };
-  // Sound / Journal: strokes fade, every head flies up to its nav dot, then the page opens with the same nav in place
+  // Sound / Library: strokes fade, every head flies up to its nav dot, then the page opens with the same nav in place
   goPage = pg => () => {
     if (this.go != null || this.T < this.readyT) return;
     if (this.tapReveal(pg)) return;
     this.exits = []; this.navFrom = {};
     ['ink', 'freediving', 'sound', 'journal', 'c4', 'c5', 'c6'].forEach(k => { const h = this.heads && this.heads[k]; if (h) this.navFrom[k] = { p: h.p.slice(), col: h.col }; });
-    this.dest = pg === 'sound' ? BASE + 'sound/?from=page' : BASE + 'journal/'; this.go = 0;
+    this.dest = pg === 'sound' ? BASE + 'sound/?from=page' : BASE + 'library/'; this.go = 0;
   };
   goSound = this.goPage('sound'); goJournal = this.goPage('journal');
   sndOn = () => { this.hovPg.sound = 1; }; sndOff = () => { this.hovPg.sound = 0; }; jrnOn = () => { this.hovPg.journal = 1; }; jrnOff = () => { this.hovPg.journal = 0; };
@@ -994,12 +994,12 @@ function View(v) {
         {"\n  "}
       </button>
       {"\n  "}
-      <button ref={v.jrnRef} onClick={v.goJournal} onMouseEnter={v.jrnOn} onMouseLeave={v.jrnOff} onFocus={v.jrnOn} onBlur={v.jrnOff} aria-label="Journal" style={sty("position:absolute;left:0;top:0;transform:translate(-50%, -50%);display:block;width:48px;height:48px;padding:0;border-radius:50%;border:0;background:none;cursor:pointer;color:#141414;font-family:'Newsreader', Georgia, serif;opacity:0;pointer-events:none")}>
+      <button ref={v.jrnRef} onClick={v.goJournal} onMouseEnter={v.jrnOn} onMouseLeave={v.jrnOff} onFocus={v.jrnOn} onBlur={v.jrnOff} aria-label="Library" style={sty("position:absolute;left:0;top:0;transform:translate(-50%, -50%);display:block;width:48px;height:48px;padding:0;border-radius:50%;border:0;background:none;cursor:pointer;color:#141414;font-family:'Newsreader', Georgia, serif;opacity:0;pointer-events:none")}>
         {"\n    "}
         <span style={sty("display:none")} />
         {"\n    "}
         <span data-lab="home" style={sty("position:absolute;pointer-events:none;white-space:nowrap;font-family:Papyrus, 'Papyrus-Regular', 'Newsreader', Georgia, serif;font-weight:400;font-size:24px;letter-spacing:0;opacity:0")}>
-          {letters("Journal")}
+          {letters("Library")}
         </span>
         {"\n  "}
       </button>

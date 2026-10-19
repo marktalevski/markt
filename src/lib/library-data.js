@@ -1,4 +1,4 @@
-// The Journal's books and what is in them: a bullet journal, short readings, quotes, a pillow book and musings. seed() is the content the
+// The Library's books and what is in them: a bullet journal, short readings, quotes, a pillow book and musings. seed() is the content the
 // site ships with; load() gives this browser's working copy (localStorage, under KEY) if there is one, otherwise the seed. Each book has a
 // slug, title, kind (one of KINDS, which sets how it is drawn and laid out), a subtitle, and its content: months of entries for the bullet
 // journal, items for the rest.

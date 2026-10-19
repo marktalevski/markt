@@ -296,12 +296,12 @@ class Component extends DCLogic {
   // ---- nav (same as the other pages)
   dotOf(k) { const d = document.querySelector('[data-navk="' + k + '"] [data-navdot]'); if (!d) return null; const r = d.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }
   // kind: 'home' (faders turn back into dots and the panel slides away, Home picks the dots up), 'dive' (the same, and Freediving picks them up:
-  // they draw its water's surface lines, then go up into its menu), 'journal' (the same, and the Journal's books open out of them), 'other'
+  // they draw its water's surface lines, then go up into its menu), 'journal' (the same, and the Library's books open out of them), 'other'
   // (plain fade)
   leave(href, kind) { return e => { if (e) e.preventDefault(); if (this.out) return; this.stop(); this.out = { href, t: 0, k: kind }; }; }
   stay = e => { if (e) e.preventDefault(); };
   goHome = this.leave(HOME, 'home');
-  GO = { freediving: this.leave(BASE + 'freediving/?from=sound', 'dive'), sound: this.stay, journal: this.leave(BASE + 'journal/', 'journal') };
+  GO = { freediving: this.leave(BASE + 'freediving/?from=sound', 'dive'), sound: this.stay, journal: this.leave(BASE + 'library/', 'journal') };
   tick = now => {
     this.raf = requestAnimationFrame(this.tick);
     const dt = Math.min(.05, (now - (this.last || now)) / 1000); this.last = now; this.t += dt;
@@ -390,7 +390,7 @@ class Component extends DCLogic {
     const ds = deckScale(Ws, Hs), W = Ws / ds, H = Hs / ds, dcs = this.dotsCtx; if (ds < 1) { ctx.save(); ctx.scale(ds, ds); if (dcs) { dcs.save(); dcs.scale(ds, ds); } }
     const AC = this.accent(), NEON_C = AC.acc, NEON_M = AC.acc; this.acc = AC;
     const look = this.look, cy = look === 'stark' && (this.props.cyber ?? true), G = deckGeoV(W, H), PM = '#8a8f94', mono = "'JetBrains Mono', monospace", mich = 'Michroma, sans-serif',
-      cols = ['#f2f2f0', 'rgb(24,88,224)', 'rgb(232,34,44)', 'rgb(255,196,0)', 'rgb(255,118,18)', 'rgb(22,168,82)', 'rgb(138,64,214)'], names = ['Home', 'Freediving', 'Sound', 'Journal'],
+      cols = ['#f2f2f0', 'rgb(24,88,224)', 'rgb(232,34,44)', 'rgb(255,196,0)', 'rgb(255,118,18)', 'rgb(22,168,82)', 'rgb(138,64,214)'], names = ['Home', 'Freediving', 'Sound', 'Library'],
       LAB = ['#f2f2f0', 'rgb(120,166,255)', 'rgb(255,112,108)', 'rgb(255,206,60)'];
     // asm: how built the deck is (its controls); slide: how far it has dropped away below the screen
     const A = this.arr, O = this.out && this.out.k !== 'other' ? this.out : null; let asm = 1, slide = 0;
@@ -792,7 +792,7 @@ function View(v) {
         <a href={BASE + "sound/"} onClick={v.pad?.sound?.go} aria-current="page" aria-label="Sound" data-navk="sound" onMouseEnter={v.pad?.sound?.on} onMouseLeave={v.pad?.sound?.off} onFocus={v.pad?.sound?.on} onBlur={v.pad?.sound?.off} style={sty("position:absolute;left:-200px;top:0;display:block;border-radius:5px;pointer-events:auto;cursor:default")}>
           <span data-navdot="1" style={sty("position:absolute;left:50%;top:50%;width:1px;height:1px")} />
         </a>
-        <a href={BASE + "journal/"} onClick={v.pad?.journal?.go} aria-label="Journal" data-navk="journal" onMouseEnter={v.pad?.journal?.on} onMouseLeave={v.pad?.journal?.off} onFocus={v.pad?.journal?.on} onBlur={v.pad?.journal?.off} style={sty("position:absolute;left:-200px;top:0;display:block;border-radius:5px;pointer-events:auto;cursor:pointer")}>
+        <a href={BASE + "library/"} onClick={v.pad?.journal?.go} aria-label="Library" data-navk="journal" onMouseEnter={v.pad?.journal?.on} onMouseLeave={v.pad?.journal?.off} onFocus={v.pad?.journal?.on} onBlur={v.pad?.journal?.off} style={sty("position:absolute;left:-200px;top:0;display:block;border-radius:5px;pointer-events:auto;cursor:pointer")}>
           <span data-navdot="1" style={sty("position:absolute;left:50%;top:50%;width:1px;height:1px")} />
         </a>
       </div>

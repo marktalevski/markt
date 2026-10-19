@@ -1,13 +1,13 @@
-// Carried over from the Claude Design file "Journal.dc.html": a reading room. Five books (BuJo 2026, Short Readings, Quotes, Pillow Book,
+// The Library, carried over from the Claude Design file "Journal.dc.html": a reading room. Five books (BuJo 2026, Short Readings, Quotes, Pillow Book,
 // Musings) lie in a painted stack in the bottom-right corner, a mug on the top one; the book you pick fills a wide reading column on the
 // left. A line in the book's colour runs down beside the text and shows where you are in it, with a ring at each section to jump to.
 // The logic class is the design's own code; View is its template as JSX.
 import React from 'react';
 import { DCLogic, page, sty, BASE } from '../lib/dc.js';
-import { load } from '../lib/journal-data.js';
+import { load } from '../lib/library-data.js';
 import { navAt } from '../lib/nav.js';
 
-const PAGE = 'journal';
+const PAGE = 'journal';   // its key in the menu (the URL and every label say Library)
 const HOME = BASE + '?from=dive';
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -27,7 +27,7 @@ const flight = (A, C1, C2, B, r, ease, cols, shown) => { const out = []; for (le
 const easeIn = u => u * u * (1.6 - .6 * u), easeOut = u => 1 - easeIn(1 - u);
 const paras = s => (s || '').split(/\n\s*\n/).map(x => x.trim()).filter(Boolean);
 const SERIF = "'Newsreader', Georgia, serif", SANS = "'Geist', sans-serif", MONOF = "'Geist Mono', monospace";
-const NAV = [['home', 'Home', 'rgb(20,20,20)'], ['freediving', 'Freediving', 'rgb(24,88,224)'], ['sound', 'Sound', 'rgb(232,34,44)'], ['journal', 'Journal', 'rgb(255,196,0)']];
+const NAV = [['home', 'Home', 'rgb(20,20,20)'], ['freediving', 'Freediving', 'rgb(24,88,224)'], ['sound', 'Sound', 'rgb(232,34,44)'], ['journal', 'Library', 'rgb(255,196,0)']];
 
 class Component extends DCLogic {
   // arriving under the last page's picture (see Base.astro) there is no fade in from blank paper: the picture gives way straight to the page
@@ -47,7 +47,7 @@ class Component extends DCLogic {
   }
   componentDidUpdate() { this.measure(); if (this.state.books && !this.readied) { this.readied = true; window.__ready && window.__ready(); this.arrive(); } }
   // arriving: each book's dot drops from where it is (the menu, or where the last page left it) to the book's place in the stack, bottom
-  // book first, and opens out into the book; dots that aren't books (Home, Journal) fly back up to the menu. The mug slides onto the top book
+  // book first, and opens out into the book; dots that aren't books (Home, Library) fly back up to the menu. The mug slides onto the top book
   // last and the text rises in. (Books use the separate scale property, so their own slide-out and hover, on transform, carry on untouched)
   // the books in the stack, top first, each with its dot (k, its fly-dot element and radius) and where it sits (r, its centre L)
   spines() {
@@ -268,7 +268,7 @@ function View(v) {
     </div>
     <nav aria-label="Pages" style={sty("position:fixed;right:12px;top:12px;display:flex;flex-direction:row;align-items:flex-start;z-index:130;color:#111")}>
       {NAV.map(([k, en, col]) => (
-        <a key={k} href={k === 'home' ? BASE + '?from=dive' : BASE + k + '/'} onClick={v.nav?.[k]?.go} aria-label={en} aria-current={k === PAGE ? 'page' : undefined} data-navk={k} onMouseEnter={v.nav?.[k]?.on} onMouseLeave={v.navOff} onFocus={v.nav?.[k]?.on} onBlur={v.navOff} style={sty("display:flex;flex-direction:column;align-items:center;gap:8px;width:24px;height:156px;padding:8px 0 0;box-sizing:border-box;border:0;background:none;color:inherit;text-decoration:none;cursor:pointer;font-family:'Newsreader', Georgia, serif;font-size:13px;line-height:1")}>
+        <a key={k} href={k === 'home' ? BASE + '?from=dive' : BASE + (k === 'journal' ? 'library' : k) + '/'} onClick={v.nav?.[k]?.go} aria-label={en} aria-current={k === PAGE ? 'page' : undefined} data-navk={k} onMouseEnter={v.nav?.[k]?.on} onMouseLeave={v.navOff} onFocus={v.nav?.[k]?.on} onBlur={v.navOff} style={sty("display:flex;flex-direction:column;align-items:center;gap:8px;width:24px;height:156px;padding:8px 0 0;box-sizing:border-box;border:0;background:none;color:inherit;text-decoration:none;cursor:pointer;font-family:'Newsreader', Georgia, serif;font-size:13px;line-height:1")}>
           <span data-navdot="1" style={sty(`width:16px;height:16px;border-radius:50%;background:${col};flex:none`)} />
           <span style={sty("position:relative;display:block;width:100%;height:116px")}>
             <span lang="en" data-lab="nav" aria-hidden="true" style={sty(`position:absolute;left:50%;top:0;writing-mode:vertical-rl;text-orientation:sideways;white-space:nowrap;font-family:Papyrus, 'Papyrus-Regular', 'Newsreader', Georgia, serif;font-weight:400;font-size:19px;letter-spacing:.02em;background-image:linear-gradient(to bottom, ${col} 0%, ${col} 20%, currentColor 60%, currentColor 100%);background-size:100% 300%;background-repeat:no-repeat;background-position:0 ${v.nav?.[k]?.bp ?? ''};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;transition:opacity .55s ease, transform .7s cubic-bezier(.2,.7,.2,1), filter .55s ease, background-position 1.1s cubic-bezier(.3,.6,.2,1);opacity:${v.nav?.[k]?.en ?? 0};transform:translateX(-50%) translateY(${v.nav?.[k]?.enY ?? ''});filter:blur(${v.nav?.[k]?.enB ?? ''});pointer-events:none`)}>

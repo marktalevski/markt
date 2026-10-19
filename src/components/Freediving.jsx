@@ -201,7 +201,7 @@ class Component extends DCLogic {
   go(i) { this.target = i; }
   navHov = null; waveRef = React.createRef();
   goHome = e => { e.preventDefault(); if (this.leaveT != null) return; const o = {}; try { document.querySelectorAll('[data-navk]').forEach(el => { const d = el.querySelector('[data-navdot]'); if (!d) return; const r = d.getBoundingClientRect(); o[el.getAttribute('data-navk')] = [r.left + r.width / 2, r.top + r.height / 2]; }); o.ink = o.home; sessionStorage.setItem('nav-from', JSON.stringify(o)); } catch (x) {} const far = this.p > -.9; this.goSurface(); this.navPos = o; try { let mb = 0; document.querySelectorAll('nav[aria-label="Pages"] [data-navk]').forEach(el => { const r = el.getBoundingClientRect(); mb = Math.max(mb, r.bottom); }); this.navBot = mb; } catch (x) {} setTimeout(() => { this.leaveT = 0; }, far ? 1300 : 0); };
-  goPage = k => e => { if (e) e.preventDefault(); if (this.leaveT != null || this.pgLeave) return; this.pgLeave = { href: k === 'sound' ? BASE + 'sound/?from=page' : BASE + 'journal/', t: 0, k }; };
+  goPage = k => e => { if (e) e.preventDefault(); if (this.leaveT != null || this.pgLeave) return; this.pgLeave = { href: k === 'sound' ? BASE + 'sound/?from=page' : BASE + 'library/', t: 0, k }; };
   goSurface = () => { this.target = -1; this.setState({ exp: null }); };
 
   tick = now => {
@@ -707,7 +707,7 @@ class Component extends DCLogic {
       counter: f >= 0 ? `${pad(f + 1)} / ${pad(list.length)}` : '',
       goSurface: this.goSurface, goHome: this.goHome,
       navOff: () => this.setState({ navHov: null }),
-      nav: Object.fromEntries([['home', '홈', 'Home'], ['freediving', '프리다이빙', 'Freediving'], ['sound', '소리', 'Sound'], ['journal', '일기', 'Journal']].map(([k, ko, en]) => { const h = this.state.navHov === k, st = on => ({ a: on ? 1 : 0, y: on ? '0px' : '8px', b: on ? '0px' : '3px' }), E = st(h), K = st(false); return [k, { bp: h ? '28%' : '100%', en: E.a, enY: E.y, enB: E.b, ko: K.a, koY: K.y, koB: K.b, on: () => { if (this.state.navHov !== k) this.setState({ navHov: k }); }, go: this.goPage(k) }]; }))
+      nav: Object.fromEntries([['home', '홈', 'Home'], ['freediving', '프리다이빙', 'Freediving'], ['sound', '소리', 'Sound'], ['journal', '서재', 'Library']].map(([k, ko, en]) => { const h = this.state.navHov === k, st = on => ({ a: on ? 1 : 0, y: on ? '0px' : '8px', b: on ? '0px' : '3px' }), E = st(h), K = st(false); return [k, { bp: h ? '28%' : '100%', en: E.a, enY: E.y, enB: E.b, ko: K.a, koY: K.y, koB: K.b, on: () => { if (this.state.navHov !== k) this.setState({ navHov: k }); }, go: this.goPage(k) }]; }))
     };
   }
 }
@@ -858,14 +858,14 @@ function View(v) {
           </span>
         </a>
         {"\n    "}
-        <a href={BASE + "journal/"} onClick={v.nav?.journal?.go} aria-label="Journal" data-navk="journal" onMouseEnter={v.nav?.journal?.on} onMouseLeave={v.navOff} onFocus={v.nav?.journal?.on} onBlur={v.navOff} style={sty("display:flex;flex-direction:column;align-items:center;gap:8px;width:24px;height:156px;padding:8px 0 0;box-sizing:border-box;border:0;background:none;color:inherit;text-decoration:none;cursor:pointer;font-family:'Newsreader', Georgia, serif;font-size:13px;line-height:1")}>
+        <a href={BASE + "library/"} onClick={v.nav?.journal?.go} aria-label="Library" data-navk="journal" onMouseEnter={v.nav?.journal?.on} onMouseLeave={v.navOff} onFocus={v.nav?.journal?.on} onBlur={v.navOff} style={sty("display:flex;flex-direction:column;align-items:center;gap:8px;width:24px;height:156px;padding:8px 0 0;box-sizing:border-box;border:0;background:none;color:inherit;text-decoration:none;cursor:pointer;font-family:'Newsreader', Georgia, serif;font-size:13px;line-height:1")}>
           <span data-navdot="1" style={sty("width:16px;height:16px;border-radius:50%;background:rgb(255,196,0);flex:none")} />
           <span style={sty("position:relative;display:block;width:100%;height:116px")}>
             <span lang="en" data-lab="nav" aria-hidden="true" style={sty(`position:absolute;left:50%;top:0;writing-mode:vertical-rl;text-orientation:sideways;white-space:nowrap;font-family:Papyrus, 'Papyrus-Regular', 'Newsreader', Georgia, serif;font-weight:400;font-size:19px;letter-spacing:.02em;background-image:linear-gradient(to bottom, rgb(255,196,0) 0%, rgb(255,196,0) 20%, currentColor 60%, currentColor 100%);background-size:100% 300%;background-repeat:no-repeat;background-position:0 ${v.nav?.journal?.bp ?? ''};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;transition:opacity .55s ease, transform .7s cubic-bezier(.2,.7,.2,1), filter .55s ease, background-position 1.1s cubic-bezier(.3,.6,.2,1);opacity:${v.nav?.journal?.en ?? ''};transform:translateX(-50%) translateY(${v.nav?.journal?.enY ?? ''});filter:blur(${v.nav?.journal?.enB ?? ''})`)}>
-              {"Journal"}
+              {"Library"}
             </span>
             <span lang="ko" aria-hidden="true" style={sty(`position:absolute;left:50%;top:0;writing-mode:vertical-rl;text-orientation:upright;white-space:nowrap;font-family:'Noto Serif KR', serif;font-weight:600;font-size:19px;letter-spacing:.08em;background-image:linear-gradient(to bottom, rgb(255,196,0) 0%, rgb(255,196,0) 20%, currentColor 60%, currentColor 100%);background-size:100% 300%;background-repeat:no-repeat;background-position:0 ${v.nav?.journal?.bp ?? ''};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;transition:opacity .55s ease, transform .7s cubic-bezier(.2,.7,.2,1), filter .55s ease, background-position 1.1s cubic-bezier(.3,.6,.2,1);opacity:${v.nav?.journal?.ko ?? ''};transform:translateX(-50%) translateY(${v.nav?.journal?.koY ?? ''});filter:blur(${v.nav?.journal?.koB ?? ''})`)}>
-              {"일기"}
+              {"서재"}
             </span>
           </span>
         </a>

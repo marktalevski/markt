@@ -3,7 +3,7 @@
 import React from 'react';
 import { DCLogic, page, sty, BASE } from '../lib/dc.js';
 
-const ARROWS = { down: 'Freediving', up: 'Sound', right: 'Journal' };
+const ARROWS = { down: 'Freediving', up: 'Sound', right: 'Library' };
 const fmt = iso => { if (!iso) return 'no date'; const d = new Date(iso + 'T12:00:00'); return isNaN(d) ? iso : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); };
 
 class Component extends DCLogic {
@@ -260,7 +260,7 @@ function View(v) {
                       </option>
                       {"\n                "}
                       <option value="right">
-                        {"Journal"}
+                        {"Library"}
                       </option>
                       {"\n              "}
                     </select>

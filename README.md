@@ -11,7 +11,7 @@ Built with [Astro](https://astro.build). Every push to `main` publishes the site
 | `/markt/` | Home, the brush-painted symbol (`src/components/Home.jsx`) |
 | `/markt/freediving/` | Dive log (`src/components/Freediving.jsx`) |
 | `/markt/sound/` | Sound: album photos, waveform and mixer panel (`src/components/Sound.jsx`, photos in `public/images/`) |
-| `/markt/journal/` | Placeholder (`src/components/Journal.jsx`) |
+| `/markt/library/` | Library: a stack of painted books to read (`src/components/Library.jsx`, books in `src/lib/library-data.js`); `/markt/journal/` forwards here |
 
 The journal editor (`src/components/Editor.jsx`, page `src/editor/editor.astro`) is private: it only exists on your own computer while `npm run dev` is running, at <http://localhost:4321/markt/editor/>. It is never published.
 
