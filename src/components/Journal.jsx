@@ -34,7 +34,21 @@ class Component extends DCLogic {
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { this.mKey = null; this.measure(); });
     this.fadeT = setTimeout(() => this.setState({ fade: 0 }), 80);
   }
-  componentDidUpdate() { this.measure(); if (this.state.books && !this.readied) { this.readied = true; window.__ready && window.__ready(); } }
+  componentDidUpdate() { this.measure(); if (this.state.books && !this.readied) { this.readied = true; window.__ready && window.__ready(); this.arrive(); } }
+  // arriving: the books fall in from above the top-right corner and stack up in the bottom-right, the bottom one first, each landing with a
+  // little bounce; the mug drops onto the top book last, and the text rises in as the stack settles. (They use the separate translate
+  // property, so the books' own slide-out and hover, on transform, carry on untouched)
+  arrive() {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const books = [...document.querySelectorAll('[data-book]')].reverse(), mug = document.querySelector('[data-mug]'), t0 = 200, step = 110, dur = 620;
+    const fall = (el, delay, d) => { const r = el.getBoundingClientRect(), y = -(r.bottom + 30);
+      el.animate([{ translate: `0 ${y}px`, easing: 'cubic-bezier(.5,0,.85,.4)' }, { translate: '0 0', offset: .72, easing: 'ease-out' }, { translate: '0 -9px', offset: .85, easing: 'ease-in' }, { translate: '0 0' }],
+        { duration: d, delay, fill: 'backwards' }); };
+    books.forEach((el, i) => fall(el, t0 + i * step, dur));
+    const landed = t0 + books.length * step + dur * .7;
+    if (mug) fall(mug, landed - dur * .35, dur);
+    const body = this.bodyRef.current; if (body) body.animate([{ opacity: 0, transform: 'translateY(16px)' }, { opacity: 1, transform: 'none' }], { duration: 520, delay: landed - 150, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' });
+  }
   componentWillUnmount() { clearTimeout(this.fadeT); clearTimeout(this.pickT); removeEventListener('resize', this.onR); removeEventListener('keydown', this.onK); }
   // a new book: the text lifts away, the column goes back to the top, and the new book's text rises in
   pick(slug) {
@@ -158,7 +172,7 @@ function Spine({ s, sfs }) {
 const TORII = "position:absolute;box-sizing:border-box;background:#d4573f;border:2px solid #4a3552;";
 function Mug({ right }) {
   return (
-    <span aria-hidden="true" style={sty(`position:absolute;right:${right}px;bottom:calc(100% + 3px);width:96px;height:128px;pointer-events:none`)}>
+    <span aria-hidden="true" data-mug="1" style={sty(`position:absolute;right:${right}px;bottom:calc(100% + 3px);width:96px;height:128px;pointer-events:none`)}>
       <span style={sty("position:absolute;left:14px;top:4px;animation:steamRise 2.6s ease-out infinite;width:12px;height:36px;box-sizing:border-box;border:3px solid #a99fb6;border-left-color:transparent;border-bottom-color:transparent;border-radius:50%")} />
       <span style={sty("position:absolute;left:29px;top:-4px;animation:steamRise 2.6s ease-out -.85s infinite;width:12px;height:42px;box-sizing:border-box;border:3px solid #a99fb6;border-right-color:transparent;border-top-color:transparent;border-radius:50%")} />
       <span style={sty("position:absolute;left:44px;top:6px;animation:steamRise 2.6s ease-out -1.7s infinite;width:12px;height:34px;box-sizing:border-box;border:3px solid #a99fb6;border-left-color:transparent;border-bottom-color:transparent;border-radius:50%")} />
