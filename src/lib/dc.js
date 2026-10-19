@@ -5,6 +5,8 @@
 import React from 'react';
 
 export const BASE = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+// a file the editor uploaded is stored by its path in the site (images/x.jpg, audio/y.mp3); full addresses and data: URIs pass through as they are
+export const assetUrl = p => !p ? '' : /^(https?:|data:|blob:|\/)/.test(p) ? p : BASE + p;
 
 export class DCLogic {
   state = {};

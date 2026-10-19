@@ -1,12 +1,13 @@
 // Carried over from the Claude Design file "Site Editor.dc.html".
 // The logic class is the design's own code; View is its template as JSX.
 import React from 'react';
-import { DCLogic, page, sty, BASE } from '../lib/dc.js';
+import { DCLogic, page, sty, BASE, assetUrl } from '../lib/dc.js';
 
-// the tabs: the dive log's entries, and the Library's books (no page shows entries on the other lines, so there is no tab for them)
-const ARROWS = { down: 'Freediving', right: 'Library' };
-// the Library tab edits the Library's books (in site.json under "books"), not entries
-const BOOKS = 'right';
+// the tabs: the dive log's entries, Sound's albums and the Library's books
+const ARROWS = { down: 'Freediving', up: 'Sound', right: 'Library' };
+// the Sound tab edits Sound's albums (src/data/sound.json), the Library tab the Library's books (site.json under "books")
+const ALBUMS = 'up', BOOKS = 'right';
+const SOUND_KINDS = [['music', 'Music'], ['voice', 'Voice'], ['field', 'Field recording']];
 const KIND_NAME = { bujo: 'Bullet journal', readings: 'Short readings', quotes: 'Quotes', pillow: 'Pillow book', musings: 'Musings' };
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const LAB = "font-family:'JetBrains Mono', monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#4a5b61";
@@ -16,6 +17,97 @@ const BTN = "height:34px;padding:0 12px;border:1px solid rgba(16,35,44,.25);back
 const Field = ({ label, value, onChange, type, placeholder, grow }) => (
   <label style={sty(`display:flex;flex-direction:column;gap:6px;flex:${grow || '1 1 200px'}`)}><span style={sty(LAB)}>{label}</span>
     <input type={type || 'text'} value={value ?? ''} placeholder={placeholder} onChange={e => onChange(e.target.value)} style={sty(INP)} /></label>);
+// uploads go through the dev server's editor helper (src/dev/editor-api.mjs) into the project's public/ folder; it answers with the file's
+// path in the site
+const upload = async (blob, dir, name) => { const r = await fetch(BASE + '__editor/upload/?dir=' + encodeURIComponent(dir) + '&name=' + encodeURIComponent(name), { method: 'POST', body: blob });
+  const j = await r.json().catch(() => ({})); if (!r.ok || !j.path) throw new Error(j.error || 'Upload failed'); return j.path; };
+// photos are scaled down to 1600px on their long side (as JPEG) before they are uploaded, so the site stays quick
+const shrink = file => new Promise((res, rej) => { const img = new Image(), url = URL.createObjectURL(file);
+  img.onload = () => { const s = Math.min(1, 1600 / Math.max(img.width, img.height)), c = document.createElement('canvas'); c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url); c.toBlob(b => b ? res(b) : rej(new Error('Could not read that image')), 'image/jpeg', .85); };
+  img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('Could not read that image')); }; img.src = url; });
+const uploadPhoto = async (file, dir) => upload(await shrink(file), dir, file.name.replace(/\.[^.]+$/, '') + '.jpg');
+// a sound file's length in seconds (0 if the browser can't read it)
+const durOf = file => file.arrayBuffer().then(b => new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 1, 44100).decodeAudioData(b)).then(buf => Math.round(buf.duration)).catch(() => 0);
+// Sound's albums as saved in the project (src/data/sound.json)
+const loadAlbums = () => fetch(BASE + '__editor/sound/', { cache: 'no-cache' }).then(r => r.json()).then(d => Array.isArray(d.albums) ? d.albums : []).catch(() => []);
+const fmtDur = s => s ? Math.floor(s / 60) + ':' + String(Math.round(s % 60)).padStart(2, '0') : '';
+// a photo field: a preview, Upload (into dir) and Remove; the photo is stored by its path
+class PhotoPick extends React.Component {
+  state = { busy: false, err: '' };
+  pick = ev => { const f = ev.target.files && ev.target.files[0]; ev.target.value = ''; if (!f) return; this.setState({ busy: true, err: '' });
+    uploadPhoto(f, this.props.dir).then(p => { this.setState({ busy: false }); this.props.onChange(p); }, e => this.setState({ busy: false, err: e.message })); };
+  render() { const v = this.props.value;
+    return (<div style={sty('display:flex;flex-direction:column;gap:8px')}><span style={sty(LAB)}>{this.props.label || 'Photo'}</span>
+      {v ? <div role="img" style={sty(`width:240px;max-width:100%;aspect-ratio:4 / 3;background:url("${assetUrl(v)}") center / cover;border-radius:6px`)} /> : null}
+      <div style={sty('display:flex;gap:8px;align-items:center;flex-wrap:wrap')}>
+        <label style={sty(BTN + ';display:flex;align-items:center')}>{this.state.busy ? 'Uploading…' : v ? 'Replace' : 'Upload'}<input type="file" accept="image/*" onChange={this.pick} style={sty('display:none')} /></label>
+        {v ? <button onClick={() => this.props.onChange('')} style={sty(BTN + ';border:0;background:none;color:#5b6b70')}>{'Remove'}</button> : null}
+        {this.state.err ? <span style={sty('color:#8a3a1c;font-size:13px')}>{this.state.err}</span> : null}</div></div>);
+  }
+}
+// a list of cards (pieces, passages...) that can each be moved up or down, removed, or added to
+const CardList = ({ items, onChange, blank, render, addLabel }) => (<div style={sty('display:flex;flex-direction:column;gap:14px')}>
+  {items.map((x, i) => (
+    <div key={i} style={sty('display:flex;flex-direction:column;gap:12px;padding:16px;border:1px solid rgba(16,35,44,.14);border-radius:8px;background:#f7f5ef')}>
+      {render(x, p => onChange(items.map((y, j) => j === i ? { ...y, ...p } : y), false), i)}
+      <div style={sty('display:flex;gap:8px;justify-content:flex-end')}>
+        <button disabled={i === 0} onClick={() => onChange(items.map((y, j) => j === i - 1 ? items[i] : j === i ? items[i - 1] : y), true)} style={sty(BTN)}>{'↑'}</button>
+        <button disabled={i === items.length - 1} onClick={() => onChange(items.map((y, j) => j === i + 1 ? items[i] : j === i ? items[i + 1] : y), true)} style={sty(BTN)}>{'↓'}</button>
+        <button onClick={() => { if (confirm('Remove this?')) onChange(items.filter((_, j) => j !== i), true); }} style={sty(BTN + ';color:#8a3a1c;border-color:#b5502c')}>{'Remove'}</button>
+      </div>
+    </div>))}
+  <button onClick={() => onChange([...items, blank()], true)} style={sty('height:40px;border:1px dashed rgba(16,35,44,.35);border-radius:6px;background:none;cursor:pointer')}>{addLabel || '+ Add'}</button>
+</div>);
+const SAVED = "Saved automatically in this browser. Save to site, then push, to publish.";
+
+// one album's editor: its title and photo (and how the photo lies on the page), and its pieces, each with a title, date, kind and sound file
+class AlbumEditor extends React.Component {
+  state = { busy: null, err: '' };
+  set(p) { this.props.onChange({ ...this.props.album, ...p }); }
+  pickAudio(i, tracks, ev) {
+    const f = ev.target.files && ev.target.files[0]; ev.target.value = ''; if (!f) return; this.setState({ busy: i, err: '' });
+    Promise.all([upload(f, 'audio', f.name), durOf(f)]).then(([src, dur]) => { this.setState({ busy: null }); const t = this.props.album.tracks || []; this.set({ tracks: t.map((x, j) => j === i ? { ...x, src, dur: dur || x.dur } : x) }); },
+      e => this.setState({ busy: null, err: e.message }));
+  }
+  render() {
+    const a = this.props.album, tracks = a.tracks || [];
+    return (<div style={sty('max-width:720px;display:flex;flex-direction:column;gap:18px')}>
+      <Field label="Album title" value={a.title} onChange={v => this.set({ title: v })} grow="0 0 auto" />
+      <PhotoPick label="Album photo (shown in black and white)" dir="images/sound" value={a.img} onChange={v => this.set({ img: v })} />
+      <div style={sty('display:flex;gap:18px;flex-wrap:wrap')}>
+        <label style={sty('display:flex;gap:8px;align-items:center')}><input type="checkbox" checked={!!a.imgMirror} onChange={e => this.set({ imgMirror: e.target.checked })} />{'Mirror the photo'}</label>
+        <label style={sty('display:flex;gap:8px;align-items:center')}><input type="checkbox" checked={!!a.imgFlip} onChange={e => this.set({ imgFlip: e.target.checked })} />{'Turn it upside down'}</label>
+      </div>
+      <div style={sty(LAB + ';padding-top:8px')}>{'Pieces'}</div>
+      <CardList items={tracks} addLabel="+ Add a piece" onChange={t => this.set({ tracks: t })} blank={() => ({ title: 'New piece', kind: 'music', date: new Date().toISOString().slice(0, 10), dur: 60, src: '' })} render={(t, upd, i) => (<>
+        <div style={sty('display:flex;flex-wrap:wrap;gap:14px')}>
+          <Field label="Title" value={t.title} onChange={v => upd({ title: v })} grow="2 1 240px" />
+          <Field label="Date" type="date" value={t.date} onChange={v => upd({ date: v })} grow="0 1 170px" />
+          <label style={sty('display:flex;flex-direction:column;gap:6px;flex:0 1 170px')}><span style={sty(LAB)}>{'Kind'}</span>
+            <select value={t.kind || 'music'} onChange={e => upd({ kind: e.target.value })} style={sty(INP)}>{SOUND_KINDS.map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select></label>
+        </div>
+        <div style={sty('display:flex;gap:10px;align-items:center;flex-wrap:wrap')}>
+          <span style={sty(LAB)}>{'Sound file'}</span>
+          <span style={sty("font-family:'JetBrains Mono', monospace;font-size:12px;color:#10232c")}>{t.src ? t.src.replace(/^audio\//, '') + (t.dur ? '  ·  ' + fmtDur(t.dur) : '') : 'none yet (plays a stand-in)'}</span>
+          <label style={sty(BTN + ';display:flex;align-items:center')}>{this.state.busy === i ? 'Uploading…' : t.src ? 'Replace' : 'Upload'}<input type="file" accept="audio/*" onChange={ev => this.pickAudio(i, tracks, ev)} style={sty('display:none')} /></label>
+          {t.src ? <audio controls preload="none" src={assetUrl(t.src)} style={sty('height:32px')} /> : null}
+          {t.src ? <button onClick={() => upd({ src: '' })} style={sty(BTN + ';border:0;background:none;color:#5b6b70')}>{'Remove'}</button> : null}
+        </div>
+      </>)} />
+      {this.state.err ? <div style={sty('color:#8a3a1c')}>{this.state.err}</div> : null}
+      <div style={sty('display:flex;justify-content:space-between;align-items:center;gap:12px;padding-top:6px;flex-wrap:wrap')}>
+        <span style={sty("font-family:'JetBrains Mono', monospace;font-size:11px;color:#4a5b61")}>{SAVED}</span>
+        <div style={sty('display:flex;gap:8px')}>
+          <button disabled={this.props.first} onClick={() => this.props.onMove(-1)} style={sty(BTN)}>{'Move earlier'}</button>
+          <button disabled={this.props.last} onClick={() => this.props.onMove(1)} style={sty(BTN)}>{'Move later'}</button>
+          <button onClick={this.props.onDelete} style={sty(BTN + ';color:#8a3a1c;border-color:#b5502c')}>{'Delete album'}</button>
+        </div>
+      </div>
+    </div>);
+  }
+}
+
 const Area = ({ label, value, onChange, rows, placeholder }) => (
   <label style={sty('display:flex;flex-direction:column;gap:6px')}><span style={sty(LAB)}>{label}</span>
     <textarea value={value ?? ''} rows={rows || 6} placeholder={placeholder} onChange={e => onChange(e.target.value)} style={sty(TXT)} /></label>);
@@ -29,20 +121,9 @@ class BookEditor extends React.Component {
   rawOf(key, fallback) { return this.state.raw[key] ?? fallback; }
   setRaw(key, v, apply) { this.setState(s => ({ raw: { ...s.raw, [key]: v } })); apply(v); }
   list(key, blank, render) {
-    const b = this.props.book, arr = b[key] || [], put = a => { this.setState({ raw: {} }); this.set({ [key]: a }); };
-    const at = (i, p) => this.set({ [key]: arr.map((x, j) => j === i ? { ...x, ...p } : x) });
-    return (<div style={sty('display:flex;flex-direction:column;gap:14px')}>
-      {arr.map((x, i) => (
-        <div key={i} style={sty('display:flex;flex-direction:column;gap:12px;padding:16px;border:1px solid rgba(16,35,44,.14);border-radius:8px;background:#f7f5ef')}>
-          {render(x, p => at(i, p), i)}
-          <div style={sty('display:flex;gap:8px;justify-content:flex-end')}>
-            <button disabled={i === 0} onClick={() => put(arr.map((y, j) => j === i - 1 ? arr[i] : j === i ? arr[i - 1] : y))} style={sty(BTN)}>{'↑'}</button>
-            <button disabled={i === arr.length - 1} onClick={() => put(arr.map((y, j) => j === i + 1 ? arr[i] : j === i ? arr[i + 1] : y))} style={sty(BTN)}>{'↓'}</button>
-            <button onClick={() => { if (confirm('Remove this?')) put(arr.filter((_, j) => j !== i)); }} style={sty(BTN + ';color:#8a3a1c;border-color:#b5502c')}>{'Remove'}</button>
-          </div>
-        </div>))}
-      <button onClick={() => put([...arr, blank()])} style={sty('height:40px;border:1px dashed rgba(16,35,44,.35);border-radius:6px;background:none;cursor:pointer')}>{'+ Add'}</button>
-    </div>);
+    const arr = this.props.book[key] || [];
+    // moving or removing cards resets the typed-as-you-go text, which is keyed by position
+    return <CardList items={arr} blank={blank} render={render} onChange={(a2, moved) => { if (moved) this.setState({ raw: {} }); this.set({ [key]: a2 }); }} />;
   }
   render() {
     const b = this.props.book, k = b.kind;
@@ -68,6 +149,7 @@ class BookEditor extends React.Component {
       </>)) : null}
       {k === 'readings' ? this.list('items', () => ({ title: 'New passage', source: '', text: '' }), (x, upd) => (<>
         <div style={sty('display:flex;flex-wrap:wrap;gap:14px')}><Field label="Title" value={x.title} onChange={v => upd({ title: v })} /><Field label="Source · book, author" value={x.source} onChange={v => upd({ source: v })} /></div>
+        <PhotoPick label="Photo (optional)" dir="images/library" value={x.image} onChange={v => upd({ image: v })} />
         <Area label="Passage · empty line starts a new paragraph" rows={8} value={x.text} onChange={v => upd({ text: v })} />
       </>)) : null}
       {k === 'quotes' ? this.list('items', () => ({ text: '', who: '' }), (x, upd) => (<>
@@ -80,23 +162,27 @@ class BookEditor extends React.Component {
       </>)) : null}
       {k === 'musings' ? this.list('items', () => ({ title: 'New piece', date: new Date().toISOString().slice(0, 10), text: '' }), (x, upd) => (<>
         <div style={sty('display:flex;flex-wrap:wrap;gap:14px')}><Field label="Title" value={x.title} onChange={v => upd({ title: v })} grow="2 1 260px" /><Field label="Date" type="date" value={x.date} onChange={v => upd({ date: v })} grow="0 1 170px" /></div>
+        <PhotoPick label="Photo (optional)" dir="images/library" value={x.image} onChange={v => upd({ image: v })} />
         <Area label="Text · empty line starts a new paragraph" rows={14} value={x.text} onChange={v => upd({ text: v })} />
       </>)) : null}
-      <div style={sty("font-family:'JetBrains Mono', monospace;font-size:11px;color:#4a5b61;padding-top:6px")}>{'Saved automatically in this browser. Export JSON to publish.'}</div>
+      <div style={sty("font-family:'JetBrains Mono', monospace;font-size:11px;color:#4a5b61;padding-top:6px")}>{SAVED}</div>
     </div>);
   }
 }
 const fmt = iso => { if (!iso) return 'no date'; const d = new Date(iso + 'T12:00:00'); return isNaN(d) ? iso : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); };
 
 class Component extends DCLogic {
-  state = { data: null, line: 'down', selId: null, selBook: null, note: '' };
+  state = { data: null, line: 'down', selId: null, selBook: null, selAlbum: null, note: '' };
 
   componentDidMount() {
-    import('../lib/site-data.js').then(m => { this.m = m; return Promise.all([m.loadDraft(), m.load()]); }).then(([data, pub]) => {
-      // a working copy whose books differ from the published ones: either edited here, or older than the site (and exporting it would undo
-      // the newer books), so say so
-      const stale = pub && Array.isArray(pub.books) && pub.books.length && JSON.stringify(pub.books) !== JSON.stringify(data.books);
-      this.setState({ data, note: stale ? 'The books here differ from the published site. If you did not change them here, use Reset to published first.' : '' }); });
+    import('../lib/site-data.js').then(m => { this.m = m; return Promise.all([m.loadDraft(), m.load(), loadAlbums()]); }).then(([data, pub, siteAlbums]) => {
+      // a working copy from before Sound's albums were editable gets the site's albums
+      if (!Array.isArray(data.albums)) data.albums = siteAlbums;
+      // a working copy whose books or albums differ from the site's: either edited here, or older than the site (and saving it would undo
+      // the newer ones), so say so
+      const diff = [pub && Array.isArray(pub.books) && pub.books.length && JSON.stringify(pub.books) !== JSON.stringify(data.books) ? 'books' : '',
+        JSON.stringify(siteAlbums) !== JSON.stringify(data.albums) ? 'albums' : ''].filter(Boolean).join(' and ');
+      this.setState({ data, note: diff ? `The ${diff} here differ from the site's. If you did not change them here, use Reset to published first.` : '' }); });
   }
 
   commit(data, extra) {
@@ -121,33 +207,33 @@ class Component extends DCLogic {
     this.commit({ ...d, entries: d.entries.filter(e => e.id !== this.state.selId) }, { selId: null });
   };
   onImageFile = ev => {
-    const file = ev.target.files && ev.target.files[0]; if (!file) return;
-    const img = new Image(), url = URL.createObjectURL(file);
-    img.onload = () => {
-      const s = Math.min(1, 1600 / Math.max(img.width, img.height));
-      const c = document.createElement('canvas'); c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
-      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-      URL.revokeObjectURL(url);
-      this.patch({ image: c.toDataURL('image/jpeg', .82) });
-    };
-    img.src = url; ev.target.value = '';
+    const file = ev.target.files && ev.target.files[0]; ev.target.value = ''; if (!file) return;
+    this.setState({ note: 'Uploading the photo…' });
+    uploadPhoto(file, 'images/entries').then(p => { this.patch({ image: p }); }, e => this.setState({ note: e.message }));
+  };
+  // writes the site's files in the project (site.json and sound.json) through the editor helper; pushing then publishes them
+  saveSite = () => {
+    const d = this.state.data, site = { profile: d.profile, entries: (d.entries || []).filter(e => e.line === 'down'), books: d.books || [] };
+    fetch(BASE + '__editor/save/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ site, sound: { albums: d.albums || [] } }) })
+      .then(r => r.json().then(j => { if (!r.ok) throw new Error(j.error || 'Save failed'); this.setState({ note: 'Saved to the site\'s files. Push them to publish.' }); }))
+      .catch(e => this.setState({ note: 'Could not save: ' + e.message }));
   };
   exportJson = () => {
-    // only what the site shows: the profile, the dive log's entries and the Library's books
-    const d = this.state.data, out = { profile: d.profile, entries: (d.entries || []).filter(e => e.line === 'down'), books: d.books || [] };
+    // a backup of everything the editor holds (Import brings it back)
+    const d = this.state.data, out = { profile: d.profile, entries: (d.entries || []).filter(e => e.line === 'down'), books: d.books || [], albums: d.albums || [] };
     const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'site.json'; a.click();
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'site-backup.json'; a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   };
   importJson = ev => {
     const file = ev.target.files && ev.target.files[0]; if (!file) return;
     file.text().then(t => {
-      try { const d = JSON.parse(t); if (!Array.isArray(d.entries)) throw 0; this.commit({ profile: d.profile || { name: 'Your Name', intro: '' }, entries: d.entries, books: Array.isArray(d.books) ? d.books : (this.state.data.books || []) }, { selId: null, selBook: null }); }
+      try { const d = JSON.parse(t); if (!Array.isArray(d.entries)) throw 0; this.commit({ profile: d.profile || { name: 'Your Name', intro: '' }, entries: d.entries, books: Array.isArray(d.books) ? d.books : (this.state.data.books || []), albums: Array.isArray(d.albums) ? d.albums : (this.state.data.albums || []) }, { selId: null, selBook: null, selAlbum: null }); }
       catch (e) { this.setState({ note: 'That file is not a valid export.' }); }
     });
     ev.target.value = '';
   };
-  resetSample = () => { if (confirm('Throw away your changes and go back to the published entries?')) this.m.seed().then(d => this.commit(d, { selId: null, selBook: null })); };
+  resetSample = () => { if (confirm('Throw away your changes and go back to the published entries?')) Promise.all([this.m.seed(), loadAlbums()]).then(([d, albums]) => this.commit({ ...d, albums }, { selId: null, selBook: null, selAlbum: null, note: '' })); };
 
   renderVals() {
     const d = this.state.data, line = this.state.line;
@@ -155,6 +241,8 @@ class Component extends DCLogic {
     const counts = { up: 0, right: 0, down: 0 };
     entries.forEach(e => { if (counts[e.line] != null) counts[e.line]++; });
     const books = (d && d.books) || [], isBooks = line === BOOKS, book = isBooks && this.state.selBook != null ? books[this.state.selBook] : null; counts[BOOKS] = books.length;
+    const albums = (d && d.albums) || [], isAlbums = line === ALBUMS, sa = this.state.selAlbum, album = isAlbums && sa != null ? albums[sa] : null; counts[ALBUMS] = albums.length;
+    const putAlbums = (a2, extra) => this.commit({ ...d, albums: a2 }, extra);
     const list = entries.filter(e => e.line === line).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
     const raw = entries.find(e => e.id === this.state.selId);
     const sel = raw ? { title: '', date: '', short: '', body: '', link: '', image: '', line: 'up', ...raw, tags: Array.isArray(raw.tags) ? raw.tags.join(', ') : (raw.tags || '') } : null;
@@ -162,13 +250,19 @@ class Component extends DCLogic {
     const profile = (d && d.profile) || { name: '', intro: '' };
     const setProfile = k => e => this.commit({ ...d, profile: { ...profile, [k]: e.target.value } });
     return {
-      tabs: ['down', 'right'].map(L => ({ arrow: ARROWS[L], count: counts[L], bg: L === line ? '#10232c' : '#fff', fg: L === line ? '#f2f0e9' : '#10232c', pick: () => this.setState({ line: L, selId: null, selBook: null }) })),
+      tabs: ['down', 'up', 'right'].map(L => ({ arrow: ARROWS[L], count: counts[L], bg: L === line ? '#10232c' : '#fff', fg: L === line ? '#f2f0e9' : '#10232c', pick: () => this.setState({ line: L, selId: null, selBook: null, selAlbum: null }) })),
       lineArrow: ARROWS[line],
-      isBooks, notBooks: !isBooks, book, bookKey: this.state.selBook,
+      isBooks, isAlbums, isEntries: !isBooks && !isAlbums, book, bookKey: this.state.selBook,
+      album, albumKey: sa, albumFirst: sa === 0, albumLast: sa === albums.length - 1,
+      onAlbum: na => putAlbums(albums.map((x, i) => i === sa ? na : x)),
+      moveAlbum: dd => { const j = sa + dd; if (j < 0 || j >= albums.length) return; const a2 = albums.slice(); [a2[sa], a2[j]] = [a2[j], a2[sa]]; putAlbums(a2, { selAlbum: j }); },
+      deleteAlbum: () => { if (confirm('Delete this album and its pieces? (Their files stay in the project.)')) putAlbums(albums.filter((_, i) => i !== sa), { selAlbum: null }); },
+      addAlbum: () => putAlbums([...albums, { title: 'New album', img: '', imgX: 1, tracks: [] }], { selAlbum: albums.length }),
+      saveSite: this.saveSite,
       onBook: nb => this.commit({ ...d, books: books.map((x, i) => i === this.state.selBook ? nb : x) }),
-      list: isBooks ? books.map((b, i) => ({ title: b.title || 'Untitled', meta: KIND_NAME[b.kind] || b.kind, bg: i === this.state.selBook ? '#dfe9e8' : 'transparent', pick: () => this.setState({ selBook: i }) })) : list.map((e, i) => ({ title: e.title || 'Untitled', meta: `${String(i + 1).padStart(2, '0')}  ·  ${fmt(e.date)}`, bg: e.id === this.state.selId ? '#dfe9e8' : 'transparent', pick: () => this.setState({ selId: e.id }) })),
-      hasSel: !isBooks && !!sel, noSel: isBooks ? !book : !sel, sel: sel || {},
-      hasImage: !!(sel && sel.image), imageBg: sel && sel.image ? `url("${sel.image}")` : 'none', imageUrl: sel && !isData ? sel.image : '', imagePlaceholder: isData ? 'Uploaded image (paste a URL to replace)' : 'Image URL, or upload',
+      list: isAlbums ? albums.map((a, i) => ({ title: a.title || 'Untitled', meta: (a.tracks || []).length + ' pieces' + ((a.tracks || []).length ? '' : ' · not shown until it has one'), bg: i === sa ? '#dfe9e8' : 'transparent', pick: () => this.setState({ selAlbum: i }) })) : isBooks ? books.map((b, i) => ({ title: b.title || 'Untitled', meta: KIND_NAME[b.kind] || b.kind, bg: i === this.state.selBook ? '#dfe9e8' : 'transparent', pick: () => this.setState({ selBook: i }) })) : list.map((e, i) => ({ title: e.title || 'Untitled', meta: `${String(i + 1).padStart(2, '0')}  ·  ${fmt(e.date)}`, bg: e.id === this.state.selId ? '#dfe9e8' : 'transparent', pick: () => this.setState({ selId: e.id }) })),
+      hasSel: !isBooks && !isAlbums && !!sel, noSel: isAlbums ? !album : isBooks ? !book : !sel, sel: sel || {},
+      hasImage: !!(sel && sel.image), imageBg: sel && sel.image ? `url("${assetUrl(sel.image)}")` : 'none', imageUrl: sel && !isData ? sel.image : '', imagePlaceholder: isData ? 'Uploaded image (upload or paste a link to replace)' : 'Upload a photo, or paste an image link',
       on: { title: this.field('title'), date: this.field('date'), line: this.field('line'), short: this.field('short'), body: this.field('body'), link: this.field('link'), tags: this.field('tags'), image: this.field('image') },
       onImageFile: this.onImageFile, clearImage: () => this.patch({ image: '' }),
       addEntry: this.addEntry, deleteEntry: this.deleteEntry,
@@ -206,8 +300,11 @@ function View(v) {
         {"\n    "}
         <div style={sty("display:flex;gap:8px")}>
           {"\n      "}
+          <button onClick={v.saveSite} style={sty("height:36px;padding:0 16px;border:0;background:#10232c;color:#f2f0e9;border-radius:6px;cursor:pointer")}>
+            {"Save to site"}
+          </button>
           <button onClick={v.exportJson} style={sty("height:36px;padding:0 14px;border:1px solid rgba(16,35,44,.25);background:#fff;border-radius:6px;cursor:pointer")}>
-            {"Export JSON"}
+            {"Export backup"}
           </button>
           {"\n      "}
           <label style={sty("height:36px;padding:0 14px;border:1px solid rgba(16,35,44,.25);background:#fff;border-radius:6px;cursor:pointer;display:flex;align-items:center")}>
@@ -251,7 +348,7 @@ function View(v) {
         {"\n    "}
         <aside style={sty("border-right:1px solid rgba(16,35,44,.14);display:flex;flex-direction:column;min-height:0")}>
           {"\n      "}
-          <div style={sty("display:grid;grid-template-columns:repeat(2, 1fr);gap:4px;padding:14px 14px 10px")}>
+          <div style={sty("display:grid;grid-template-columns:repeat(3, 1fr);gap:4px;padding:14px 14px 10px")}>
             {"\n        "}
             {(v.tabs || []).map((tab, $index) => (
               <React.Fragment key={$index}>
@@ -272,7 +369,8 @@ function View(v) {
             {"\n      "}
           </div>
           {"\n      "}
-          {v.notBooks ? <div style={sty("padding:0 14px 10px")}>
+          {v.isAlbums ? <div style={sty("padding:0 14px 10px")}><button onClick={v.addAlbum} style={sty("width:100%;height:40px;border:1px dashed rgba(16,35,44,.35);border-radius:6px;background:none;cursor:pointer")}>{"+ New album"}</button></div> : null}
+          {v.isEntries ? <div style={sty("padding:0 14px 10px")}>
             {"\n        "}
             <button onClick={v.addEntry} style={sty("width:100%;height:40px;border:1px dashed rgba(16,35,44,.35);border-radius:6px;background:none;cursor:pointer")}>
               {"+ New entry on "}
@@ -420,7 +518,7 @@ function View(v) {
                 <div style={sty("display:flex;justify-content:space-between;align-items:center;gap:12px;padding-top:6px")}>
                   {"\n            "}
                   <span style={sty("font-family:'JetBrains Mono', monospace;font-size:11px;color:#4a5b61")}>
-                    {"Saved automatically in this browser. Export JSON to publish."}
+                    {SAVED}
                   </span>
                   {"\n            "}
                   <button onClick={v.deleteEntry} style={sty("height:38px;padding:0 14px;border:1px solid #b5502c;color:#8a3a1c;background:none;border-radius:6px;cursor:pointer")}>
@@ -435,11 +533,12 @@ function View(v) {
           ) : null}
           {"\n      "}
           {v.book ? <BookEditor key={v.bookKey} book={v.book} onChange={v.onBook} /> : null}
+          {v.album ? <AlbumEditor key={v.albumKey} album={v.album} onChange={v.onAlbum} onMove={v.moveAlbum} onDelete={v.deleteAlbum} first={v.albumFirst} last={v.albumLast} /> : null}
           {v.noSel ? (
             <>
               {"\n        "}
               <div style={sty("color:#4a5b61;padding-top:40px")}>
-                {v.isBooks ? "Pick a book on the left to edit what's in it." : "Pick an entry on the left, or add a new one."}
+                {v.isAlbums ? "Pick an album on the left, or add a new one." : v.isBooks ? "Pick a book on the left to edit what's in it." : "Pick an entry on the left, or add a new one."}
               </div>
               {"\n      "}
             </>

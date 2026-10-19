@@ -1,9 +1,11 @@
 // Carried over from the Claude Design file "Sound.dc.html".
 // The logic class is the design's own code; View is its template as JSX.
 import React from 'react';
-import { DCLogic, page, sty, BASE } from '../lib/dc.js';
+import { DCLogic, page, sty, BASE, assetUrl } from '../lib/dc.js';
 import { squid, squidCells, SQUID_W, SQUID_H, SQUID_IDLES, SQUID_REACTS, SQUID_MOVES, SQUID_SLOW, SQUID_FAST } from '../lib/squid.js';
 import { deckGeo, deckGeoV, deckScale, isPhone, DECK_KEYS, padOf } from '../lib/deck.js';
+import SOUND from '../data/sound.json';
+const KINDS_OK = ['field', 'voice', 'music'];
 
 const PAGE = 'sound';
 const COL = [232, 34, 44];
@@ -33,24 +35,14 @@ const CUR_PAUSE = svgCur("<rect x='8.5' y='7' width='5.5' height='18' rx='1'/><r
 const CUR_PLAY = svgCur("<path d='M10 6.5 L25 16 L10 25.5 Z'/>");
 const CUR_SCRUB = svgCur("<rect x='14.5' y='4' width='3' height='24' rx='1'/><path d='M3.5 16 L11 10.5 L11 21.5 Z'/><path d='M28.5 16 L21 10.5 L21 21.5 Z'/>");
 const INKS = [[232, 34, 44], [255, 118, 18], [255, 196, 0], [22, 168, 82], [110, 200, 230], [24, 88, 224], [138, 64, 214], [244, 138, 172]];
-// albums are just categories. Placeholder pieces: give one a src (an audio file next to this page) and it plays that file with its real waveform;
-// without one it plays a synthesised stand-in of its kind. dur is in seconds (taken from the file when there is one)
-const ALBUMS = [
-  // img: the album's photo (black & white, white ground) laid into the page in the stark style; imgX: 0 puts it flush left, 1 flush against the panel; imgY: shift up (negative) as a fraction of the page height; imgFlip: upside down; imgMirror: left to right.
-  { title: 'Water', img: BASE + 'images/lone-tree.jpg', imgX: 1, imgY: -.2, tracks: [
-    { title: 'Low tide, Panglao', kind: 'field', date: '2026-11-06', dur: 134 },
-    { title: 'Breathe-up before a dive', kind: 'voice', date: '2026-11-12', dur: 65 },
-    { title: 'Boat engine, 6 a.m.', kind: 'field', date: '2026-11-15', dur: 92 },
-    { title: 'Surface', kind: 'music', date: '2026-12-01', dur: 188 }] },
-  { title: 'Studio', img: BASE + 'images/great-buddha.jpg', imgX: 1, imgMirror: true, tracks: [
-    { title: 'Sketch no. 4', kind: 'music', date: '2026-03-02', dur: 166 },
-    { title: 'Tape loop', kind: 'music', date: '2026-04-19', dur: 118 },
-    { title: 'Late take, talking', kind: 'voice', date: '2026-05-07', dur: 52 }] },
-  { title: 'Notes', img: BASE + 'images/driftwood.jpg', imgX: 1, imgFlip: true, tracks: [
-    { title: 'Voice memo, train', kind: 'voice', date: '2026-02-11', dur: 80 },
-    { title: 'Rain on the roof', kind: 'field', date: '2026-06-23', dur: 160 },
-    { title: 'Humming the melody', kind: 'voice', date: '2026-08-30', dur: 38 }] }
-];
+// the albums and their pieces, from src/data/sound.json (edited in the editor's Sound tab). An album: title, img (its photo, under public/,
+// laid into the page in black and white in the stark style; imgX: 0 flush left, 1 flush against the panel; imgY: shift up as a fraction of the
+// page height; imgFlip: upside down; imgMirror: left to right), and its pieces: title, kind (field, voice or music: its colour and label),
+// date, and src (an audio file under public/), whose real waveform and length it plays; a piece without a file plays a synthesised stand-in
+// of its kind, dur seconds long. Albums with no pieces are left out
+const ALBUMS = (() => { const list = (SOUND.albums || []).filter(a => a.tracks && a.tracks.length).map(a => ({ ...a, img: assetUrl(a.img),
+  tracks: a.tracks.map(t => ({ ...t, kind: KINDS_OK.includes(t.kind) ? t.kind : 'music', dur: t.dur || 60, src: assetUrl(t.src) })) }));
+  return list.length ? list : [{ title: 'Sound', img: '', tracks: [{ title: 'Coming soon', kind: 'music', date: '', dur: 60, src: '' }] }]; })();
 // cyberpunk accents for the stark style: neon magenta and cyan
 const NEON_M = '#ff2bd6', NEON_C = '#00e5ff';
 // a few milliseconds of silence, looped alongside a playing piece on older iPhones (see mediaOn)

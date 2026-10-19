@@ -1,0 +1,88 @@
+{
+  "albums": [
+    {
+      "title": "Water",
+      "img": "images/lone-tree.jpg",
+      "imgX": 1,
+      "imgY": -0.2,
+      "tracks": [
+        {
+          "title": "Low tide, Panglao",
+          "kind": "field",
+          "date": "2026-11-06",
+          "dur": 134
+        },
+        {
+          "title": "Breathe-up before a dive",
+          "kind": "voice",
+          "date": "2026-11-12",
+          "dur": 65
+        },
+        {
+          "title": "Boat engine, 6 a.m.",
+          "kind": "field",
+          "date": "2026-11-15",
+          "dur": 92
+        },
+        {
+          "title": "Surface",
+          "kind": "music",
+          "date": "2026-12-01",
+          "dur": 188
+        }
+      ]
+    },
+    {
+      "title": "Studio",
+      "img": "images/great-buddha.jpg",
+      "imgX": 1,
+      "imgMirror": true,
+      "tracks": [
+        {
+          "title": "Sketch no. 4",
+          "kind": "music",
+          "date": "2026-03-02",
+          "dur": 166
+        },
+        {
+          "title": "Tape loop",
+          "kind": "music",
+          "date": "2026-04-19",
+          "dur": 118
+        },
+        {
+          "title": "Late take, talking",
+          "kind": "voice",
+          "date": "2026-05-07",
+          "dur": 52
+        }
+      ]
+    },
+    {
+      "title": "Notes",
+      "img": "images/driftwood.jpg",
+      "imgX": 1,
+      "imgFlip": true,
+      "tracks": [
+        {
+          "title": "Voice memo, train",
+          "kind": "voice",
+          "date": "2026-02-11",
+          "dur": 80
+        },
+        {
+          "title": "Rain on the roof",
+          "kind": "field",
+          "date": "2026-06-23",
+          "dur": 160
+        },
+        {
+          "title": "Humming the melody",
+          "kind": "voice",
+          "date": "2026-08-30",
+          "dur": 38
+        }
+      ]
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 // Carried over from the Claude Design file "Freediving v2.dc.html".
 // The logic class is the design's own code; View is its template as JSX.
 import React from 'react';
-import { DCLogic, page, sty, BASE } from '../lib/dc.js';
+import { DCLogic, page, sty, BASE, assetUrl } from '../lib/dc.js';
 import { ropeX } from '../lib/rope.js';
 import { drawSquid } from '../lib/squid-draw.js';
 
@@ -700,7 +700,7 @@ class Component extends DCLogic {
         const isExp = ex === i;
         return {
           id: e.id, i, title: e.title || 'Untitled', meta: `${(i + 1) * mpe} m  ·  ${fmt(e.date)}`,
-          short: e.short || '', hasShort: !!e.short, imageBg: e.image ? `url("${String(e.image).replace(/["\\\n\r]/g, c => encodeURIComponent(c))}")` : 'none', hasImage: !!e.image,
+          short: e.short || '', hasShort: !!e.short, imageBg: e.image ? `url("${String(assetUrl(e.image)).replace(/["\\\n\r]/g, c => encodeURIComponent(c))}")` : 'none', hasImage: !!e.image,
           paras, tags, hasTags: tags.length > 0, link: e.link || '', hasLink: !!e.link, linkLabel,
           isExp, notExp: !isExp, isFocus: !isExp && f === i, go: () => this.go(i)
         };

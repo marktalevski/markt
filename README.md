@@ -17,11 +17,17 @@ The editor (`src/components/Editor.jsx`, page `src/editor/editor.astro`) is priv
 
 Each component is the Claude Design prototype's own logic class, unchanged except for page links, plus its template rewritten as JSX. `src/lib/dc.js` supplies the small base class they expect.
 
-## Dive log entries and Library books
+## Editing the site
 
-The published entries (the Freediving tab) and the Library's books (the Library tab: each book's title, subtitle and contents) are in `public/data/site.json`; pages fetch it when they need it (the Library fetches just its books, which the build serves on their own as `data/books.json`). To change them, run `npm run dev`, open the editor at <http://localhost:4321/markt/editor/>, edit (changes save in that browser only), click **Export JSON**, and save the downloaded `site.json` over `public/data/site.json`.
+Run `npm run dev` and open the editor at <http://localhost:4321/markt/editor/> (it only exists on your own computer, never on the published site). It has three tabs:
 
-Photos uploaded in the editor are stored inside `site.json`, which makes it slower to load. For anything more than a few photos, put the image files in `public/images/` and paste their address (for example `/markt/images/dive-1.jpg`) into the entry's image field instead.
+- **Freediving**: the dive log's entries.
+- **Sound**: the albums, each with a photo and its pieces (title, date, kind, and the sound file).
+- **Library**: the five books' titles, subtitles and contents, with an optional photo on each passage or piece.
+
+Changes save in that browser as you go. Uploaded songs go into `public/audio/` and photos into `public/images/` straight away. **Save to site** writes the content into the project (`public/data/site.json` for the dive log and books, `src/data/sound.json` for the albums); then commit and push to publish. **Export backup** downloads everything as one file, and **Import** brings a backup back.
+
+Photos are scaled down to 1600px before they are uploaded. Songs are uploaded as they are; MP3 or M4A keeps them small (GitHub refuses single files over 100 MB).
 
 ## Design files
 

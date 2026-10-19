@@ -3,7 +3,7 @@
 // left. A line in the book's colour runs down beside the text and shows where you are in it, with a ring at each section to jump to.
 // The logic class is the design's own code; View is its template as JSX.
 import React from 'react';
-import { DCLogic, page, sty, BASE } from '../lib/dc.js';
+import { DCLogic, page, sty, BASE, assetUrl } from '../lib/dc.js';
 import { loadBooks } from '../lib/library-data.js';
 import { navAt } from '../lib/nav.js';
 
@@ -113,7 +113,8 @@ class Component extends DCLogic {
     if (b.kind === 'bujo') (b.months || []).forEach(m => { H((MONTHS[m.month - 1] + ' ' + (b.year || '')).trim()); if (m.intention) P(m.intention, true); (m.entries || []).forEach(e => L(e.d + '   ' + e.sym + '   ' + e.text)); });
     else if (b.kind === 'quotes') it.forEach(q => { B.push({ text: '“' + q.text + '”', ff: SERIF, fs: Math.round(fs * 1.55), fst: 'italic', fw: 400, lh: 1.35, ls: '-.01em', c: '#111', m: '1.6em 0 .4em' }); M(q.who || ''); });
     else if (b.kind === 'pillow') it.forEach(c => { H(c.title); (c.items || []).filter(Boolean).forEach(x => L('—  ' + x)); });
-    else it.forEach(x => { H(x.title); M(b.kind === 'musings' ? (x.date || '') : (x.source || '')); paras(x.text).forEach(p => P(p)); });
+    // a passage or piece may have a photo, between its heading and its text
+    else it.forEach(x => { H(x.title); M(b.kind === 'musings' ? (x.date || '') : (x.source || '')); if (x.image) B.push({ img: assetUrl(x.image), alt: x.title || '', m: '.2em 0 1.4em' }); paras(x.text).forEach(p => P(p)); });
     return B.map((x, i) => Object.assign(x, { h: x.h || i === 0 ? 1 : 0 }));
   }
   dotOf(k) { const d = document.querySelector('[data-navk="' + k + '"] [data-navdot]'); if (!d) return null; const r = d.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }
@@ -160,6 +161,8 @@ class Component extends DCLogic {
       return { kind: GOUACHE[x.kind] ? x.kind : 'other', title: x.title, first: i === 0, w: Math.round(stackW - (narrow ? 0 : 14)), h: Math.round(barH * (SPINE_H[x.kind] || 1)), bg: (GOUACHE[x.kind] || ['#888'])[0], rad: SPINE_R[x.kind] || '3px', tx: on ? (narrow ? -12 : -40) : 0, z: on ? 3 : 1, pick: () => this.pick(x.slug) }; });
     return {
       scrollRef: this.scrollRef, bodyRef: this.bodyRef, fillRef: this.fillRef, onScroll: this.onScroll, blocks: this.bc.blocks,
+      // a photo that has loaded moves the headings below it, so the section rings are placed again
+      onImg: () => { this.mKey = null; this.measure(); },
       railL: lm, railT: 28, railH, rule, railOn: b ? 1 : 0,
       notches: this.state.notchData.map((n, i) => ({ y: n.y, label: n.label, c: rule, o: i === 0 ? 0 : 1, go: () => { const sc = this.scrollRef.current; if (sc) sc.scrollTo({ top: Math.max(0, n.top - 30), behavior: 'smooth' }); } })),
       cupR: Math.round(stackW * .14), shelf, colW, colL: lm, stackW, stackR, sfs,
@@ -245,6 +248,7 @@ function View(v) {
       <div ref={v.scrollRef} onScroll={v.onScroll} data-read="1" style={sty(`position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;-webkit-mask-image:${mask};mask-image:${mask}`)}>
         <div ref={v.bodyRef} style={sty(`width:${v.colW}px;margin-left:${v.colL}px;box-sizing:border-box;padding:${v.padTop}px 0 ${v.padBot}px 28px`)}>
           {(v.blocks || []).map((k, i) => (
+            k.img ? <img key={i} src={k.img} alt={k.alt} loading="lazy" onLoad={v.onImg} style={sty(`display:block;max-width:100%;max-height:70vh;width:auto;height:auto;margin:${k.m};border-radius:3px`)} /> :
             <p key={i} data-h={k.h} style={sty(`margin:${k.m};font-family:${k.ff};font-size:${k.fs}px;font-style:${k.fst};font-weight:${k.fw};line-height:${k.lh};letter-spacing:${k.ls};color:${k.c};text-wrap:pretty;white-space:pre-wrap`)}>{k.text}</p>
           ))}
         </div>
