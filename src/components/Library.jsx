@@ -70,8 +70,8 @@ class Component extends DCLogic {
       A(dot, flight(S, [S[0], S[1] - 120], [N[0] - 30, N[1] + 80], N, DOT_R(k), easeOut, [DOT_COL[k], DOT_COL[k]], true), { duration: fly + 200, delay: t0, fill: 'both' });
       A(dot, [{ opacity: 1 }, { opacity: 0 }], { duration: 120, delay: t0 + fly + 200, fill: 'forwards' }); });
     const landed = t0 + (books.length - 1) * step + fly + open, mug = mugEl;
-    // the mug slides in along the top book from off the right edge, overshooting a touch and settling back
-    if (mug) { const dx = innerWidth - mugL + 60; A(mug, [{ translate: `${dx}px 0`, easing: 'cubic-bezier(.2,.7,.3,1)' }, { translate: '-7px 0', offset: .78, easing: 'ease-in-out' }, { translate: '0 0' }], { duration: 700, delay: landed + 20, fill: 'backwards' });
+    // the mug slides in along the top book from off the right edge and slows to a stop in its place (no overshoot)
+    if (mug) { const dx = innerWidth - mugL + 60; A(mug, [{ translate: `${dx}px 0` }, { translate: '0 0' }], { duration: 900, delay: landed + 20, easing: 'cubic-bezier(.16,1,.3,1)', fill: 'backwards' });
       // hidden until then: while the top book opens out of its dot, its scale would carry the waiting mug into view
       A(mug, [{ opacity: 0 }, { opacity: 0 }], { duration: landed + 20 }); }
     const body = this.bodyRef.current; if (body) A(body, [{ opacity: 0, transform: 'translateY(16px)' }, { opacity: 1, transform: 'none' }], { duration: 520, delay: landed + 150, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' });
@@ -136,7 +136,7 @@ class Component extends DCLogic {
       // has arrived
       const W = innerWidth, fold = 210, fly = 480, step = 70, flights = [];
       [this.bodyRef.current, document.querySelector('[data-rail]')].forEach(el => el && el.animate([{ opacity: getComputedStyle(el).opacity }, { opacity: 0 }], { duration: 220, fill: 'forwards' }));   // from as they are (the line is hidden with no book open)
-      const mug = document.querySelector('[data-mug]'); if (mug) { const r = mug.getBoundingClientRect(); mug.animate([{ translate: '0 0' }, { translate: '-6px 0', offset: .2 }, { translate: `${innerWidth - r.left + 60}px 0` }], { duration: 380, easing: 'ease-in', fill: 'forwards' }); }
+      const mug = document.querySelector('[data-mug]'); if (mug) { const r = mug.getBoundingClientRect(); mug.animate([{ translate: '0 0' }, { translate: `${innerWidth - r.left + 60}px 0` }], { duration: 420, easing: 'cubic-bezier(.55,0,.75,.4)', fill: 'forwards' }); }
       this.spines().forEach(({ el, k, L, rad, dot, asDot }, i) => { const N = navAt(W, k), d = 160 + i * step;
         el.animate([{ scale: '1 1', opacity: 1 }, { scale: asDot, opacity: 0 }], { duration: fold, delay: d, fill: 'forwards', easing: 'ease-in' });
         if (!dot) return;

@@ -7,6 +7,8 @@ import { drawSquid } from '../lib/squid-draw.js';
 
 // the rope down from the buoy, wide enough for its twist to show
 const ROPE_W = 3.6;
+// leaving for Sound or the Library: how long the buoy's and flag's colours take to drain into their dots before the water fades
+const PG_DRAIN = .85;
 // the rope is one warm sand colour all the way down, with a thin dark edge so it reads on the pale surface water and the deep blue alike
 const ROPE_SAND = '#e9dcbc', ROPE_EDGE = '#141414';
 // leaving for Home: how long each colour takes to gather at the centre, circle there with the others and go up into its dot (s)
@@ -202,7 +204,7 @@ class Component extends DCLogic {
   go(i) { this.target = i; }
   navHov = null; waveRef = React.createRef();
   goHome = e => { e.preventDefault(); if (this.leaveT != null) return; const o = {}; try { document.querySelectorAll('[data-navk]').forEach(el => { const d = el.querySelector('[data-navdot]'); if (!d) return; const r = d.getBoundingClientRect(); o[el.getAttribute('data-navk')] = [r.left + r.width / 2, r.top + r.height / 2]; }); o.ink = o.home; sessionStorage.setItem('nav-from', JSON.stringify(o)); } catch (x) {} const far = this.p > -.9; this.goSurface(); this.navPos = o; try { let mb = 0; document.querySelectorAll('nav[aria-label="Pages"] [data-navk]').forEach(el => { const r = el.getBoundingClientRect(); mb = Math.max(mb, r.bottom); }); this.navBot = mb; } catch (x) {} setTimeout(() => { this.leaveT = 0; }, far ? 1300 : 0); };
-  goPage = k => e => { if (e) e.preventDefault(); if (this.leaveT != null || this.pgLeave) return; this.pgLeave = { href: k === 'sound' ? BASE + 'sound/?from=page' : BASE + 'library/', t: 0, k }; };
+  goPage = k => e => { if (e) e.preventDefault(); if (this.leaveT != null || this.pgLeave) return; this.pgLeave = { href: k === 'sound' ? BASE + 'sound/?from=page' : BASE + 'library/', t: 0, k, nav: Object.fromEntries(['c4', 'sound'].map(n => { const d = document.querySelector('[data-navk="' + n + '"] [data-navdot]'), r = d && d.getBoundingClientRect(); return [n, r ? [r.left + r.width / 2, r.top + r.height / 2] : null]; })) }; };
   goSurface = () => { this.target = -1; this.setState({ exp: null }); };
 
   tick = now => {
@@ -220,8 +222,11 @@ class Component extends DCLogic {
         const k = clamp((this.leaveT - SWIRL_DUR * .85 - i * .1) / .75, 0, 1), e = k * k * (3 - 2 * k); lab.style.transformOrigin = '50% 0'; lab.style.transform = 'translateY(' + (-30 * e).toFixed(1) + 'px) scaleY(' + (1 - .85 * e).toFixed(3) + ') scaleX(' + (1 - .5 * e).toFixed(3) + ')'; lab.style.opacity = (1 - e).toFixed(3); lab.style.filter = e > .02 ? 'blur(' + (2.5 * e).toFixed(2) + 'px)' : '';
         if (dot && k > 0) { const u = clamp((k - .55) / .45, 0, 1); dot.style.transform = 'scale(' + (1 + .18 * Math.sin(Math.PI * u)).toFixed(3) + ')'; } });
       if (this.leaveT > SWIRL_DUR * .85 + 1.25 && !this.left) { this.left = true; (window.__leave || (h => { location.href = h; }))(BASE + '?from=dive'); } }
-    if ((this.fromHome || this.fromSound) && !this.navLabDone) { const k = this.state.introDone ? 1 : smooth(clamp((this.introT - (this.fromSound ? 3 : 1.3)) / .9, 0, 1)); if (this.fromSound && k >= 1) document.querySelectorAll('[data-navdot]').forEach(d => { d.style.opacity = '1'; }); document.querySelectorAll('nav[aria-label="Pages"] > [data-navk] > span:last-child').forEach(el => { el.style.opacity = k.toFixed(3); }); if (k >= 1) this.navLabDone = true; }
+    if ((this.fromHome || this.fromSound) && !this.navLabDone) { const k = this.state.introDone ? 1 : smooth(clamp((this.introT - (this.fromSound ? 3 : 1.3)) / .9, 0, 1)); if (this.fromSound && k >= 1) document.querySelectorAll('[data-navdot]').forEach(d => { const nk = d.closest('[data-navk]'), key = nk && nk.getAttribute('data-navk'); if ((key === 'c4' || key === 'sound') && !(this.painted && this.painted[key])) return; d.style.opacity = '1'; }); document.querySelectorAll('nav[aria-label="Pages"] > [data-navk] > span:last-child').forEach(el => { el.style.opacity = k.toFixed(3); }); if (k >= 1) this.navLabDone = true; }
     if (!this.state.introDone) { this.introT += dt; if (this.introT >= this.introEnd) this.setState({ introDone: true }); }
+    // the intro skipped (or left) before the orange and red dots finished colouring the buoy and flag: their menu dots come back regardless
+    if (!this.paintDone && (this.state.introDone || this.leaveT != null || this.pgLeave)) { this.paintDone = true; this.painted = { c4: true, sound: true };
+      ['c4', 'sound'].forEach(k => { const d = document.querySelector('[data-navk="' + k + '"] [data-navdot]'); if (d) d.style.opacity = '1'; }); }
     // the dive follows the scroll closely (a time constant of 1/11 s): smooth, without trailing behind slow scrolling. The cards, the orange
     // line and the squid each follow it in turn, so their rates are kept quick too, or their lags would add up
     this.p += (this.target - this.p) * (1 - Math.exp(-dt * 11));
@@ -230,12 +235,14 @@ class Component extends DCLogic {
     const f = this.p > -.5 && this.count ? clamp(Math.round(this.p), 0, this.count - 1) : -1;
     if (f !== this.state.focus) this.setState({ focus: f });
     this.layout(dt);
-    if (this.pgLeave) { const L = this.pgLeave; L.t += dt; const k = smooth(clamp(L.t / .45, 0, 1));
-      [this.canvasRef, this.waveRef, this.fgRef].forEach(r => { if (r.current) r.current.style.opacity = (1 - k).toFixed(3); }); [this.worldRef, this.chromeRef].forEach(r => { if (r.current) r.current.style.opacity = ((+r.current.style.opacity || 0) * (1 - k)).toFixed(3); });
+    // leaving for Sound or the Library: the cards fade at once; the buoy's and flag's colours drain back into the orange and red dots (see
+    // draw, PG_DRAIN), and only then does the water fade and the page go
+    if (this.pgLeave) { const L = this.pgLeave; L.t += dt; const kc = smooth(clamp(L.t / .45, 0, 1)), k = smooth(clamp((L.t - PG_DRAIN) / .45, 0, 1));
+      [this.canvasRef, this.waveRef, this.fgRef].forEach(r => { if (r.current) r.current.style.opacity = (1 - k).toFixed(3); }); [this.worldRef, this.chromeRef].forEach(r => { if (r.current) r.current.style.opacity = ((+r.current.style.opacity || 0) * (1 - kc)).toFixed(3); });
       const d = document.querySelector('[data-navk="' + L.k + '"] [data-navdot]'); if (d) d.style.transform = 'scale(' + (1 + .6 * Math.sin(Math.PI * clamp(L.t / .55, 0, 1))).toFixed(3) + ')';
       // for Sound: the menu's names fade and only the dots stay; Sound takes them over from exactly where they sit
       if (L.k === 'sound') document.querySelectorAll('nav[aria-label="Pages"] [data-navk] > span:not([data-navdot])').forEach(sp => { sp.style.opacity = (1 - k).toFixed(3); });
-      if (L.t > .55 && !this.left) { this.left = true;
+      if (L.t > PG_DRAIN + .5 && !this.left) { this.left = true;
         if (L.k === 'sound') try { const o = {}; document.querySelectorAll('[data-navk]').forEach(el => { const d = el.querySelector('[data-navdot]'); if (!d) return; const r = d.getBoundingClientRect(); o[el.getAttribute('data-navk')] = [r.left + r.width / 2, r.top + r.height / 2]; }); o.ink = o.home; sessionStorage.setItem('nav-from', JSON.stringify(o)); } catch (e) {}
         (window.__leave || (h => { location.href = h; }))(L.href); } }
     if (this.state.introDone && this.count) {
@@ -392,8 +399,35 @@ class Component extends DCLogic {
       bead(p, col, r); }
     // the other dots fly straight up into their places in the menu
     const RGB = { sound: [232, 34, 44], library: [255, 196, 0], c4: [255, 118, 18], c5: [22, 168, 82], c6: [138, 64, 214] };
-    Object.keys(RGB).forEach((k, i) => { const from = nf[k], D = NV[k]; if (!from || !D) { land(k); return; } const g = (T - .15 - i * .08) / 1.1; if (g >= 1) { land(k); return; }
+    Object.keys(RGB).forEach((k, i) => { if (k === 'c4' || k === 'sound') return;   // these two colour the buoy and flag first (paintDots)
+      const from = nf[k], D = NV[k]; if (!from || !D) { land(k); return; } const g = (T - .15 - i * .08) / 1.1; if (g >= 1) { land(k); return; }
       const u = ease(clamp(g, 0, 1)), p = bz(from, [from[0] - 60, from[1] - 220], [D[0] - 40, D[1] + 160], D, u); bead(p, RGB[k], 4); });
+  }
+  // arriving, the buoy and flag are bare (cream) until their dots colour them: the orange dot flies to the buoy and the red one to the flag,
+  // from wherever they are (the menu, or where the last page handed them over: Sound's pads, the Library's books), the colour floods in as
+  // each lands, and the dot rises on into its place in the menu. Leaving, the colours drain back into the same dots (see absorb)
+  PAINT = { fly: .9, fill: .45, rise: .8, lag: { c4: 0, sound: .15 } };
+  paintStart() { return this.fromHome ? 1.15 : (this.fromSound ? 2.75 : 1.6) + .4; }
+  paintFill(T, k) { return smooth(clamp((T - this.paintStart() - this.PAINT.lag[k]) / this.PAINT.fill, 0, 1)); }
+  paintDots(ctx, T, B) {
+    const P = this.PAINT, nf = this.fromSound, BS = B[2] || 1, ease = v => v < .5 ? 4 * v * v * v : 1 - Math.pow(-2 * v + 2, 3) / 2;
+    const bz = (P0, C1, C2, P1, u) => { const a = (1 - u) ** 3, b = 3 * (1 - u) ** 2 * u, c = 3 * (1 - u) * u * u, d = u ** 3; return [a * P0[0] + b * C1[0] + c * C2[0] + d * P1[0], a * P0[1] + b * C1[1] + c * C2[1] + d * P1[1]]; };
+    if (!this.painted) this.painted = {};
+    [['c4', [255, 118, 18], 5.5, [B[0], B[1]]], ['sound', this.redC || [232, 34, 44], 8, [B[0] + 11 * BS, B[1] - 39 * BS]]].forEach(([k, col, r, D]) => {
+      if (this.painted[k]) return;
+      const el = document.querySelector('[data-navk="' + k + '"] [data-navdot]'); if (!el) return;
+      if (!this.paintNav) this.paintNav = {}; if (!this.paintNav[k]) { const rr = el.getBoundingClientRect(); this.paintNav[k] = [rr.left + rr.width / 2, rr.top + rr.height / 2]; }
+      const M = this.paintNav[k], S = (nf && nf[k]) || M, t0 = this.paintStart() + P.lag[k], uIn = (T - (t0 - P.fly)) / P.fly, uOut = (T - t0 - P.fill) / P.rise;
+      const dot = (p, rad) => { ctx.globalAlpha = 1; ctx.fillStyle = css(col); ctx.beginPath(); ctx.arc(p[0], p[1], rad, 0, 6.2832); ctx.fill(); };
+      if (uOut >= 1) { this.painted[k] = true; el.style.opacity = '1'; return; }
+      // away from the menu: its dot there is hidden until this one comes back to it
+      if (uIn > 0 || S !== M) el.style.opacity = '0';
+      if (uIn <= 0) { if (S !== M) dot(S, r); return; }
+      if (uIn < 1) { const u = ease(uIn); dot(bz(S, [S[0] - 40, S[1] - (S[1] > D[1] ? 160 : -40)], [D[0] + 60, D[1] - 90], D, u), r); return; }
+      const uf = clamp((T - t0) / P.fill, 0, 1);
+      if (uOut <= 0) { dot(D, r * (1 - .35 * Math.sin(Math.PI * uf))); return; }   // it gives up its colour: a small squeeze as the fill floods out
+      const u = ease(clamp(uOut, 0, 1)); dot(bz(D, [D[0] + 20, D[1] - 140], [M[0] - 40, M[1] + 140], M, u), r);
+    });
   }
   // a menu dot breathes once as the tail of its line goes in
   navPulse(key, g) { const d = document.querySelector('[data-navk="' + key + '"] [data-navdot]'); if (!d) return; const u = clamp((g - .88) / .3, 0, 1); d.style.transform = 'scale(' + (1 + .22 * Math.sin(Math.PI * u)).toFixed(3) + ')'; d.style.boxShadow = 'none'; }
@@ -581,6 +615,16 @@ class Component extends DCLogic {
     const flagAt = b => [b[0] + 11 * b[2], b[1] - 39 * b[2]];
     // leaving for Home: each colour lifts off as a soft bead of light and drifts up into its menu dot, which breathes once as it takes it in
     this.sqDrain = 0;
+    // leaving for Sound or the Library: the buoy's colour runs off along its top into the orange dot, the flag's into the red one, each by the
+    // plain rising route (no swirl), and the bare buoy and flag are left behind as the water fades
+    if (this.pgLeave && this.pgLeave.nav && this.buoyPos) {
+      const lt = this.pgLeave.t, B = this.buoyPos, BS = B[2] || 1, NV = this.pgLeave.nav, RC = this.redC || [232, 34, 44], D = PG_DRAIN - .1;
+      this.buoyDrain = smooth(clamp(lt / .5, 0, 1)); this.flagDrain = smooth(clamp((lt - .08) / .5, 0, 1));
+      const buoySrc = Array.from({ length: 13 }, (_, q) => { const a = Math.PI + q / 12 * Math.PI; return [B[0] + Math.cos(a) * 22 * BS, B[1] + Math.sin(a) * 13 * BS]; });
+      const flagSrc = [[B[0], B[1] - 46 * BS], [B[0] + 11 * BS, B[1] - 46.5 * BS], [B[0] + 22 * BS, B[1] - 46 * BS]];
+      if (NV.c4) { this.absorb(WX, buoySrc, NV.c4, lt / D, { w: 3.4, colA: [255, 118, 18], colB: [255, 118, 18], lift: 40, sway: 12, ph: .4 }); this.navPulse('c4', lt / D); }
+      if (NV.sound) { this.absorb(WX, flagSrc, NV.sound, (lt - .08) / D, { w: 3, colA: RC, colB: RC, lift: 30, sway: 8, ph: 1.9 }); this.navPulse('sound', (lt - .08) / D); }
+    }
     if (this.leaveT != null && this.navPos && this.navPos.c4 && this.buoyPos) {
       const lt = this.leaveT, B = this.buoyPos, F = flagAt(B), ez = v => v < .5 ? 4 * v * v * v : 1 - Math.pow(-2 * v + 2, 3) / 2, DUR = 1.5;
       const RC = this.redC || [232, 34, 44], tB = .1, tF = .2, tS = .4, BS = B[2] || 1, DU = { b: SWIRL_DUR, f: SWIRL_DUR, s: SWIRL_DUR };
@@ -611,7 +655,9 @@ class Component extends DCLogic {
     if (intro) {
       const d = smooth(clamp((T - this.tideEnd) / 1.0, 0, 1)), drop = this.fromHome ? 1 : smooth(clamp((T - (this.fromSound ? 2.75 : 1.6)) / .4, 0, 1));
       if (d > 0) { const end = LS + (H + 20 - LS) * d, pts = []; for (let y = LS; y <= end; y += 15) pts.push([o.x + Math.sin((y - o.y) * .02) * .7, y]); pts.push([o.x + Math.sin((end - o.y) * .02) * .7, end]); this.brush(ctx, pts, ROPE_W + 1.8, .85, LS - o.y, false, d < 1, ROPE_EDGE); this.brush(ctx, pts, ROPE_W - .2, 1, LS - o.y, false, d < 1, ROPE_SAND); }
+      if (this.leaveT == null) { this.buoyDrain = 1 - this.paintFill(T, 'c4'); this.flagDrain = 1 - this.paintFill(T, 'sound'); }
       if (drop > 0) { this.buoyPos = [o.x, BY - (1 - drop) * 60, BS * drop]; this.drawBuoy(ctx, o.x, BY - (1 - drop) * 60, BS * drop, t); }
+      if (this.leaveT == null) this.paintDots(ctx, T, [o.x, BY, BS]);
     } else {
       const a0 = Math.max(LS, -20), a1 = Math.min(o.y + this.lineEnd, H + 20);
       // one stroke all the way down (drawn in pieces, every join showed as a band across the rope): its dark edge, then the sand over it
