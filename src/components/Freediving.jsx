@@ -35,8 +35,9 @@ class Component extends DCLogic {
     import('../lib/site-data.js').then(m => { this.store = m; return m.load(); }).then(data => this.setState({ data }));
     this.introT = (this.props.intro ?? true) && (this.props.motion ?? true) ? 0 : 99;
     if (this.introT === 0 && /from=home/.test(location.search)) { this.introT = 1; this.fromHome = true; }
-    // from Sound: its menu dots, handed over where its beat pads closed into them
-    if (this.introT === 0 && /from=sound/.test(location.search)) try { const nf = JSON.parse(sessionStorage.getItem('nav-from') || 'null'); sessionStorage.removeItem('nav-from'); if (nf && nf.home && nf.freediving) { this.fromSound = nf; this.skipWaves = true; } } catch (e) {}
+    // from Sound or the Library: their menu dots, handed over where Sound's beat pads closed into them or where the Library's books folded
+    // back into them (its menu); Home's and this page's dots draw the water's surface lines, the rest go up into the menu
+    if (this.introT === 0 && /from=(sound|page)/.test(location.search)) try { const nf = JSON.parse(sessionStorage.getItem('nav-from') || 'null'); sessionStorage.removeItem('nav-from'); if (nf && nf.home && nf.freediving) { this.fromSound = nf; this.skipWaves = true; } } catch (e) {}
     // the page comes in in order: the surface lines draw (already there when arriving from Home), the water rises up to them, then the rope goes
     // down as the entries come in, and the squid arrives last
     this.tideIntro = true; this.tide0 = this.fromHome ? 2.0 : this.fromSound ? 3.25 : 2.15; this.tideEnd = this.tide0 + 1.5; this.introEnd = this.tideEnd + 1.15; if (this.fromHome) this.skipWaves = true;

@@ -117,7 +117,7 @@ class Component extends DCLogic {
     return B.map((x, i) => Object.assign(x, { h: x.h || i === 0 ? 1 : 0 }));
   }
   dotOf(k) { const d = document.querySelector('[data-navk="' + k + '"] [data-navdot]'); if (!d) return null; const r = d.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }
-  // leaving: the page fades to its paper colour, then goes (handing its menu dots' places to Home or Sound, whose dots fly from them)
+  // leaving: the page fades to its paper colour, then goes (handing its menu dots' places to the next page, whose dots fly on from them)
   leave(href, dots) {
     return e => { if (e) e.preventDefault(); if (this.out) return; this.out = true;
       if (dots) try { const o = {}; document.querySelectorAll('[data-navk]').forEach(el => { const k = el.getAttribute('data-navk'), p = this.dotOf(k); if (p) o[k] = p; }); o.ink = o.home; sessionStorage.setItem('nav-from', JSON.stringify(o)); } catch (x) {}
@@ -141,7 +141,7 @@ class Component extends DCLogic {
       Promise.all(flights.map(a => a.finished)).then(() => setTimeout(once, flights.length ? 60 : 280), once); };
   }
   stay = e => { if (e) e.preventDefault(); };
-  GO = { home: this.leave(HOME, true), freediving: this.leave(BASE + 'freediving/'), sound: this.leave(BASE + 'sound/?from=page', true), library: this.stay };
+  GO = { home: this.leave(HOME, true), freediving: this.leave(BASE + 'freediving/?from=page', true), sound: this.leave(BASE + 'sound/?from=page', true), library: this.stay };
   renderVals() {
     const { vw, vh, sel } = this.state, books = this.state.books || [], narrow = vw < 760;
     const b = books.find(x => x.slug === sel);
