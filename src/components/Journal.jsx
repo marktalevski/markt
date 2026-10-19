@@ -47,7 +47,7 @@ class Component extends DCLogic {
   }
   componentDidUpdate() { this.measure(); if (this.state.books && !this.readied) { this.readied = true; window.__ready && window.__ready(); this.arrive(); } }
   // arriving: each book's dot drops from where it is (the menu, or where the last page left it) to the book's place in the stack, bottom
-  // book first, and opens out into the book; dots that aren't books (Home, Journal) fly back up to the menu. The mug lands on the top book
+  // book first, and opens out into the book; dots that aren't books (Home, Journal) fly back up to the menu. The mug slides onto the top book
   // last and the text rises in. (Books use the separate scale property, so their own slide-out and hover, on transform, carry on untouched)
   arrive() {
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -63,7 +63,8 @@ class Component extends DCLogic {
       dot.animate(flight(S, [S[0], S[1] - 120], [N[0] - 30, N[1] + 80], N, DOT_R(k), easeOut, [DOT_COL[k], DOT_COL[k]], true), { duration: fly + 200, delay: t0, fill: 'both' });
       dot.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 120, delay: t0 + fly + 200, fill: 'forwards' }); });
     const landed = t0 + (books.length - 1) * step + fly + open, mug = document.querySelector('[data-mug]');
-    if (mug) { const r = mug.getBoundingClientRect(); mug.animate([{ translate: `0 ${-(r.bottom + 30)}px`, easing: 'cubic-bezier(.5,0,.85,.4)' }, { translate: '0 0', offset: .72, easing: 'ease-out' }, { translate: '0 -9px', offset: .85, easing: 'ease-in' }, { translate: '0 0' }], { duration: 620, delay: landed - 120, fill: 'backwards' }); }
+    // the mug slides in along the top book from off the right edge, overshooting a touch and settling back
+    if (mug) { const r = mug.getBoundingClientRect(), dx = innerWidth - r.left + 20; mug.animate([{ translate: `${dx}px 0`, easing: 'cubic-bezier(.2,.7,.3,1)' }, { translate: '-7px 0', offset: .78, easing: 'ease-in-out' }, { translate: '0 0' }], { duration: 700, delay: landed - 80, fill: 'backwards' }); }
     const body = this.bodyRef.current; if (body) body.animate([{ opacity: 0, transform: 'translateY(16px)' }, { opacity: 1, transform: 'none' }], { duration: 520, delay: landed + 150, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' });
   }
   // a new book: the text lifts away, the column goes back to the top, and the new book's text rises in
@@ -113,11 +114,11 @@ class Component extends DCLogic {
       if (dots) try { const o = {}; document.querySelectorAll('[data-navk]').forEach(el => { const k = el.getAttribute('data-navk'), p = this.dotOf(k); if (p) o[k] = p; }); o.ink = o.home; sessionStorage.setItem('nav-from', JSON.stringify(o)); } catch (x) {}
       const go = () => (window.__leave || (h => { location.href = h; }))(href);
       if (matchMedia('(prefers-reduced-motion: reduce)').matches) { this.setState({ fade: 1 }); setTimeout(go, 480); return; }
-      // the text and the line fade, the mug lifts off, then the books fold back into their dots, top one first, and the dots rise into the
+      // the text and the line fade, the mug slides off to the right, then the books fold back into their dots, top one first, and the dots rise into the
       // menu; the next page picks them up there
       const W = innerWidth, books0 = this.state.books || [], fold = 240, fly = 560, step = 90;
       [this.bodyRef.current, document.querySelector('[data-rail]')].forEach(el => el && el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 220, fill: 'forwards' }));
-      const mug = document.querySelector('[data-mug]'); if (mug) mug.animate([{ opacity: 1, translate: '0 0' }, { opacity: 0, translate: '0 -14px' }], { duration: 220, fill: 'forwards' });
+      const mug = document.querySelector('[data-mug]'); if (mug) { const r = mug.getBoundingClientRect(); mug.animate([{ translate: '0 0' }, { translate: '-6px 0', offset: .2 }, { translate: `${innerWidth - r.left + 20}px 0` }], { duration: 380, easing: 'ease-in', fill: 'forwards' }); }
       let end = 0;
       [...document.querySelectorAll('[data-book]')].forEach((el, i) => { const bk = books0.find(x => 'Read ' + x.title === el.getAttribute('aria-label')), k = bk && BOOK_DOT[bk.kind]; if (!k) return;
         const r = el.getBoundingClientRect(), L = [r.left + r.width / 2, r.top + r.height / 2], N = navAt(W, k), rad = DOT_R(k), d = 160 + i * step, dot = document.querySelector('[data-fly="' + k + '"]');
