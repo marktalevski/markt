@@ -12,6 +12,8 @@ import Sound from '../components/Sound.jsx';
     <style is:inline>
       /* the paper colour the other pages hand over on, so nothing flashes before the canvas draws */
       html,body{margin:0;height:100%;overflow:hidden;background:#f5f3ee}
+      /* sideways drags are the page's own (they move the playhead on a phone), not the browser's; up and down and pinching still work */
+      body{touch-action:pan-y pinch-zoom}
       a{color:inherit}a:hover{color:inherit;opacity:.6}nav a:hover{opacity:1}
     </style>
   </Fragment>

@@ -404,7 +404,7 @@ class Component extends DCLogic {
     setTimeout(() => { try { sessionStorage.removeItem('nav-from'); } catch (e) {} }, 4000);
     this.raf = requestAnimationFrame(this.tick);
   }
-  componentWillUnmount() { cancelAnimationFrame(this.raf); if (this.offTap) document.removeEventListener('pointerdown', this.offTap); }
+  componentWillUnmount() { cancelAnimationFrame(this.raf); if (this.offTap) document.removeEventListener('pointerdown', this.offTap); if (this.offInk) document.removeEventListener('pointerdown', this.offInk, true); }
   // paint, not outline. Four things real strokes do:
   // 1. ridges catch the light: one light from the upper left, so the edge facing it gets a pale highlight and the opposite edge a soft shadow, swapping as the stroke turns
   // 2. colour mixed on the brush stays in stripes: two or three bands of the same hue, a little lighter or deeper, running the length of the stroke
@@ -960,10 +960,20 @@ class Component extends DCLogic {
   }
 
   inkRef = React.createRef(); hovI = 0; hovIT = 0;
-  inkOn = () => { this.hovI = 1; }; inkOff = () => { this.hovI = 0; };
+  inkOn = () => { this.hovI = 1; }; inkOff = () => { if (!this.inkArmed) this.hovI = 0; };
+  // the black dot. With a mouse, hovering fades the coloured lines and a click shuffles. On a touch screen (no hover) it takes two taps: the
+  // first fades the coloured lines, the second shuffles, and the new symbol comes in with every line showing; a tap anywhere else undoes the first
+  inkTap = e => {
+    const touch = typeof matchMedia !== 'undefined' && matchMedia('(hover: none)').matches;
+    if (!touch) { this.shuffle(); return; }
+    const disarm = () => { this.inkArmed = false; this.hovI = 0; if (this.offInk) { document.removeEventListener('pointerdown', this.offInk, true); this.offInk = null; } };
+    if (!this.inkArmed) { this.inkArmed = true; this.hovI = 1;
+      this.offInk = ev => { if (this.inkRef.current && this.inkRef.current.contains(ev.target)) return; disarm(); }; document.addEventListener('pointerdown', this.offInk, true); return; }
+    disarm(); this.shuffle();
+  };
   renderVals() {
     return {
-      inkRef: this.inkRef, inkOn: this.inkOn, inkOff: this.inkOff, shuffle: this.shuffle, canvasRef: this.canvasRef, btnRef: this.btnRef, sndRef: this.sndRef, libRef: this.libRef, goDive: this.goDive, goSound: this.goSound, goLibrary: this.goLibrary, sndOn: this.sndOn, sndOff: this.sndOff, libOn: this.libOn, libOff: this.libOff, hoverOn: this.hoverOn, hoverOff: this.hoverOff };
+      inkRef: this.inkRef, inkOn: this.inkOn, inkOff: this.inkOff, inkTap: this.inkTap, shuffle: this.shuffle, canvasRef: this.canvasRef, btnRef: this.btnRef, sndRef: this.sndRef, libRef: this.libRef, goDive: this.goDive, goSound: this.goSound, goLibrary: this.goLibrary, sndOn: this.sndOn, sndOff: this.sndOff, libOn: this.libOn, libOff: this.libOff, hoverOn: this.hoverOn, hoverOff: this.hoverOff };
   }
 }
 
@@ -987,7 +997,7 @@ function View(v) {
         {"\n  "}
       </button>
       {"\n  "}
-      <button ref={v.inkRef} onClick={v.shuffle} onMouseEnter={v.inkOn} onMouseLeave={v.inkOff} aria-label="Shuffle symbol" title="Shuffle" style={sty("position:absolute;left:-100px;top:-100px;width:44px;height:44px;transform:translate(-50%, -50%);border:0;padding:0;background:none;cursor:pointer;border-radius:50%;pointer-events:none")} />
+      <button ref={v.inkRef} onClick={v.inkTap} onMouseEnter={v.inkOn} onMouseLeave={v.inkOff} aria-label="Shuffle symbol" title="Shuffle" style={sty("position:absolute;left:-100px;top:-100px;width:44px;height:44px;transform:translate(-50%, -50%);border:0;padding:0;background:none;cursor:pointer;border-radius:50%;pointer-events:none")} />
       {"\n  "}
       <button ref={v.sndRef} onClick={v.goSound} onMouseEnter={v.sndOn} onMouseLeave={v.sndOff} onFocus={v.sndOn} onBlur={v.sndOff} aria-label="Sound" style={sty("position:absolute;left:0;top:0;transform:translate(-50%, -50%);display:block;width:48px;height:48px;padding:0;border-radius:50%;border:0;background:none;cursor:pointer;color:#141414;font-family:'Newsreader', Georgia, serif;opacity:0;pointer-events:none")}>
         {"\n    "}

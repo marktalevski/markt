@@ -201,7 +201,9 @@ class Component extends DCLogic {
     e.preventDefault();
     this.target = clamp(Math.round(this.target) + s, -1, this.count - 1);
   }
-  go(i) { this.target = i; }
+  // an entry's card opens only when it is asked for (a tap or click on the entry, or Enter), never just by scrolling past it, so scrolling
+  // stays free; asking again closes it, and scrolling away from it closes it too
+  go(i) { this.target = i; this.setState({ exp: this.state.exp === i ? null : i }); }
   navHov = null; waveRef = React.createRef();
   goHome = e => { e.preventDefault(); if (this.leaveT != null) return; const o = {}; try { document.querySelectorAll('[data-navk]').forEach(el => { const d = el.querySelector('[data-navdot]'); if (!d) return; const r = d.getBoundingClientRect(); o[el.getAttribute('data-navk')] = [r.left + r.width / 2, r.top + r.height / 2]; }); o.ink = o.home; sessionStorage.setItem('nav-from', JSON.stringify(o)); } catch (x) {} const far = this.p > -.9; this.goSurface(); this.navPos = o; try { let mb = 0; document.querySelectorAll('nav[aria-label="Pages"] [data-navk]').forEach(el => { const r = el.getBoundingClientRect(); mb = Math.max(mb, r.bottom); }); this.navBot = mb; } catch (x) {} setTimeout(() => { this.leaveT = 0; }, far ? 1300 : 0); };
   goPage = k => e => { if (e) e.preventDefault(); if (this.leaveT != null || this.pgLeave) return; this.pgLeave = { href: k === 'sound' ? BASE + 'sound/?from=page' : BASE + 'library/', t: 0, k, nav: Object.fromEntries(['c4', 'sound'].map(n => { const d = document.querySelector('[data-navk="' + n + '"] [data-navdot]'), r = d && d.getBoundingClientRect(); return [n, r ? [r.left + r.width / 2, r.top + r.height / 2] : null]; })) }; };
@@ -403,30 +405,32 @@ class Component extends DCLogic {
       const from = nf[k], D = NV[k]; if (!from || !D) { land(k); return; } const g = (T - .15 - i * .08) / 1.1; if (g >= 1) { land(k); return; }
       const u = ease(clamp(g, 0, 1)), p = bz(from, [from[0] - 60, from[1] - 220], [D[0] - 40, D[1] + 160], D, u); bead(p, RGB[k], 4); });
   }
-  // arriving, the buoy and flag are bare (cream) until their dots colour them: the orange dot flies to the buoy and the red one to the flag,
-  // from wherever they are (the menu, or where the last page handed them over: Sound's pads, the Library's books), the colour floods in as
-  // each lands, and the dot rises on into its place in the menu. Leaving, the colours drain back into the same dots (see absorb)
-  PAINT = { fly: .9, fill: .45, rise: .8, lag: { c4: 0, sound: .15 } };
-  paintStart() { return this.fromHome ? 1.15 : (this.fromSound ? 2.75 : 1.6) + .4; }
-  paintFill(T, k) { return smooth(clamp((T - this.paintStart() - this.PAINT.lag[k]) / this.PAINT.fill, 0, 1)); }
+  // arriving, the buoy and flag are bare (cream) until their dots colour them: a line runs out of the orange dot into the buoy and out of the
+  // red one into the flag (the leave's absorb, played backwards), and the colour floods in as each line arrives. A dot in the menu stays put;
+  // a dot handed over somewhere else (Sound's pads, the Library's books) sends its line from there, then rises into its place in the menu
+  PAINT = { lead: .55, run: 1.05, rise: .75, lag: { c4: 0, sound: .15 } };
+  paintStart() { return (this.fromHome ? 1.15 : (this.fromSound ? 2.75 : 1.6) + .4) - this.PAINT.lead; }
+  paintE(T, k) { return clamp((T - this.paintStart() - this.PAINT.lag[k]) / this.PAINT.run, 0, 1); }
+  paintFill(T, k) { return smooth(clamp((this.paintE(T, k) - .6) / .4, 0, 1)); }
   paintDots(ctx, T, B) {
     const P = this.PAINT, nf = this.fromSound, BS = B[2] || 1, ease = v => v < .5 ? 4 * v * v * v : 1 - Math.pow(-2 * v + 2, 3) / 2;
     const bz = (P0, C1, C2, P1, u) => { const a = (1 - u) ** 3, b = 3 * (1 - u) ** 2 * u, c = 3 * (1 - u) * u * u, d = u ** 3; return [a * P0[0] + b * C1[0] + c * C2[0] + d * P1[0], a * P0[1] + b * C1[1] + c * C2[1] + d * P1[1]]; };
+    // where each line goes in: along the top of the float, and along the flag's top edge (as the leave takes them out)
+    const buoySrc = Array.from({ length: 13 }, (_, q) => { const a = Math.PI + q / 12 * Math.PI; return [B[0] + Math.cos(a) * 22 * BS, B[1] + Math.sin(a) * 13 * BS]; });
+    const flagSrc = [[B[0], B[1] - 46 * BS], [B[0] + 11 * BS, B[1] - 46.5 * BS], [B[0] + 22 * BS, B[1] - 46 * BS]];
     if (!this.painted) this.painted = {};
-    [['c4', [255, 118, 18], 5.5, [B[0], B[1]]], ['sound', this.redC || [232, 34, 44], 8, [B[0] + 11 * BS, B[1] - 39 * BS]]].forEach(([k, col, r, D]) => {
+    [['c4', [255, 118, 18], 5.5, buoySrc, 3.4, 40, 12, .4], ['sound', this.redC || [232, 34, 44], 8, flagSrc, 3, 30, 8, 1.9]].forEach(([k, col, r, src, w, lift, sway, ph]) => {
       if (this.painted[k]) return;
       const el = document.querySelector('[data-navk="' + k + '"] [data-navdot]'); if (!el) return;
       if (!this.paintNav) this.paintNav = {}; if (!this.paintNav[k]) { const rr = el.getBoundingClientRect(); this.paintNav[k] = [rr.left + rr.width / 2, rr.top + rr.height / 2]; }
-      const M = this.paintNav[k], S = (nf && nf[k]) || M, t0 = this.paintStart() + P.lag[k], uIn = (T - (t0 - P.fly)) / P.fly, uOut = (T - t0 - P.fill) / P.rise;
+      const M = this.paintNav[k], S = (nf && nf[k]) || M, handed = S !== M, e = this.paintE(T, k), t1 = this.paintStart() + P.lag[k] + P.run, uR = (T - t1) / P.rise;
       const dot = (p, rad) => { ctx.globalAlpha = 1; ctx.fillStyle = css(col); ctx.beginPath(); ctx.arc(p[0], p[1], rad, 0, 6.2832); ctx.fill(); };
-      if (uOut >= 1) { this.painted[k] = true; el.style.opacity = '1'; return; }
-      // away from the menu: its dot there is hidden until this one comes back to it
-      if (uIn > 0 || S !== M) el.style.opacity = '0';
-      if (uIn <= 0) { if (S !== M) dot(S, r); return; }
-      if (uIn < 1) { const u = ease(uIn); dot(bz(S, [S[0] - 40, S[1] - (S[1] > D[1] ? 160 : -40)], [D[0] + 60, D[1] - 90], D, u), r); return; }
-      const uf = clamp((T - t0) / P.fill, 0, 1);
-      if (uOut <= 0) { dot(D, r * (1 - .35 * Math.sin(Math.PI * uf))); return; }   // it gives up its colour: a small squeeze as the fill floods out
-      const u = ease(clamp(uOut, 0, 1)); dot(bz(D, [D[0] + 20, D[1] - 140], [M[0] - 40, M[1] + 140], M, u), r);
+      if (e > 0 && e < 1) { this.absorb(ctx, src, S, 1 - e, { w, colA: col, colB: col, lift, sway, ph }); if (!handed) this.navPulse(k, e); }
+      if (!handed) { if (e >= 1) this.painted[k] = true; return; }
+      // a handed-over dot: waits where it was left, sends its line, then rises into the menu, whose dot shows once it is there
+      el.style.opacity = '0';
+      if (uR >= 1) { this.painted[k] = true; el.style.opacity = '1'; return; }
+      dot(uR <= 0 ? S : bz(S, [S[0] - 30, S[1] - 160], [M[0] - 40, M[1] + 140], M, ease(clamp(uR, 0, 1))), r);
     });
   }
   // a menu dot breathes once as the tail of its line goes in
@@ -750,7 +754,7 @@ class Component extends DCLogic {
           id: e.id, i, title: e.title || 'Untitled', meta: `${(i + 1) * mpe} m  ·  ${fmt(e.date)}`,
           short: e.short || '', hasShort: !!e.short, imageBg: e.image ? `url("${String(assetUrl(e.image)).replace(/["\\\n\r]/g, c => encodeURIComponent(c))}")` : 'none', hasImage: !!e.image,
           paras, tags, hasTags: tags.length > 0, link: e.link || '', hasLink: !!e.link, linkLabel,
-          isExp, notExp: !isExp, isFocus: !isExp && f === i, go: () => this.go(i)
+          isExp, notExp: !isExp, isFocus: isExp, go: () => this.go(i)
         };
       }),
       counter: f >= 0 ? `${pad(f + 1)} / ${pad(list.length)}` : '',

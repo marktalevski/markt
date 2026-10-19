@@ -219,22 +219,33 @@ class Component extends DCLogic {
         if (c && !c.paused && now - (this.scrub.at || 0) > 70) { this.scrub.at = now; const sc = this.scrub; this.scrub = null; this.seek(sc.x / this.wvOf()); this.scrub = sc; } };
       const up = () => { removeEventListener('pointermove', mv); removeEventListener('pointerup', up); const u = this.scrub.x / this.wvOf(); this.scrub = null; this.scrubAt = performance.now(); this.seek(u); };
       addEventListener('pointermove', mv); addEventListener('pointerup', up); };
-    // on a phone (which has no play button) a tap on the wave area plays and pauses, or starts the album's first piece; taps on controls, links,
-    // the album's text, the deck, the playhead or just after scrubbing are left alone
-    this.onWClick = e => { if (this.focus || !isPhone(innerWidth, innerHeight) || performance.now() - (this.scrubAt || 0) < 350 || this.nearHead(e.clientX)) return;
-      const tg = e.target; if (tg && tg.closest && tg.closest('button,a,input,[role],[data-row],[data-navk],[data-deck],[data-knob],[data-cpad],[data-full-exit],h2,p,ol,li')) return;
-      if (e.clientY >= deckGeo(innerWidth, innerHeight).y0 + (this.deckSY || 0)) return; this.playBtn(); };
+    // on a phone (which has no play button) a tap anywhere above the deck plays and pauses, or starts the album's first piece; taps on controls,
+    // links, the menu and the deck, or just after a drag, are left alone
+    const phoneTarget = e => { if (this.focus || !isPhone(innerWidth, innerHeight) || e.clientY >= deckGeo(innerWidth, innerHeight).y0 + (this.deckSY || 0)) return false;
+      const tg = e.target; return !(tg && tg.closest && tg.closest('button,a,input,[role],[data-row],[data-navk],[data-deck],[data-knob],[data-cpad],[data-full-exit]')); };
+    this.onWClick = e => { if (performance.now() - (this.scrubAt || 0) < 350 || !phoneTarget(e)) return; this.playBtn(); };
+    // and a sideways drag anywhere above the deck moves the playhead: from where it was, by how far the finger goes (the screen's width is the
+    // whole piece); a playing piece jumps along every few frames as it goes, like dragging tape. Up-and-down swipes still change the album
+    this.onPDown = e => { if (e.pointerType === 'mouse' || !this.cur || !phoneTarget(e)) return;
+      const x0 = e.clientX, y0 = e.clientY, W0 = this.wvOf(), u0 = clamp(this.posOf() / this.cur.tr.dur, 0, 1); let drag = false;
+      const mv = ev => { const dx = ev.clientX - x0, dy = ev.clientY - y0;
+        if (!drag) { if (Math.abs(dx) < 10 || Math.abs(dx) < Math.abs(dy)) return; drag = true; this.ty = null; this.scrub = { x: u0 * W0 }; }
+        this.scrub.x = clamp(u0 + dx / W0, 0, 1) * W0; const now = performance.now(), c = this.cur;
+        if (c && !c.paused && now - (this.scrub.at || 0) > 70) { this.scrub.at = now; const sc = this.scrub; this.scrub = null; this.seek(sc.x / W0); this.scrub = sc; } };
+      const up = () => { removeEventListener('pointermove', mv); removeEventListener('pointerup', up); removeEventListener('pointercancel', up);
+        if (!drag || !this.scrub) return; const u = this.scrub.x / W0; this.scrub = null; this.scrubAt = performance.now(); this.seek(u); };
+      addEventListener('pointermove', mv); addEventListener('pointerup', up); addEventListener('pointercancel', up); };
     this.onFClick = e => { if (!this.focus || performance.now() - (this.fAt || 0) < 400 || onExit(e) || performance.now() - (this.scrubAt || 0) < 350 || this.nearHead(e.clientX)) return; if (this.cur) this.toggle(); };
     this.onTS = e => { this.ty = e.touches[0].clientY; }; this.onTE = e => { if (this.ty == null) return; const dy = this.ty - e.changedTouches[0].clientY; this.ty = null; if (Math.abs(dy) > 50) this.step(dy > 0 ? 1 : -1); };
     this.onPM = e => { this.mxT = e.clientX / innerWidth * 2 - 1; };
-    addEventListener('resize', this.onResize); addEventListener('wheel', this.onWheel, { passive: true }); addEventListener('keydown', this.onKey); document.addEventListener('fullscreenchange', this.onFsc); addEventListener('pointermove', this.onFMove); addEventListener('click', this.onFClick); addEventListener('click', this.onWClick); addEventListener('pointerdown', this.onFDown); addEventListener('touchstart', this.onTS, { passive: true }); addEventListener('touchend', this.onTE); addEventListener('pointermove', this.onPM);
+    addEventListener('resize', this.onResize); addEventListener('wheel', this.onWheel, { passive: true }); addEventListener('keydown', this.onKey); document.addEventListener('fullscreenchange', this.onFsc); addEventListener('pointermove', this.onFMove); addEventListener('click', this.onFClick); addEventListener('click', this.onWClick); addEventListener('pointerdown', this.onFDown); addEventListener('pointerdown', this.onPDown); addEventListener('touchstart', this.onTS, { passive: true }); addEventListener('touchend', this.onTE); addEventListener('pointermove', this.onPM);
     // pieces with a file: decode it for its real waveform and length
     this.albums.forEach(a => a.tracks.forEach(tr => { if (!tr.src) return; const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext; if (!OAC) return;
       fetch(tr.src).then(res => res.arrayBuffer()).then(b => new OAC(1, 1, 44100).decodeAudioData(b)).then(buf => { tr.buf = buf; tr.dur = buf.duration; tr.env = envFromBuf(buf); a.mix = mixOf(a.tracks); this.forceUpdate(); }).catch(() => {}); }));
     if (import.meta.env.DEV) window.__sound = this; // a handle for checking the page in development; not in the built site
     this.raf = requestAnimationFrame(this.tick);
   }
-  componentWillUnmount() { this.mediaOff(); cancelAnimationFrame(this.raf); removeEventListener('resize', this.onResize); removeEventListener('wheel', this.onWheel); removeEventListener('keydown', this.onKey); document.removeEventListener('fullscreenchange', this.onFsc); removeEventListener('pointermove', this.onFMove); removeEventListener('click', this.onFClick); removeEventListener('click', this.onWClick); removeEventListener('pointerdown', this.onFDown); removeEventListener('touchstart', this.onTS); removeEventListener('touchend', this.onTE); removeEventListener('pointermove', this.onPM); this.stopNodes(); try { this.ac && this.ac.close(); } catch (e) {} }
+  componentWillUnmount() { this.mediaOff(); cancelAnimationFrame(this.raf); removeEventListener('resize', this.onResize); removeEventListener('wheel', this.onWheel); removeEventListener('keydown', this.onKey); document.removeEventListener('fullscreenchange', this.onFsc); removeEventListener('pointermove', this.onFMove); removeEventListener('click', this.onFClick); removeEventListener('click', this.onWClick); removeEventListener('pointerdown', this.onFDown); removeEventListener('pointerdown', this.onPDown); removeEventListener('touchstart', this.onTS); removeEventListener('touchend', this.onTE); removeEventListener('pointermove', this.onPM); this.stopNodes(); try { this.ac && this.ac.close(); } catch (e) {} }
   componentDidUpdate(prev) { if (prev.style !== this.props.style) { this.t = 0; this.disp = null; this.listBottom = 0; } }
   step(d) { this.goAlbum(this.state.album + d)(); }
   goAlbum = a => () => { a = clamp(a, 0, this.albums.length - 1); if (a === this.state.album) return; this.albDir = a > this.state.album ? 1 : -1; if (this.strip && this.cur) this.stop(); this.flipPrev = this.state.album; this.flipT0 = this.t; this.setState({ album: a, hover: null }); };
