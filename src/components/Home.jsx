@@ -10,10 +10,15 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const smooth = x => x * x * (3 - 2 * x);
 const rng = s => () => { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 const INK = [20, 20, 20], BLUE = [24, 88, 224];
-// weighted pick: each time a symbol is shown its weight drops, so unseen ones come up more; counts reset on refresh / fresh visit
-const pickShape = (exclude) => { let seen = {}; try { seen = JSON.parse(sessionStorage.getItem('shape-seen') || '{}'); } catch (e) {}
-  const opts = SHAPES.filter(x => x !== exclude), w = opts.map(x => 1 / Math.pow(1 + (seen[x] || 0), 2)), tot = w.reduce((a, b) => a + b, 0); let r = Math.random() * tot, k = 0; while (k < opts.length - 1 && (r -= w[k]) > 0) k++;
-  const pick = opts[k]; seen[pick] = (seen[pick] || 0) + 1; try { sessionStorage.setItem('shape-seen', JSON.stringify(seen)); sessionStorage.setItem('home-shape', pick); } catch (e) {} return pick; };
+// weighted pick: every symbol shown is counted (in this browser, across visits), and the more often one has been shown the less likely it is
+// to come up again: one not seen yet is 8 times as likely as one seen once, 27 times as one seen twice. Once every symbol has been seen,
+// all counts drop by the smallest, so it starts favouring the least-seen again rather than settling. The last one shown never repeats
+const SEEN_KEY = 'shape-seen-v2';
+const pickShape = (exclude) => { let seen = {}; try { seen = JSON.parse(localStorage.getItem(SEEN_KEY) || '{}') || {}; } catch (e) {}
+  const opts = SHAPES.filter(x => x !== exclude), w = opts.map(x => 1 / Math.pow(1 + (seen[x] || 0), 3)), tot = w.reduce((a, b) => a + b, 0); let r = Math.random() * tot, k = 0; while (k < opts.length - 1 && (r -= w[k]) > 0) k++;
+  const pick = opts[k]; seen[pick] = (seen[pick] || 0) + 1;
+  const low = Math.min(...SHAPES.map(x => seen[x] || 0)); if (low > 0) SHAPES.forEach(x => { seen[x] = (seen[x] || 0) - low; });
+  try { localStorage.setItem(SEEN_KEY, JSON.stringify(seen)); sessionStorage.setItem('home-shape', pick); } catch (e) {} return pick; };
 // golden spiral: from the top of a circle of radius r0 round c (angle a0), turning clockwise, the radius shrinks by φ every quarter turn,
 // the curve of a golden rectangle's nested squares. n points per turn, w(u) the brush weight along it
 const PHI = (1 + Math.sqrt(5)) / 2;
@@ -392,7 +397,7 @@ class Component extends DCLogic {
     { const x = gc.getContext('2d'), im = x.createImageData(220, 220); for (let i = 0; i < im.data.length; i += 4) { const v = 255 - Math.pow(r(), 3) * 40; im.data[i] = im.data[i + 1] = im.data[i + 2] = v; im.data[i + 3] = 255; } x.putImageData(im, 0, 0); }
     this.grainC = gc;
     this.fromDive = /from=dive/.test(location.search);
-    { let nt = 'navigate'; try { nt = performance.getEntriesByType('navigation')[0].type; } catch (e) {} if (nt === 'reload' || !this.fromDive) try { sessionStorage.removeItem('shape-seen'); } catch (e) {} }
+    try { sessionStorage.removeItem('shape-seen'); } catch (e) {}   // the old per-tab counts (now kept across visits, see pickShape)
     let last = null; try { last = sessionStorage.getItem('home-shape'); } catch (e) {}
     this.pick = pickShape(last); if (import.meta.env.DEV) window.__home = this; // (for the local symbol picker only)
     try { if (this.fromDive) { const nf = JSON.parse(sessionStorage.getItem('nav-from') || 'null'); if (nf) this.navArrive = nf; } } catch (e) {}
