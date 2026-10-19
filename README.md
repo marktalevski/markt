@@ -19,7 +19,7 @@ Each component is the Claude Design prototype's own logic class, unchanged excep
 
 ## Dive log entries and Library books
 
-The published entries (the Freediving tab) and the Library's books (the Library tab: each book's title, subtitle and contents) are in `public/data/site.json`; pages fetch it when they need it. To change them, run `npm run dev`, open the editor at <http://localhost:4321/markt/editor/>, edit (changes save in that browser only), click **Export JSON**, and save the downloaded `site.json` over `public/data/site.json`.
+The published entries (the Freediving tab) and the Library's books (the Library tab: each book's title, subtitle and contents) are in `public/data/site.json`; pages fetch it when they need it (the Library fetches just its books, which the build serves on their own as `data/books.json`). To change them, run `npm run dev`, open the editor at <http://localhost:4321/markt/editor/>, edit (changes save in that browser only), click **Export JSON**, and save the downloaded `site.json` over `public/data/site.json`.
 
 Photos uploaded in the editor are stored inside `site.json`, which makes it slower to load. For anything more than a few photos, put the image files in `public/images/` and paste their address (for example `/markt/images/dive-1.jpg`) into the entry's image field instead.
 

@@ -3,7 +3,8 @@
 import React from 'react';
 import { DCLogic, page, sty, BASE } from '../lib/dc.js';
 
-const ARROWS = { down: 'Freediving', up: 'Sound', right: 'Library' };
+// the tabs: the dive log's entries, and the Library's books (no page shows entries on the other lines, so there is no tab for them)
+const ARROWS = { down: 'Freediving', right: 'Library' };
 // the Library tab edits the Library's books (in site.json under "books"), not entries
 const BOOKS = 'right';
 const KIND_NAME = { bujo: 'Bullet journal', readings: 'Short readings', quotes: 'Quotes', pillow: 'Pillow book', musings: 'Musings' };
@@ -46,12 +47,13 @@ class BookEditor extends React.Component {
   render() {
     const b = this.props.book, k = b.kind;
     const entriesText = m => (m.entries || []).map(e => [e.d, e.sym, e.text].filter(x => x != null && x !== '').join('  ')).join('\n');
-    const parseEntries = v => v.split('\n').filter(l => l.trim()).map(l => { const t = l.trim().split(/\s+/); return { d: t[0] || '', sym: t[1] || '', text: t.slice(2).join(' ') }; });
+    // day, then a symbol if the next word is one (a mark like × ○ – ★ •, not a word), then the text
+    const parseEntries = v => v.split('\n').filter(l => l.trim()).map(l => { const t = l.trim().split(/\s+/), hasSym = t.length > 2 && /^[^\p{L}\p{N}]{1,2}$/u.test(t[1]); return { d: t[0] || '', sym: hasSym ? t[1] : '', text: t.slice(hasSym ? 2 : 1).join(' ') }; });
     return (<div style={sty('max-width:720px;display:flex;flex-direction:column;gap:18px')}>
       <div style={sty(LAB)}>{KIND_NAME[k] || k}</div>
       <div style={sty('display:flex;flex-wrap:wrap;gap:14px')}>
         <Field label="Title (on the spine)" value={b.title} onChange={v => this.set({ title: v })} grow="2 1 260px" />
-        {k === 'bujo' ? <Field label="Year" type="number" value={b.year} onChange={v => this.set({ year: +v || v })} grow="0 1 120px" /> : null}
+        {k === 'bujo' ? <Field label="Year" type="number" value={b.year} onChange={v => { const n = parseInt(v, 10); this.set({ year: isNaN(n) ? '' : n }); }} grow="0 1 120px" /> : null}
       </div>
       <Field label="Subtitle" value={b.subtitle} onChange={v => this.set({ subtitle: v })} grow="0 0 auto" />
       <div style={sty(LAB + ';padding-top:8px')}>{k === 'bujo' ? 'Months' : k === 'quotes' ? 'Quotes' : k === 'pillow' ? 'Lists' : k === 'musings' ? 'Pieces' : 'Passages'}</div>
@@ -90,7 +92,11 @@ class Component extends DCLogic {
   state = { data: null, line: 'down', selId: null, selBook: null, note: '' };
 
   componentDidMount() {
-    import('../lib/site-data.js').then(m => { this.m = m; return m.loadDraft(); }).then(data => this.setState({ data }));
+    import('../lib/site-data.js').then(m => { this.m = m; return Promise.all([m.loadDraft(), m.load()]); }).then(([data, pub]) => {
+      // a working copy whose books differ from the published ones: either edited here, or older than the site (and exporting it would undo
+      // the newer books), so say so
+      const stale = pub && Array.isArray(pub.books) && pub.books.length && JSON.stringify(pub.books) !== JSON.stringify(data.books);
+      this.setState({ data, note: stale ? 'The books here differ from the published site. If you did not change them here, use Reset to published first.' : '' }); });
   }
 
   commit(data, extra) {
@@ -127,7 +133,9 @@ class Component extends DCLogic {
     img.src = url; ev.target.value = '';
   };
   exportJson = () => {
-    const blob = new Blob([JSON.stringify(this.state.data, null, 2)], { type: 'application/json' });
+    // only what the site shows: the profile, the dive log's entries and the Library's books
+    const d = this.state.data, out = { profile: d.profile, entries: (d.entries || []).filter(e => e.line === 'down'), books: d.books || [] };
+    const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'site.json'; a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   };
@@ -154,7 +162,7 @@ class Component extends DCLogic {
     const profile = (d && d.profile) || { name: '', intro: '' };
     const setProfile = k => e => this.commit({ ...d, profile: { ...profile, [k]: e.target.value } });
     return {
-      tabs: ['down', 'up', 'right'].map(L => ({ arrow: ARROWS[L], count: counts[L], bg: L === line ? '#10232c' : '#fff', fg: L === line ? '#f2f0e9' : '#10232c', pick: () => this.setState({ line: L, selId: null, selBook: null }) })),
+      tabs: ['down', 'right'].map(L => ({ arrow: ARROWS[L], count: counts[L], bg: L === line ? '#10232c' : '#fff', fg: L === line ? '#f2f0e9' : '#10232c', pick: () => this.setState({ line: L, selId: null, selBook: null }) })),
       lineArrow: ARROWS[line],
       isBooks, notBooks: !isBooks, book, bookKey: this.state.selBook,
       onBook: nb => this.commit({ ...d, books: books.map((x, i) => i === this.state.selBook ? nb : x) }),
@@ -243,7 +251,7 @@ function View(v) {
         {"\n    "}
         <aside style={sty("border-right:1px solid rgba(16,35,44,.14);display:flex;flex-direction:column;min-height:0")}>
           {"\n      "}
-          <div style={sty("display:grid;grid-template-columns:repeat(3, 1fr);gap:4px;padding:14px 14px 10px")}>
+          <div style={sty("display:grid;grid-template-columns:repeat(2, 1fr);gap:4px;padding:14px 14px 10px")}>
             {"\n        "}
             {(v.tabs || []).map((tab, $index) => (
               <React.Fragment key={$index}>
@@ -304,7 +312,7 @@ function View(v) {
               {"\n        "}
               <div style={sty("max-width:720px;display:flex;flex-direction:column;gap:18px")}>
                 {"\n          "}
-                <div style={sty("display:grid;grid-template-columns:minmax(0, 1fr) 170px 150px;gap:14px")}>
+                <div style={sty("display:grid;grid-template-columns:minmax(0, 1fr) 170px;gap:14px")}>
                   {"\n            "}
                   <label style={sty("display:flex;flex-direction:column;gap:6px")}>
                     {"\n              "}
@@ -326,29 +334,7 @@ function View(v) {
                     {"\n            "}
                   </label>
                   {"\n            "}
-                  <label style={sty("display:flex;flex-direction:column;gap:6px")}>
-                    {"\n              "}
-                    <span style={sty("font-family:'JetBrains Mono', monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#4a5b61")}>
-                      {"Line"}
-                    </span>
-                    {"\n              "}
-                    <select value={v.sel?.line} onChange={v.on?.line} style={sty("height:40px;padding:0 10px;border:1px solid rgba(16,35,44,.2);border-radius:6px;background:#fff")}>
-                      {"\n                "}
-                      <option value="down">
-                        {"Freediving"}
-                      </option>
-                      {"\n                "}
-                      <option value="up">
-                        {"Sound"}
-                      </option>
-                      {"\n                "}
-                      <option value="right">
-                        {"Library"}
-                      </option>
-                      {"\n              "}
-                    </select>
-                    {"\n            "}
-                  </label>
+
                   {"\n          "}
                 </div>
                 {"\n          "}

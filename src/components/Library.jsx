@@ -37,7 +37,7 @@ class Component extends DCLogic {
     // arriving under the last page's picture, its dots may be handed over (Sound leaves them where its pads closed), to fly on from there
     try { const nf = JSON.parse(sessionStorage.getItem('nav-from') || 'null'); sessionStorage.removeItem('nav-from'); if (nf && document.getElementById('page-cover')) this.nf = nf; } catch (e) {}
     // the books are published in site.json; the page opens on the stack alone, no book open yet, the reading side blank until one is picked
-    loadBooks().then(books => this.setState({ books, sel: null }));
+    loadBooks().then(books => this.setState({ books: books || [], loadErr: !books, sel: null }));
     this.onR = () => this.setState({ vw: innerWidth, vh: innerHeight });
     this.onK = e => { if (/^[1-9]$/.test(e.key) && !e.metaKey && !e.ctrlKey && !e.altKey) { const bk = (this.state.books || [])[+e.key - 1]; if (bk) this.pick(bk.slug); } };
     addEventListener('resize', this.onR); addEventListener('keydown', this.onK);
@@ -110,7 +110,7 @@ class Component extends DCLogic {
     B.push({ text: b.title, ff: SANS, fs: Math.round(fs * 3.2), fst: 'normal', fw: 600, lh: 1, ls: '-.045em', c: '#111', m: '0 0 .35em' });
     if (b.subtitle) P(b.subtitle, true);
     const it = b.items || [];
-    if (b.kind === 'bujo') (b.months || []).forEach(m => { H(MONTHS[m.month - 1] + ' ' + (b.year || '')); if (m.intention) P(m.intention, true); (m.entries || []).forEach(e => L(e.d + '   ' + e.sym + '   ' + e.text)); });
+    if (b.kind === 'bujo') (b.months || []).forEach(m => { H((MONTHS[m.month - 1] + ' ' + (b.year || '')).trim()); if (m.intention) P(m.intention, true); (m.entries || []).forEach(e => L(e.d + '   ' + e.sym + '   ' + e.text)); });
     else if (b.kind === 'quotes') it.forEach(q => { B.push({ text: '“' + q.text + '”', ff: SERIF, fs: Math.round(fs * 1.55), fst: 'italic', fw: 400, lh: 1.35, ls: '-.01em', c: '#111', m: '1.6em 0 .4em' }); M(q.who || ''); });
     else if (b.kind === 'pillow') it.forEach(c => { H(c.title); (c.items || []).filter(Boolean).forEach(x => L('—  ' + x)); });
     else it.forEach(x => { H(x.title); M(b.kind === 'musings' ? (x.date || '') : (x.source || '')); paras(x.text).forEach(p => P(p)); });
@@ -152,6 +152,8 @@ class Component extends DCLogic {
     const lm = narrow ? 14 : Math.round(clamp(vw * .02, 16, 32)), avail = narrow ? vw - 36 : vw - stackR - stackW - Math.round(clamp(vw * .05, 40, 80)) - lm, colW = Math.round(Math.min(860, avail));
     const fs = Math.round(clamp(colW / 40, 16, 20)), sfs = narrow ? 12 : Math.round(clamp(barH * .36, 12, 13));
     if (!this.bc || this.bc.sel !== sel || this.bc.fs !== fs || this.bc.books !== books) this.bc = { sel, fs, books, blocks: b ? this.blocks(b, fs) : [] };
+    // the books couldn't be loaded: a quiet line in the reading column says so, instead of an empty page
+    if (this.state.loadErr && !b) this.bc.blocks = [{ text: "The books couldn't be loaded just now. Try again in a moment.", ff: MONOF, fs: Math.max(11, Math.round(fs * .6)), fst: 'normal', fw: 400, lh: 1.4, ls: '.08em', c: '#8c8c8c', m: '0', h: 0 }];
     const rule = b ? (GOUACHE[b.kind] || ['#111'])[0] : '#111', railH = Math.max(120, vh - 56); this.railH = railH;
     // the one being read slides out of the stack (on a narrow screen only a little, the stack being the screen's width)
     const shelf = books.map((x, i) => { const on = x.slug === sel;
