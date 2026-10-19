@@ -2,7 +2,7 @@
 // site ships with; load() gives this browser's working copy (localStorage, under KEY) if there is one, otherwise the seed. Each book has a
 // slug, title, kind (one of KINDS, which sets how it is drawn and laid out), a subtitle, and its content: months of entries for the bullet
 // journal, items for the rest.
-export const KEY = 'tl-journal-v1';
+export const KEY = 'tl-library-v1';
 export const KINDS = ['bujo', 'readings', 'quotes', 'pillow', 'musings'];
 
 export function seed() {

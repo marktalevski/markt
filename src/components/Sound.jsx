@@ -296,12 +296,12 @@ class Component extends DCLogic {
   // ---- nav (same as the other pages)
   dotOf(k) { const d = document.querySelector('[data-navk="' + k + '"] [data-navdot]'); if (!d) return null; const r = d.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }
   // kind: 'home' (faders turn back into dots and the panel slides away, Home picks the dots up), 'dive' (the same, and Freediving picks them up:
-  // they draw its water's surface lines, then go up into its menu), 'journal' (the same, and the Library's books open out of them), 'other'
+  // they draw its water's surface lines, then go up into its menu), 'library' (the same, and the Library's books open out of them), 'other'
   // (plain fade)
   leave(href, kind) { return e => { if (e) e.preventDefault(); if (this.out) return; this.stop(); this.out = { href, t: 0, k: kind }; }; }
   stay = e => { if (e) e.preventDefault(); };
   goHome = this.leave(HOME, 'home');
-  GO = { freediving: this.leave(BASE + 'freediving/?from=sound', 'dive'), sound: this.stay, journal: this.leave(BASE + 'library/', 'journal') };
+  GO = { freediving: this.leave(BASE + 'freediving/?from=sound', 'dive'), sound: this.stay, library: this.leave(BASE + 'library/', 'library') };
   tick = now => {
     this.raf = requestAnimationFrame(this.tick);
     const dt = Math.min(.05, (now - (this.last || now)) / 1000); this.last = now; this.t += dt;
@@ -336,7 +336,7 @@ class Component extends DCLogic {
     const e = easeIO(clamp(ft, 0, 1)); A.style.visibility = e < .5 ? 'visible' : 'hidden'; A.style.transform = 'rotateX(' + (-180 * e).toFixed(1) + 'deg)'; B.style.visibility = e >= .5 ? 'visible' : 'hidden'; B.style.transform = 'rotateX(' + (180 - 180 * e).toFixed(1) + 'deg)'; }
   // ---- the deck: a DJ controller running off the bottom of the screen (geometry in lib/deck.js). Its hit areas are real elements over the drawing
   placeDeck(G, SY) { const R = this.rootRef.current; if (!R) return;
-    if (!this.dk || !this.dk.jog || !this.dk.jog.isConnected) this.dk = { jog: R.querySelector('[data-deck="jog"]'), cp: [...R.querySelectorAll('[data-cpad]')], play: R.querySelector('[data-deck="play"]'), full: R.querySelector('[data-deck="full"]'), vol: R.querySelector('[data-deck="vol"]'), knobs: [...R.querySelectorAll('[data-knob]')], rows: [...R.querySelectorAll('[data-row]')], pads: ['home', 'freediving', 'sound', 'journal'].map(k => R.querySelector('[data-navk="' + k + '"]')) };
+    if (!this.dk || !this.dk.jog || !this.dk.jog.isConnected) this.dk = { jog: R.querySelector('[data-deck="jog"]'), cp: [...R.querySelectorAll('[data-cpad]')], play: R.querySelector('[data-deck="play"]'), full: R.querySelector('[data-deck="full"]'), vol: R.querySelector('[data-deck="vol"]'), knobs: [...R.querySelectorAll('[data-knob]')], rows: [...R.querySelectorAll('[data-row]')], pads: ['home', 'freediving', 'sound', 'library'].map(k => R.querySelector('[data-navk="' + k + '"]')) };
     const put = (el, x, y, w, h) => { if (!el) return; const st = el.style, v = [x, y + SY, w, h].map(n => Math.round(n) + 'px'); if (st.left !== v[0]) st.left = v[0]; if (st.top !== v[1]) st.top = v[1]; if (st.width !== v[2]) st.width = v[2]; if (st.height !== v[3]) st.height = v[3]; if (st.display === 'none') st.display = ''; };
     this.jogCs = {}; const [jx, jy, jr] = G.jog, jo = jr + 16; put(this.dk.jog, jx - jo, jy - jo, jo * 2, jo * 2); this.jogCs.jog = [jx, jy + SY];
     this.dk.knobs.forEach((el, i) => { const [kx, ky] = G.knobs[i], hs = G.kc / 2; put(el, kx - hs, ky - hs, hs * 2, hs * 2); if (el.getAttribute('aria-valuenow') !== String(this.knobV[i])) el.setAttribute('aria-valuenow', String(this.knobV[i])); });
@@ -767,7 +767,7 @@ class Component extends DCLogic {
         btnOn: k => () => { this.btnHov = k; }, btnOff: () => { this.btnHov = null; }, full: this.goFull, leaveFull: this.leaveFull, fullDn: () => { this.fullDown = true; }, fullUp: () => { this.fullDown = false; }, fullOut: () => { this.btnHov = null; this.fullDown = false; },
         cpOn: i => () => this.padOn(4 + i), cpOff: i => () => this.padOff(4 + i), spare: this.spareHit, vol: this.volDown, knob: [0, 1, 2, 3, 4, 5].map(i => ({ down: this.knobDown(i), wheel: this.knobWheel(i), on: () => { this.knobHov = i; }, off: () => { if (this.knobHov === i) this.knobHov = null; this.knobNum = null; }, move: this.knobMove(i) })),
         rows: [0, 1, 2, 3, 4, 5].map(k => ({ go: () => { const tr = this.albums[this.state.album].tracks[k]; if (tr) this.click(tr); }, on: () => { this.rowHov = k; }, off: () => { if (this.rowHov === k) this.rowHov = null; } })) },
-      pad: Object.fromEntries(['home', 'freediving', 'sound', 'journal'].map((k, i) => [k, { on: () => this.padOn(i), off: () => this.padOff(i), go: k === 'home' ? this.goHome : this.GO[k] }]))
+      pad: Object.fromEntries(['home', 'freediving', 'sound', 'library'].map((k, i) => [k, { on: () => this.padOn(i), off: () => this.padOff(i), go: k === 'home' ? this.goHome : this.GO[k] }]))
     };
   }
 }
@@ -792,7 +792,7 @@ function View(v) {
         <a href={BASE + "sound/"} onClick={v.pad?.sound?.go} aria-current="page" aria-label="Sound" data-navk="sound" onMouseEnter={v.pad?.sound?.on} onMouseLeave={v.pad?.sound?.off} onFocus={v.pad?.sound?.on} onBlur={v.pad?.sound?.off} style={sty("position:absolute;left:-200px;top:0;display:block;border-radius:5px;pointer-events:auto;cursor:default")}>
           <span data-navdot="1" style={sty("position:absolute;left:50%;top:50%;width:1px;height:1px")} />
         </a>
-        <a href={BASE + "library/"} onClick={v.pad?.journal?.go} aria-label="Library" data-navk="journal" onMouseEnter={v.pad?.journal?.on} onMouseLeave={v.pad?.journal?.off} onFocus={v.pad?.journal?.on} onBlur={v.pad?.journal?.off} style={sty("position:absolute;left:-200px;top:0;display:block;border-radius:5px;pointer-events:auto;cursor:pointer")}>
+        <a href={BASE + "library/"} onClick={v.pad?.library?.go} aria-label="Library" data-navk="library" onMouseEnter={v.pad?.library?.on} onMouseLeave={v.pad?.library?.off} onFocus={v.pad?.library?.on} onBlur={v.pad?.library?.off} style={sty("position:absolute;left:-200px;top:0;display:block;border-radius:5px;pointer-events:auto;cursor:pointer")}>
           <span data-navdot="1" style={sty("position:absolute;left:50%;top:50%;width:1px;height:1px")} />
         </a>
       </div>

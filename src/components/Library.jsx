@@ -7,7 +7,7 @@ import { DCLogic, page, sty, BASE } from '../lib/dc.js';
 import { load } from '../lib/library-data.js';
 import { navAt } from '../lib/nav.js';
 
-const PAGE = 'journal';   // its key in the menu (the URL and every label say Library)
+const PAGE = 'library';
 const HOME = BASE + '?from=dive';
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -18,7 +18,7 @@ const SPINE_H = { bujo: 1.08, readings: .94, quotes: .86, pillow: 1, musings: 1.
 const SPINE_R = { bujo: '2px 4px 4px 2px', readings: '6px 3px 5px 4px / 4px 6px 3px 5px', quotes: '1px', pillow: '10px 4px 4px 10px', musings: '3px 9px 4px 8px / 6px 3px 7px 4px' };
 // each book is one of the menu's dots: it arrives as that dot and opens out into the book, and leaves by folding back into it
 const BOOK_DOT = { bujo: 'freediving', readings: 'sound', quotes: 'c6', pillow: 'c4', musings: 'c5' };
-const DOT_COL = { home: 'rgb(20,20,20)', freediving: 'rgb(24,88,224)', sound: 'rgb(232,34,44)', journal: 'rgb(255,196,0)', c4: 'rgb(255,118,18)', c5: 'rgb(22,168,82)', c6: 'rgb(138,64,214)' };
+const DOT_COL = { home: 'rgb(20,20,20)', freediving: 'rgb(24,88,224)', sound: 'rgb(232,34,44)', library: 'rgb(255,196,0)', c4: 'rgb(255,118,18)', c5: 'rgb(22,168,82)', c6: 'rgb(138,64,214)' };
 const DOT_R = k => /^c\d/.test(k) ? 5.5 : 8;
 // a dot's flight from A to B along a curve (control points C1, C2), as keyframes for its translate (and its colour, from cols[0] to cols[1]);
 // ease shapes its pace, and shown keeps it visible the whole way (and while it waits to set off)
@@ -27,7 +27,7 @@ const flight = (A, C1, C2, B, r, ease, cols, shown) => { const out = []; for (le
 const easeIn = u => u * u * (1.6 - .6 * u), easeOut = u => 1 - easeIn(1 - u);
 const paras = s => (s || '').split(/\n\s*\n/).map(x => x.trim()).filter(Boolean);
 const SERIF = "'Newsreader', Georgia, serif", SANS = "'Geist', sans-serif", MONOF = "'Geist Mono', monospace";
-const NAV = [['home', 'Home', 'rgb(20,20,20)'], ['freediving', 'Freediving', 'rgb(24,88,224)'], ['sound', 'Sound', 'rgb(232,34,44)'], ['journal', 'Library', 'rgb(255,196,0)']];
+const NAV = [['home', 'Home', 'rgb(20,20,20)'], ['freediving', 'Freediving', 'rgb(24,88,224)'], ['sound', 'Sound', 'rgb(232,34,44)'], ['library', 'Library', 'rgb(255,196,0)']];
 
 class Component extends DCLogic {
   // arriving under the last page's picture (see Base.astro) there is no fade in from blank paper: the picture gives way straight to the page
@@ -66,7 +66,7 @@ class Component extends DCLogic {
       A(dot, [{ opacity: 1, scale: '1 1' }, { opacity: 0, scale: '2.4 1' }], { duration: open * .6, delay: d + fly, fill: 'forwards' });
       A(el, [{ scale: asDot, opacity: 0 }, { opacity: 1, offset: .2 }, { scale: '1.03 1.12', offset: .7 }, { scale: '1 1', opacity: 1 }], { duration: open, delay: d + fly, fill: 'backwards', easing: 'ease-out' }); });
     // a handed-over dot that isn't a book goes up to its place in the menu
-    ['home', 'journal'].forEach(k => { if (!nf[k] && !(k === 'home' && nf.ink)) return; const S = from(k), N = navAt(W, k), dot = document.querySelector('[data-fly="' + k + '"]'); if (!dot) return;
+    ['home', 'library'].forEach(k => { if (!nf[k] && !(k === 'home' && nf.ink)) return; const S = from(k), N = navAt(W, k), dot = document.querySelector('[data-fly="' + k + '"]'); if (!dot) return;
       A(dot, flight(S, [S[0], S[1] - 120], [N[0] - 30, N[1] + 80], N, DOT_R(k), easeOut, [DOT_COL[k], DOT_COL[k]], true), { duration: fly + 200, delay: t0, fill: 'both' });
       A(dot, [{ opacity: 1 }, { opacity: 0 }], { duration: 120, delay: t0 + fly + 200, fill: 'forwards' }); });
     const landed = t0 + (books.length - 1) * step + fly + open, mug = mugEl;
@@ -141,7 +141,7 @@ class Component extends DCLogic {
       Promise.all(flights.map(a => a.finished)).then(() => setTimeout(once, flights.length ? 60 : 280), once); };
   }
   stay = e => { if (e) e.preventDefault(); };
-  GO = { home: this.leave(HOME, true), freediving: this.leave(BASE + 'freediving/'), sound: this.leave(BASE + 'sound/?from=page', true), journal: this.stay };
+  GO = { home: this.leave(HOME, true), freediving: this.leave(BASE + 'freediving/'), sound: this.leave(BASE + 'sound/?from=page', true), library: this.stay };
   renderVals() {
     const { vw, vh, sel } = this.state, books = this.state.books || [], narrow = vw < 760;
     const b = books.find(x => x.slug === sel);
@@ -268,7 +268,7 @@ function View(v) {
     </div>
     <nav aria-label="Pages" style={sty("position:fixed;right:12px;top:12px;display:flex;flex-direction:row;align-items:flex-start;z-index:130;color:#111")}>
       {NAV.map(([k, en, col]) => (
-        <a key={k} href={k === 'home' ? BASE + '?from=dive' : BASE + (k === 'journal' ? 'library' : k) + '/'} onClick={v.nav?.[k]?.go} aria-label={en} aria-current={k === PAGE ? 'page' : undefined} data-navk={k} onMouseEnter={v.nav?.[k]?.on} onMouseLeave={v.navOff} onFocus={v.nav?.[k]?.on} onBlur={v.navOff} style={sty("display:flex;flex-direction:column;align-items:center;gap:8px;width:24px;height:156px;padding:8px 0 0;box-sizing:border-box;border:0;background:none;color:inherit;text-decoration:none;cursor:pointer;font-family:'Newsreader', Georgia, serif;font-size:13px;line-height:1")}>
+        <a key={k} href={k === 'home' ? BASE + '?from=dive' : BASE + k + '/'} onClick={v.nav?.[k]?.go} aria-label={en} aria-current={k === PAGE ? 'page' : undefined} data-navk={k} onMouseEnter={v.nav?.[k]?.on} onMouseLeave={v.navOff} onFocus={v.nav?.[k]?.on} onBlur={v.navOff} style={sty("display:flex;flex-direction:column;align-items:center;gap:8px;width:24px;height:156px;padding:8px 0 0;box-sizing:border-box;border:0;background:none;color:inherit;text-decoration:none;cursor:pointer;font-family:'Newsreader', Georgia, serif;font-size:13px;line-height:1")}>
           <span data-navdot="1" style={sty(`width:16px;height:16px;border-radius:50%;background:${col};flex:none`)} />
           <span style={sty("position:relative;display:block;width:100%;height:116px")}>
             <span lang="en" data-lab="nav" aria-hidden="true" style={sty(`position:absolute;left:50%;top:0;writing-mode:vertical-rl;text-orientation:sideways;white-space:nowrap;font-family:Papyrus, 'Papyrus-Regular', 'Newsreader', Georgia, serif;font-weight:400;font-size:19px;letter-spacing:.02em;background-image:linear-gradient(to bottom, ${col} 0%, ${col} 20%, currentColor 60%, currentColor 100%);background-size:100% 300%;background-repeat:no-repeat;background-position:0 ${v.nav?.[k]?.bp ?? ''};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;transition:opacity .55s ease, transform .7s cubic-bezier(.2,.7,.2,1), filter .55s ease, background-position 1.1s cubic-bezier(.3,.6,.2,1);opacity:${v.nav?.[k]?.en ?? 0};transform:translateX(-50%) translateY(${v.nav?.[k]?.enY ?? ''});filter:blur(${v.nav?.[k]?.enB ?? ''});pointer-events:none`)}>

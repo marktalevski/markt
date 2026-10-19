@@ -4,7 +4,7 @@
 // lock, for something to come) in a row under the beat pads, square, four wide and two tall: the four pages, three for the pages still to come
 // (orange, green, purple) and one spare. The menu dots fly into the pads.
 // It lives here so Home can drop its dots straight onto the pads when it hands over to Sound.
-export const DECK_KEYS = ['home', 'freediving', 'sound', 'journal', 'c4', 'c5', 'c6'];
+export const DECK_KEYS = ['home', 'freediving', 'sound', 'library', 'c4', 'c5', 'c6'];
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 // the deck needs about this much width; on a narrower screen (a phone) it is laid out at this width and the whole thing scaled down to fit,

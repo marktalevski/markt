@@ -72,7 +72,7 @@ const sndDrop = (k, W, H) => { const G = deckGeo(W, H); return [padOf(G, k)[0], 
 const LINES = [
   { col: INK, w: 11, d: .35, spd: 1, keep: 1 },
   { col: [232, 34, 44], w: 9, d: .45, spd: 1, page: 'sound' },
-  { col: [255, 196, 0], w: 9, d: .55, spd: .97, page: 'journal' },
+  { col: [255, 196, 0], w: 9, d: .55, spd: .97, page: 'library' },
   { col: BLUE, w: 9.5, d: .65, spd: 1.02, page: 'freediving' },
   { col: [255, 118, 18], w: 9, d: .75, spd: 1, u: .5 },
   { col: [22, 168, 82], w: 9, d: .85, spd: .97, u: .66 },
@@ -374,17 +374,17 @@ function shapeOf(name, cx, cy, R) {
   for (let i = 1; i < Q.length; i++) { const d = Math.hypot(Q[i][0] - out[out.length - 1][0], Q[i][1] - out[out.length - 1][1]); if (d >= 4.5 || i === Q.length - 1) out.push(Q[i]); }
   const lTip = (a, Lp) => [cx + Math.sin(a) * (Lp + .12) * R, cy + (.55 - Math.cos(a) * (Lp + .12)) * R];
   const wEnd = li => { const W0 = WAVES.find(v => v[0] === li), p = li === 3 ? blueRide : miniWave(...W0.slice(1)), e = p[p.length - 1]; return [cx + e[0] * R, cy + e[1] * R]; };
-  const stOv = name === 'maple' ? { sound: [cx - .84 * R, cy - .38 * R], journal: [cx + .84 * R, cy - .38 * R], freediving: [cx, cy - .88 * R], labelAt: { sound: [cx - 1.08 * R, cy - .72 * R], journal: [cx + 1.08 * R, cy - .72 * R], freediving: [cx, cy - 1.38 * R] } } : name === 'headphones' ? { sound: [cx - .72 * R, cy + .35 * R], journal: [cx + .72 * R, cy + .35 * R], labelAt: { sound: [cx - .72 * R, cy + 1.0 * R], journal: [cx + .72 * R, cy + 1.0 * R] } } : name === 'octopus' ? { freediving: [cx + (-.22 - 1.15 + .27) * R, cy + 1.03 * R] } : name === 'wave' ? { sound: wEnd(1), journal: wEnd(2), freediving: wEnd(3), labelAt: (() => { const lc = (li, dx, dy, deg, sc) => { const W0 = WAVES.find(v => v[0] === li), [C, r] = miniC(...W0.slice(1)); return [cx + (C[0] + dx * r) * R, cy + (C[1] + dy * r) * R, deg, sc]; };
-        return { freediving: [cx + 1.3 * R, cy - .58 * R, -9, 1.18], sound: lc(1, -1.6, -1.7, -12, .92), journal: lc(2, -1.3, -2.3, -4, 1.04) }; })() } : name === 'lotus' ? { sound: lTip(-1.25, .9), journal: lTip(1.25, .9), freediving: lTip(0, 1.45) } : name === 'egg' ? { journal: [cx + .18 * R, cy - .12 * R], labelAt: { journal: [cx + .18 * R, cy + .4 * R] } } : name === 'book' ? { sound: [cx - 1.17 * R, cy + bookRowY(-1.17, .25) * R], freediving: [cx - 1.16 * R, cy + bookRowY(-1.16, .5) * R], journal: [cx + 1.15 * R, cy + bookRowY(1.15, .5) * R],
+  const stOv = name === 'maple' ? { sound: [cx - .84 * R, cy - .38 * R], library: [cx + .84 * R, cy - .38 * R], freediving: [cx, cy - .88 * R], labelAt: { sound: [cx - 1.08 * R, cy - .72 * R], library: [cx + 1.08 * R, cy - .72 * R], freediving: [cx, cy - 1.38 * R] } } : name === 'headphones' ? { sound: [cx - .72 * R, cy + .35 * R], library: [cx + .72 * R, cy + .35 * R], labelAt: { sound: [cx - .72 * R, cy + 1.0 * R], library: [cx + .72 * R, cy + 1.0 * R] } } : name === 'octopus' ? { freediving: [cx + (-.22 - 1.15 + .27) * R, cy + 1.03 * R] } : name === 'wave' ? { sound: wEnd(1), library: wEnd(2), freediving: wEnd(3), labelAt: (() => { const lc = (li, dx, dy, deg, sc) => { const W0 = WAVES.find(v => v[0] === li), [C, r] = miniC(...W0.slice(1)); return [cx + (C[0] + dx * r) * R, cy + (C[1] + dy * r) * R, deg, sc]; };
+        return { freediving: [cx + 1.3 * R, cy - .58 * R, -9, 1.18], sound: lc(1, -1.6, -1.7, -12, .92), library: lc(2, -1.3, -2.3, -4, 1.04) }; })() } : name === 'lotus' ? { sound: lTip(-1.25, .9), library: lTip(1.25, .9), freediving: lTip(0, 1.45) } : name === 'egg' ? { library: [cx + .18 * R, cy - .12 * R], labelAt: { library: [cx + .18 * R, cy + .4 * R] } } : name === 'book' ? { sound: [cx - 1.17 * R, cy + bookRowY(-1.17, .25) * R], freediving: [cx - 1.16 * R, cy + bookRowY(-1.16, .5) * R], library: [cx + 1.15 * R, cy + bookRowY(1.15, .5) * R],
         // labels sit just outside the pages, level with their dots (32 px gap plus half the label's width)
-        labelAt: { sound: [cx - 1.17 * R - 69, cy + bookRowY(-1.17, .25) * R], freediving: [cx - 1.16 * R - 88, cy + bookRowY(-1.16, .5) * R], journal: [cx + 1.15 * R + 73, cy + bookRowY(1.15, .5) * R] } } : name === 'triskele' ? { freediving: [cx + .62 * R, cy + 1.12 * R] } : name === 'mountain' ? { freediving: [cx + .02 * R, cy + .86 * R], journal: [cx + .36 * R, cy - .4 * R] } : name === 'spring' ? { sound: [cx + 1.64 * R, cy - .39 * R], journal: [cx - .2 * R, cy - 1.0 * R], freediving: [cx - .4 * R, cy + 1.24 * R] } : name === 'plane' ? (() => { const end = (ex, L) => { const ey = .4 - .3 * (ex < 0 ? (ex + 1.24) / 1.08 : (1.24 - ex) / 1.08) + .07 + L; return [cx + (ex - ey) * Math.SQRT1_2 * R, cy + (ex + ey) * Math.SQRT1_2 * R]; }; const w = planeWind(-1, .6).pop(); return { sound: [cx + w[0] * R, cy + w[1] * R], journal: end(-.86, .9), freediving: end(.86, .9) }; })() : name === 'hangul' ? { sound: [cx - SEAL.x * R, cy - (SEAL.y - .01) * R], journal: [cx + .74 * R, cy - .5 * R], freediving: [cx + .84 * R, cy + .76 * R],
+        labelAt: { sound: [cx - 1.17 * R - 69, cy + bookRowY(-1.17, .25) * R], freediving: [cx - 1.16 * R - 88, cy + bookRowY(-1.16, .5) * R], library: [cx + 1.15 * R + 73, cy + bookRowY(1.15, .5) * R] } } : name === 'triskele' ? { freediving: [cx + .62 * R, cy + 1.12 * R] } : name === 'mountain' ? { freediving: [cx + .02 * R, cy + .86 * R], library: [cx + .36 * R, cy - .4 * R] } : name === 'spring' ? { sound: [cx + 1.64 * R, cy - .39 * R], library: [cx - .2 * R, cy - 1.0 * R], freediving: [cx - .4 * R, cy + 1.24 * R] } : name === 'plane' ? (() => { const end = (ex, L) => { const ey = .4 - .3 * (ex < 0 ? (ex + 1.24) / 1.08 : (1.24 - ex) / 1.08) + .07 + L; return [cx + (ex - ey) * Math.SQRT1_2 * R, cy + (ex + ey) * Math.SQRT1_2 * R]; }; const w = planeWind(-1, .6).pop(); return { sound: [cx + w[0] * R, cy + w[1] * R], library: end(-.86, .9), freediving: end(.86, .9) }; })() : name === 'hangul' ? { sound: [cx - SEAL.x * R, cy - (SEAL.y - .01) * R], library: [cx + .74 * R, cy - .5 * R], freediving: [cx + .84 * R, cy + .76 * R],
         // labels sit just outside the stamp's right edge, clear of the letters
-        labelAt: { journal: [cx + SEAL.x * R + 58, cy - .5 * R], freediving: [cx + SEAL.x * R + 74, cy + .76 * R] } } : name === 'muaythai' ? (() => { const end = li => { const e = BAG_ROT(BAG_LINES.find(l => l.li === li).path.slice(-1)[0]); return [cx + e[0] * R, cy + e[1] * R]; }; return { sound: end(1), journal: end(2), freediving: end(3) }; })() : name === 'samurai' ? { sound: [cx - .26 * R, cy - .61 * R], journal: [cx + .26 * R, cy - .61 * R], freediving: [cx - .26 * R, cy - .27 * R], labelAt: { sound: [cx - .26 * R, cy - .99 * R], journal: [cx + .26 * R, cy - .99 * R], freediving: [cx - .68 * R, cy - .1 * R] } } : null;
+        labelAt: { library: [cx + SEAL.x * R + 58, cy - .5 * R], freediving: [cx + SEAL.x * R + 74, cy + .76 * R] } } : name === 'muaythai' ? (() => { const end = li => { const e = BAG_ROT(BAG_LINES.find(l => l.li === li).path.slice(-1)[0]); return [cx + e[0] * R, cy + e[1] * R]; }; return { sound: end(1), library: end(2), freediving: end(3) }; })() : name === 'samurai' ? { sound: [cx - .26 * R, cy - .61 * R], library: [cx + .26 * R, cy - .61 * R], freediving: [cx - .26 * R, cy - .27 * R], labelAt: { sound: [cx - .26 * R, cy - .99 * R], library: [cx + .26 * R, cy - .99 * R], freediving: [cx - .68 * R, cy - .1 * R] } } : null;
   return { pts: out, station: [cx + st[0] * R, cy + st[1] * R], dots: extra, blooms, colorPaths, stOv };
 }
 
 class Component extends DCLogic {
-  canvasRef = React.createRef(); btnRef = React.createRef(); sndRef = React.createRef(); jrnRef = React.createRef();
+  canvasRef = React.createRef(); btnRef = React.createRef(); sndRef = React.createRef(); libRef = React.createRef();
   T = 0; go = null; hov = 0; hovT = 0; hovPg = {}; hovPgT = {};
 
   componentDidMount() {
@@ -451,12 +451,12 @@ class Component extends DCLogic {
     const mX = W < 720 ? 44 : 70, clear = S => S[0] > mX && S[0] < W - mX && S[1] > 66 && S[1] < H - 70 && SP.every(p => !(p[0] > S[0] - 100 && p[0] < S[0] + 100 && p[1] > S[1] - 50 && p[1] < S[1] + 100));
     const auto = (f, dist) => { const i = Math.round(f * (NS - 1)), p = SP[i], dx = p[0] - cx, dy = p[1] - cy, dl = Math.hypot(dx, dy) || 1; return [p[0] + dx / dl * dist, p[1] + dy / dl * dist]; };
     const pickF = (f, avoid) => { for (let t = 0; t < 14; t++) for (let dist = 34; dist <= 220; dist += 16) { const S = auto((f + t * .07) % 1, dist); if (clear(S) && avoid.every(A => Math.hypot(A[0] - S[0], A[1] - S[1]) > 150)) return S; } return auto(f, 120); };
-    let sSnd, sJrn;
-    { sSnd = pickF(.18, [this.station]); sJrn = pickF(.6, [this.station, sSnd]); }
-    if (W < 720) { let yb = -1e9; SP.forEach(p => { if ((p[2] ?? 1) >= .2) yb = Math.max(yb, p[1]); }); const ry = Math.min(H - 90, yb + 84); sSnd = [W * .2, ry]; this.station = [W * .5, ry]; sJrn = [W * .8, ry]; }
-    if (SH.stOv && SH.stOv.journal) sJrn = SH.stOv.journal; if (SH.stOv && SH.stOv.sound) sSnd = SH.stOv.sound; if (SH.stOv && SH.stOv.freediving) this.station = SH.stOv.freediving; this.labelAt = SH.stOv && SH.stOv.labelAt || null;
-    this.stations = { freediving: this.station, sound: sSnd, journal: sJrn }; const fdI = near(this.station);
-    const stIs = { freediving: fdI, sound: near(sSnd), journal: near(sJrn) }; const ends = [this.station, sSnd, sJrn];
+    let sSnd, sLib;
+    { sSnd = pickF(.18, [this.station]); sLib = pickF(.6, [this.station, sSnd]); }
+    if (W < 720) { let yb = -1e9; SP.forEach(p => { if ((p[2] ?? 1) >= .2) yb = Math.max(yb, p[1]); }); const ry = Math.min(H - 90, yb + 84); sSnd = [W * .2, ry]; this.station = [W * .5, ry]; sLib = [W * .8, ry]; }
+    if (SH.stOv && SH.stOv.library) sLib = SH.stOv.library; if (SH.stOv && SH.stOv.sound) sSnd = SH.stOv.sound; if (SH.stOv && SH.stOv.freediving) this.station = SH.stOv.freediving; this.labelAt = SH.stOv && SH.stOv.labelAt || null;
+    this.stations = { freediving: this.station, sound: sSnd, library: sLib }; const fdI = near(this.station);
+    const stIs = { freediving: fdI, sound: near(sSnd), library: near(sLib) }; const ends = [this.station, sSnd, sLib];
     const SB = 48, secR = new Array(SB).fill(0), sec = E => ((Math.floor((Math.atan2(E[1] - cy, E[0] - cx) + Math.PI) / (2 * Math.PI) * SB)) % SB + SB) % SB;
     SP.forEach(q => { if ((q[2] ?? 1) < .2) return; const k = sec(q), r = Math.hypot(q[0] - cx, q[1] - cy); if (r > secR[k]) secR[k] = r; });
     const SPv = SP.filter((q, i) => (q[2] ?? 1) >= .2 && i % 2 === 0);
@@ -561,9 +561,9 @@ class Component extends DCLogic {
     if (this.shapeName === 'spring' && !this.trans && !this.fromDive) { const ink = this.paths[0], e = this.endOf(ink); this.paths.forEach((P, li) => { if (this.colorPaths[li] && !P.tr) P.d = Math.max(P.d ?? P.L.d, e - this.durOf(P) + .3); }); }
     // label placement: decided once, against every settled stroke
     { const pts = []; this.paths.forEach(P => P.pts.forEach((p, i) => { if (i >= P.arc0 && (!P.L.keep || (P.wt[i] ?? 1) >= .2)) pts.push(p); }));
-      const mw = r => { const e = r.current && r.current.children[1]; return e && e.offsetWidth ? e.offsetWidth + 4 : 0; }, lw = { freediving: mw(this.btnRef) || 116, sound: mw(this.sndRef) || 74, journal: mw(this.jrnRef) || 84 }, lh = { freediving: 18, sound: 18, journal: 18 };
+      const mw = r => { const e = r.current && r.current.children[1]; return e && e.offsetWidth ? e.offsetWidth + 4 : 0; }, lw = { freediving: mw(this.btnRef) || 116, sound: mw(this.sndRef) || 74, library: mw(this.libRef) || 84 }, lh = { freediving: 18, sound: 18, library: 18 };
       this.labelUp = {};
-      for (const pg of ['freediving', 'sound', 'journal']) { const S = this.stations[pg], w = lw[pg], h = lh[pg];
+      for (const pg of ['freediving', 'sound', 'library']) { const S = this.stations[pg], w = lw[pg], h = lh[pg];
         const boxes = { below: [S[0] - w / 2 - 6, S[0] + w / 2 + 6, S[1] + 10, S[1] + 18 + h * 1.6], above: [S[0] - w / 2 - 6, S[0] + w / 2 + 6, S[1] - 18 - h * 1.6, S[1] - 10], right: [S[0] + 10, S[0] + 22 + w, S[1] - h, S[1] + h], left: [S[0] - 22 - w, S[0] - 10, S[1] - h, S[1] + h] };
         let best = 'below', bh = 1e9; const OP = this.paths.find(P => P.L.page === pg); let ap = [0, 0]; if (OP) { const q = OP.pts, e = q[q.length - 1]; let k2 = q.length - 1; while (k2 > 0 && Math.hypot(q[k2][0] - e[0], q[k2][1] - e[1]) < 45) k2--; const dx = q[k2][0] - e[0], dy = q[k2][1] - e[1], dl = Math.hypot(dx, dy) || 1; ap = [dx / dl, dy / dl]; }
         const DIR = { below: [0, 1], above: [0, -1], right: [1, 0], left: [-1, 0] };
@@ -596,7 +596,7 @@ class Component extends DCLogic {
       mkX({ col: [255, 118, 18], k: 3, d: .25, dur: 2.7, start: hd('c4'), c1: [hd('c4')[0], hd('c4')[1] + 120], c2: [B[0] + 120, B[1] - 90], feat: coil, end: [NX('c4'), NY], r1: [B[0] + 30, Math.max(40, B[1] - 170)], rx: -260, w: 7, tw: 6.5 * BS, ta: 1 }),
       mkX({ col: [232, 34, 44], k: 4, d: .5, dur: 2.6, start: hd('sound'), c1: [hd('sound')[0], hd('sound')[1] - 100], c2: [B[0] - 30, B[1] - 120], feat: flag, end: [NX('sound'), NY], r1: [B[0] + 20, Math.max(30, B[1] - 160)], rx: -260, w: 6.5, tw: 4.6 * BS, ta: 1 })
     ];
-    this.navFrom = {}; ['journal', 'c5', 'c6'].forEach(k => { const h = this.heads && this.heads[k]; if (h) this.navFrom[k] = { p: h.p.slice(), col: h.col }; });
+    this.navFrom = {}; ['library', 'c5', 'c6'].forEach(k => { const h = this.heads && this.heads[k]; if (h) this.navFrom[k] = { p: h.p.slice(), col: h.col }; });
     this.go = 0;
   };
   // Sound / Library: strokes fade, every head flies up to its nav dot, then the page opens with the same nav in place
@@ -604,11 +604,11 @@ class Component extends DCLogic {
     if (this.go != null || this.T < this.readyT) return;
     if (this.tapReveal(pg)) return;
     this.exits = []; this.navFrom = {};
-    ['ink', 'freediving', 'sound', 'journal', 'c4', 'c5', 'c6'].forEach(k => { const h = this.heads && this.heads[k]; if (h) this.navFrom[k] = { p: h.p.slice(), col: h.col }; });
+    ['ink', 'freediving', 'sound', 'library', 'c4', 'c5', 'c6'].forEach(k => { const h = this.heads && this.heads[k]; if (h) this.navFrom[k] = { p: h.p.slice(), col: h.col }; });
     this.dest = pg === 'sound' ? BASE + 'sound/?from=page' : BASE + 'library/'; this.go = 0;
   };
-  goSound = this.goPage('sound'); goJournal = this.goPage('journal');
-  sndOn = () => { this.hovPg.sound = 1; }; sndOff = () => { this.hovPg.sound = 0; }; jrnOn = () => { this.hovPg.journal = 1; }; jrnOff = () => { this.hovPg.journal = 0; };
+  goSound = this.goPage('sound'); goLibrary = this.goPage('library');
+  sndOn = () => { this.hovPg.sound = 1; }; sndOff = () => { this.hovPg.sound = 0; }; libOn = () => { this.hovPg.library = 1; }; libOff = () => { this.hovPg.library = 0; };
   durOf(P) { const fast = this.shapeName === 'spring' && this.colorPaths && this.colorPaths[LINES.indexOf(P.L)], run = P.len / (fast ? 2400 : this.shapeName === 'octopus' && P.L.keep ? 1300 : 650); return (2.8 + (P.L.keep ? Math.min(run, INK_RUN) : run)) / P.L.spd; }
   endOf(P) { return P.tr ? P.L.d * .6 + (1.6 + (P.len - P.oldLen) / 900) / P.L.spd : (P.d ?? P.L.d) + this.durOf(P); }
   // the ink dot calls this with a click event and gets a random symbol; the local symbol picker (src/dev/symbol-picker.js) passes a name
@@ -625,7 +625,7 @@ class Component extends DCLogic {
   hoverOff = () => { this.hov = 0; };
   // hovering a section dot (or the black ink dot) fades every other line from the start of its stroke to its tail, all at the same time, down to 25%; it plays back in reverse when the hover ends
   fadeTick(dt) {
-    dt = Math.max(0, dt); const pg = this.go != null || !(this.T >= this.readyT) ? null : this.hov ? 'freediving' : this.hovPg.sound ? 'sound' : this.hovPg.journal ? 'journal' : this.hovI ? 'ink' : null, hl = pg === 'ink' ? 0 : pg ? LINES.findIndex(L => L.page === pg) : -1;
+    dt = Math.max(0, dt); const pg = this.go != null || !(this.T >= this.readyT) ? null : this.hov ? 'freediving' : this.hovPg.sound ? 'sound' : this.hovPg.library ? 'library' : this.hovI ? 'ink' : null, hl = pg === 'ink' ? 0 : pg ? LINES.findIndex(L => L.page === pg) : -1;
     if (!this.fadeC) this.fadeC = LINES.map(() => 0);
     this.fadeC = this.fadeC.map((c, li) => { const tg = hl >= 0 && li !== hl ? FADE.sweep : 0; return tg > c ? Math.min(tg, c + dt) : Math.max(tg, c - dt); });
   }
@@ -669,7 +669,7 @@ class Component extends DCLogic {
   // touch screens have no hover: the first tap shows the label, the second goes there
   tapReveal(pg) { if (typeof matchMedia === 'undefined' || !matchMedia('(hover: none)').matches) return false; const s = this.labs && this.labs[pg]; if (s && s.on) return false;
     if (pg === 'freediving') this.hov = 1; else this.hovPg[pg] = 1;
-    if (!this.offTap) { this.offTap = e => { if (e.target.closest && e.target.closest('button[aria-label]')) return; this.hov = 0; this.hovPg.sound = this.hovPg.journal = 0; }; document.addEventListener('pointerdown', this.offTap); }
+    if (!this.offTap) { this.offTap = e => { if (e.target.closest && e.target.closest('button[aria-label]')) return; this.hov = 0; this.hovPg.sound = this.hovPg.library = 0; }; document.addEventListener('pointerdown', this.offTap); }
     return true; }
   // x: 0 at the start of the visible stroke, 1 at its tail
   fadeAt(li, x) {
@@ -683,17 +683,17 @@ class Component extends DCLogic {
   tick = now => {
     cancelAnimationFrame(this.raf); this.raf = requestAnimationFrame(this.tick);
     const dt = Math.min(.05, (now - (this.last || now)) / 1000); this.last = now;
-    this.T += dt; this.hovT += (this.hov - this.hovT) * (1 - Math.exp(-dt * 8)); for (const k of ['sound', 'journal']) this.hovPgT[k] = (this.hovPgT[k] || 0) + ((this.hovPg[k] || 0) - (this.hovPgT[k] || 0)) * (1 - Math.exp(-dt * 8));
+    this.T += dt; this.hovT += (this.hov - this.hovT) * (1 - Math.exp(-dt * 8)); for (const k of ['sound', 'library']) this.hovPgT[k] = (this.hovPgT[k] || 0) + ((this.hovPg[k] || 0) - (this.hovPgT[k] || 0)) * (1 - Math.exp(-dt * 8));
     this.fadeTick(dt); this.dtF = Math.max(0, dt);
     // leaving: the last frame is kept (window.__leave) and shown by the next page while it loads, so there's no blank moment in between
     if (this.go != null) { this.go += dt; if (this.go > (this.dest ? (/\/sound\//.test(this.dest) ? 1.3 : 2.05) : 4.05) && !this.left) { this.left = true; // Sound picks the menu dots up where they are and drops them onto its beat pads
-      if (/\/sound\//.test(this.dest || '')) try { const o = {}; ['ink', 'freediving', 'sound', 'journal', 'c4', 'c5', 'c6'].forEach(k => { const f = this.navFrom && this.navFrom[k]; o[k] = f ? f.p : sndDrop(k, innerWidth, innerHeight); }); o.home = o.ink; sessionStorage.setItem('nav-from', JSON.stringify(o)); } catch (e) {}
+      if (/\/sound\//.test(this.dest || '')) try { const o = {}; ['ink', 'freediving', 'sound', 'library', 'c4', 'c5', 'c6'].forEach(k => { const f = this.navFrom && this.navFrom[k]; o[k] = f ? f.p : sndDrop(k, innerWidth, innerHeight); }); o.home = o.ink; sessionStorage.setItem('nav-from', JSON.stringify(o)); } catch (e) {}
       (window.__leave || (h => { location.href = h; }))(this.dest || BASE + 'freediving/?from=home'); } }
     // once the symbol has settled (drawn, its transition over, nothing hovered, fading or with labels moving) the picture doesn't change, so it
     // isn't redrawn every frame; any hover, shuffle or resize wakes it
     { const L = this.labs || {}, near = (a, b) => Math.abs((a || 0) - (b || 0)) < .002, still = this.go == null && !this.morph && !this.trans && !this.oldPaths && this.T > (this.readyT ?? 99) + 3
-        && near(this.hovT, this.hov) && near(this.hovIT, this.hovI) && ['sound', 'journal'].every(k => near(this.hovPgT[k], this.hovPg[k])) && (this.fadeC || []).every(c => c === 0 || c === FADE.sweep) && Object.values(L).every(x => x.rest && x.pk == null),
-        sig = innerWidth + 'x' + innerHeight + ':' + this.shapeName + ':' + (this.fadeC || []).join() + ':' + this.hov + this.hovI + (this.hovPg.sound || 0) + (this.hovPg.journal || 0);
+        && near(this.hovT, this.hov) && near(this.hovIT, this.hovI) && ['sound', 'library'].every(k => near(this.hovPgT[k], this.hovPg[k])) && (this.fadeC || []).every(c => c === 0 || c === FADE.sweep) && Object.values(L).every(x => x.rest && x.pk == null),
+        sig = innerWidth + 'x' + innerHeight + ':' + this.shapeName + ':' + (this.fadeC || []).join() + ':' + this.hov + this.hovI + (this.hovPg.sound || 0) + (this.hovPg.library || 0);
       if (still && this.stillSig === sig) return; this.stillSig = still ? sig : null; }
     this.draw();
     if (!this.readied) { this.readied = true; window.__ready && window.__ready(); }
@@ -744,7 +744,7 @@ class Component extends DCLogic {
     }
     const quads = [], NIB = -.65, HF = [-.4, -.13, .16, .41];
     if (morphK >= 0 && morphK < 1) {
-      [this.btnRef, this.sndRef, this.jrnRef].forEach(r => { if (r.current) { r.current.style.opacity = '0'; r.current.style.pointerEvents = 'none'; } });
+      [this.btnRef, this.sndRef, this.libRef].forEach(r => { if (r.current) { r.current.style.opacity = '0'; r.current.style.pointerEvents = 'none'; } });
       if (!this.grainP) this.grainP = ctx.createPattern(this.grainC, 'repeat');
       ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = .35; ctx.fillStyle = this.grainP; ctx.fillRect(0, 0, W, H); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1; return;
     }
@@ -916,7 +916,7 @@ class Component extends DCLogic {
       const dx = stx, dy = sty;
       if (this.hovT > .01) { const g = ctx.createRadialGradient(dx, dy, 0, dx, dy, 60); g.addColorStop(0, `rgba(30,90,190,${.3 * this.hovT * dA})`); g.addColorStop(1, 'rgba(30,90,190,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(dx, dy, 60, 0, 6.2832); ctx.fill(); }
     }
-    [['sound', this.sndRef, [214, 40, 40]], ['journal', this.jrnRef, [200, 150, 0]]].forEach(([pg, ref, c]) => {
+    [['sound', this.sndRef, [214, 40, 40]], ['library', this.libRef, [200, 150, 0]]].forEach(([pg, ref, c]) => {
       const P = this.paths.find(q => q.L.page === pg), S = this.stations[pg]; if (!P || !S) return;
       const a2 = smooth(clamp((T - Math.max(this.readyT, this.endOf(P))) / .5, 0, 1)) * (1 - gone), el = ref.current;
       const LA = this.labelAt && this.labelAt[pg], hh = this.heads && this.heads[pg], HP = LA || (hh && hh.t === T ? hh.p : S); if (el) { this.placeLabel(el, hh && hh.t === T ? hh.p : S, LA, LA ? null : this.labelUp && this.labelUp[pg]); el.style.opacity = a2.toFixed(3); el.style.pointerEvents = a2 > .5 ? 'auto' : 'none'; this.labelFx(pg, el, hh && hh.t === T ? hh.p : S, !!this.hovPg[pg] && a2 > .5, LA && LA.length > 2 ? [LA[2], LA[3]] : null); }
@@ -938,14 +938,14 @@ class Component extends DCLogic {
     if (this.navArrive && G == null && T < 4) LINES.forEach((L, li) => { const key = L.keep ? 'ink' : L.page || 'c' + li, p = this.navArrive[key], h = this.heads && this.heads[key]; if (!p || (h && h.t === T)) return;
       ctx.globalAlpha = 1; ctx.fillStyle = `rgb(${L.col[0]},${L.col[1]},${L.col[2]})`; ctx.beginPath(); ctx.arc(p[0], p[1], /^c\d/.test(key) ? 5.5 : 8, 0, 6.2832); ctx.fill(); });
     if (this.exitHeads) for (const eh of this.exitHeads) { ctx.globalAlpha = 1; ctx.fillStyle = eh.col; ctx.beginPath(); ctx.arc(eh.p[0], eh.p[1], eh.r, 0, 6.2832); ctx.fill(); }
-    if (G != null && this.navFrom) ['sound', 'journal', 'c4', 'c5', 'c6', 'freediving', 'ink'].forEach((k, i) => { const f = this.navFrom[k]; if (!f) return; const toSnd = /\/sound\//.test(this.dest || ''), P0 = f.p, kk = easeIO(clamp((G - .15 - i * .07) / 1.4, 0, 1));
+    if (G != null && this.navFrom) ['sound', 'library', 'c4', 'c5', 'c6', 'freediving', 'ink'].forEach((k, i) => { const f = this.navFrom[k]; if (!f) return; const toSnd = /\/sound\//.test(this.dest || ''), P0 = f.p, kk = easeIO(clamp((G - .15 - i * .07) / 1.4, 0, 1));
       // to Sound each dot waits where it is while the strokes fade (Sound then drops it onto its beat pad); anywhere else it rises to the menu at the top
       if (toSnd) { ctx.globalAlpha = 1; ctx.fillStyle = `rgb(${f.col[0]},${f.col[1]},${f.col[2]})`; ctx.beginPath(); ctx.arc(P0[0], P0[1], /^c\d/.test(k) ? 5.5 : 8, 0, 6.2832); ctx.fill(); return; }
       const P1 = toSnd ? sndDrop(k, W, H) : navAt(W, k), C1 = toSnd ? [P0[0], P0[1] + (P1[1] - P0[1]) * .45] : [P0[0], P0[1] - 90], C2 = toSnd ? [P1[0], P1[1] - 90] : [P1[0], P1[1] + 70], bz = u => { const a = (1 - u) ** 3, b = 3 * (1 - u) ** 2 * u, c = 3 * (1 - u) * u * u, d = u ** 3; return [a * P0[0] + b * C1[0] + c * C2[0] + d * P1[0], a * P0[1] + b * C1[1] + c * C2[1] + d * P1[1]]; };
       const col = `rgb(${f.col[0]},${f.col[1]},${f.col[2]})`, tail = Math.max(0, kk - .35); ctx.strokeStyle = col; ctx.lineCap = 'round';
       for (let q = 0; q < 24; q++) { const u0 = tail + (kk - tail) * q / 24, u1 = tail + (kk - tail) * (q + 1) / 24, a0 = bz(u0), a1 = bz(u1); ctx.globalAlpha = .85 * (q / 24) * Math.sin(Math.PI * Math.min(1, kk * 1.15)); ctx.lineWidth = 1.5 + 3.5 * q / 24; ctx.beginPath(); ctx.moveTo(a0[0], a0[1]); ctx.lineTo(a1[0], a1[1]); ctx.stroke(); }
       const p = bz(kk); ctx.globalAlpha = 1; ctx.fillStyle = col; ctx.beginPath(); ctx.arc(p[0], p[1], 7 + (/^c\d/.test(k) ? -1.5 : 1) * kk, 0, 6.2832); ctx.fill(); });
-    if (this.heads) for (const pg in this.heads) { const h = this.heads[pg]; if (h.t !== T) continue; if (G != null && this.navFrom && this.navFrom[pg]) continue; const hv = pg === 'freediving' ? this.hovT : pg === 'ink' ? this.hovIT * 1.6 : (this.hovPgT[pg] || 0), hs = [...(this.shapeName || '')].reduce((x, ch) => x + ch.charCodeAt(0), 0) + ['freediving', 'sound', 'journal'].indexOf(pg) * 7, endR = [5, 8.5, 12.5][hs % 3], r = (pg === 'ink' ? 8 : 7.5 * (1 - h.set) + endR * h.set) + hv * 2 + LABEL.pulseR * this.labelPulse(pg), al = (1 - gone) * this.fadeAt(pg === 'ink' ? 0 : /^c\d$/.test(pg) ? +pg[1] : LINES.findIndex(L => L.page === pg), 1);
+    if (this.heads) for (const pg in this.heads) { const h = this.heads[pg]; if (h.t !== T) continue; if (G != null && this.navFrom && this.navFrom[pg]) continue; const hv = pg === 'freediving' ? this.hovT : pg === 'ink' ? this.hovIT * 1.6 : (this.hovPgT[pg] || 0), hs = [...(this.shapeName || '')].reduce((x, ch) => x + ch.charCodeAt(0), 0) + ['freediving', 'sound', 'library'].indexOf(pg) * 7, endR = [5, 8.5, 12.5][hs % 3], r = (pg === 'ink' ? 8 : 7.5 * (1 - h.set) + endR * h.set) + hv * 2 + LABEL.pulseR * this.labelPulse(pg), al = (1 - gone) * this.fadeAt(pg === 'ink' ? 0 : /^c\d$/.test(pg) ? +pg[1] : LINES.findIndex(L => L.page === pg), 1);
       if (al <= 0) continue; ctx.globalAlpha = al; ctx.fillStyle = `rgb(${h.col[0]},${h.col[1]},${h.col[2]})`; ctx.beginPath(); ctx.arc(h.p[0], h.p[1], r, 0, 6.2832); ctx.fill(); ctx.globalAlpha = 1; }
     this.hovIT += (this.hovI - this.hovIT) * .15;
     { const b = this.inkRef.current, h = this.heads && this.heads.ink; if (b) { const on = h && h.t === T && T >= this.readyT && G == null; if (h && h.t === T) { b.style.left = h.p[0] + 'px'; b.style.top = h.p[1] + 'px'; } b.style.pointerEvents = on ? 'auto' : 'none'; } }
@@ -958,7 +958,7 @@ class Component extends DCLogic {
   inkOn = () => { this.hovI = 1; }; inkOff = () => { this.hovI = 0; };
   renderVals() {
     return {
-      inkRef: this.inkRef, inkOn: this.inkOn, inkOff: this.inkOff, shuffle: this.shuffle, canvasRef: this.canvasRef, btnRef: this.btnRef, sndRef: this.sndRef, jrnRef: this.jrnRef, goDive: this.goDive, goSound: this.goSound, goJournal: this.goJournal, sndOn: this.sndOn, sndOff: this.sndOff, jrnOn: this.jrnOn, jrnOff: this.jrnOff, hoverOn: this.hoverOn, hoverOff: this.hoverOff };
+      inkRef: this.inkRef, inkOn: this.inkOn, inkOff: this.inkOff, shuffle: this.shuffle, canvasRef: this.canvasRef, btnRef: this.btnRef, sndRef: this.sndRef, libRef: this.libRef, goDive: this.goDive, goSound: this.goSound, goLibrary: this.goLibrary, sndOn: this.sndOn, sndOff: this.sndOff, libOn: this.libOn, libOff: this.libOff, hoverOn: this.hoverOn, hoverOff: this.hoverOff };
   }
 }
 
@@ -994,7 +994,7 @@ function View(v) {
         {"\n  "}
       </button>
       {"\n  "}
-      <button ref={v.jrnRef} onClick={v.goJournal} onMouseEnter={v.jrnOn} onMouseLeave={v.jrnOff} onFocus={v.jrnOn} onBlur={v.jrnOff} aria-label="Library" style={sty("position:absolute;left:0;top:0;transform:translate(-50%, -50%);display:block;width:48px;height:48px;padding:0;border-radius:50%;border:0;background:none;cursor:pointer;color:#141414;font-family:'Newsreader', Georgia, serif;opacity:0;pointer-events:none")}>
+      <button ref={v.libRef} onClick={v.goLibrary} onMouseEnter={v.libOn} onMouseLeave={v.libOff} onFocus={v.libOn} onBlur={v.libOff} aria-label="Library" style={sty("position:absolute;left:0;top:0;transform:translate(-50%, -50%);display:block;width:48px;height:48px;padding:0;border-radius:50%;border:0;background:none;cursor:pointer;color:#141414;font-family:'Newsreader', Georgia, serif;opacity:0;pointer-events:none")}>
         {"\n    "}
         <span style={sty("display:none")} />
         {"\n    "}

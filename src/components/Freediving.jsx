@@ -388,7 +388,7 @@ class Component extends DCLogic {
       else { land(k ? 'freediving' : 'home'); continue; }
       bead(p, col, r); }
     // the other dots fly straight up into their places in the menu
-    const RGB = { sound: [232, 34, 44], journal: [255, 196, 0], c4: [255, 118, 18], c5: [22, 168, 82], c6: [138, 64, 214] };
+    const RGB = { sound: [232, 34, 44], library: [255, 196, 0], c4: [255, 118, 18], c5: [22, 168, 82], c6: [138, 64, 214] };
     Object.keys(RGB).forEach((k, i) => { const from = nf[k], D = NV[k]; if (!from || !D) { land(k); return; } const g = (T - .15 - i * .08) / 1.1; if (g >= 1) { land(k); return; }
       const u = ease(clamp(g, 0, 1)), p = bz(from, [from[0] - 60, from[1] - 220], [D[0] - 40, D[1] + 160], D, u); bead(p, RGB[k], 4); });
   }
@@ -707,7 +707,7 @@ class Component extends DCLogic {
       counter: f >= 0 ? `${pad(f + 1)} / ${pad(list.length)}` : '',
       goSurface: this.goSurface, goHome: this.goHome,
       navOff: () => this.setState({ navHov: null }),
-      nav: Object.fromEntries([['home', '홈', 'Home'], ['freediving', '프리다이빙', 'Freediving'], ['sound', '소리', 'Sound'], ['journal', '서재', 'Library']].map(([k, ko, en]) => { const h = this.state.navHov === k, st = on => ({ a: on ? 1 : 0, y: on ? '0px' : '8px', b: on ? '0px' : '3px' }), E = st(h), K = st(false); return [k, { bp: h ? '28%' : '100%', en: E.a, enY: E.y, enB: E.b, ko: K.a, koY: K.y, koB: K.b, on: () => { if (this.state.navHov !== k) this.setState({ navHov: k }); }, go: this.goPage(k) }]; }))
+      nav: Object.fromEntries([['home', '홈', 'Home'], ['freediving', '프리다이빙', 'Freediving'], ['sound', '소리', 'Sound'], ['library', '서재', 'Library']].map(([k, ko, en]) => { const h = this.state.navHov === k, st = on => ({ a: on ? 1 : 0, y: on ? '0px' : '8px', b: on ? '0px' : '3px' }), E = st(h), K = st(false); return [k, { bp: h ? '28%' : '100%', en: E.a, enY: E.y, enB: E.b, ko: K.a, koY: K.y, koB: K.b, on: () => { if (this.state.navHov !== k) this.setState({ navHov: k }); }, go: this.goPage(k) }]; }))
     };
   }
 }
@@ -858,13 +858,13 @@ function View(v) {
           </span>
         </a>
         {"\n    "}
-        <a href={BASE + "library/"} onClick={v.nav?.journal?.go} aria-label="Library" data-navk="journal" onMouseEnter={v.nav?.journal?.on} onMouseLeave={v.navOff} onFocus={v.nav?.journal?.on} onBlur={v.navOff} style={sty("display:flex;flex-direction:column;align-items:center;gap:8px;width:24px;height:156px;padding:8px 0 0;box-sizing:border-box;border:0;background:none;color:inherit;text-decoration:none;cursor:pointer;font-family:'Newsreader', Georgia, serif;font-size:13px;line-height:1")}>
+        <a href={BASE + "library/"} onClick={v.nav?.library?.go} aria-label="Library" data-navk="library" onMouseEnter={v.nav?.library?.on} onMouseLeave={v.navOff} onFocus={v.nav?.library?.on} onBlur={v.navOff} style={sty("display:flex;flex-direction:column;align-items:center;gap:8px;width:24px;height:156px;padding:8px 0 0;box-sizing:border-box;border:0;background:none;color:inherit;text-decoration:none;cursor:pointer;font-family:'Newsreader', Georgia, serif;font-size:13px;line-height:1")}>
           <span data-navdot="1" style={sty("width:16px;height:16px;border-radius:50%;background:rgb(255,196,0);flex:none")} />
           <span style={sty("position:relative;display:block;width:100%;height:116px")}>
-            <span lang="en" data-lab="nav" aria-hidden="true" style={sty(`position:absolute;left:50%;top:0;writing-mode:vertical-rl;text-orientation:sideways;white-space:nowrap;font-family:Papyrus, 'Papyrus-Regular', 'Newsreader', Georgia, serif;font-weight:400;font-size:19px;letter-spacing:.02em;background-image:linear-gradient(to bottom, rgb(255,196,0) 0%, rgb(255,196,0) 20%, currentColor 60%, currentColor 100%);background-size:100% 300%;background-repeat:no-repeat;background-position:0 ${v.nav?.journal?.bp ?? ''};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;transition:opacity .55s ease, transform .7s cubic-bezier(.2,.7,.2,1), filter .55s ease, background-position 1.1s cubic-bezier(.3,.6,.2,1);opacity:${v.nav?.journal?.en ?? ''};transform:translateX(-50%) translateY(${v.nav?.journal?.enY ?? ''});filter:blur(${v.nav?.journal?.enB ?? ''})`)}>
+            <span lang="en" data-lab="nav" aria-hidden="true" style={sty(`position:absolute;left:50%;top:0;writing-mode:vertical-rl;text-orientation:sideways;white-space:nowrap;font-family:Papyrus, 'Papyrus-Regular', 'Newsreader', Georgia, serif;font-weight:400;font-size:19px;letter-spacing:.02em;background-image:linear-gradient(to bottom, rgb(255,196,0) 0%, rgb(255,196,0) 20%, currentColor 60%, currentColor 100%);background-size:100% 300%;background-repeat:no-repeat;background-position:0 ${v.nav?.library?.bp ?? ''};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;transition:opacity .55s ease, transform .7s cubic-bezier(.2,.7,.2,1), filter .55s ease, background-position 1.1s cubic-bezier(.3,.6,.2,1);opacity:${v.nav?.library?.en ?? ''};transform:translateX(-50%) translateY(${v.nav?.library?.enY ?? ''});filter:blur(${v.nav?.library?.enB ?? ''})`)}>
               {"Library"}
             </span>
-            <span lang="ko" aria-hidden="true" style={sty(`position:absolute;left:50%;top:0;writing-mode:vertical-rl;text-orientation:upright;white-space:nowrap;font-family:'Noto Serif KR', serif;font-weight:600;font-size:19px;letter-spacing:.08em;background-image:linear-gradient(to bottom, rgb(255,196,0) 0%, rgb(255,196,0) 20%, currentColor 60%, currentColor 100%);background-size:100% 300%;background-repeat:no-repeat;background-position:0 ${v.nav?.journal?.bp ?? ''};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;transition:opacity .55s ease, transform .7s cubic-bezier(.2,.7,.2,1), filter .55s ease, background-position 1.1s cubic-bezier(.3,.6,.2,1);opacity:${v.nav?.journal?.ko ?? ''};transform:translateX(-50%) translateY(${v.nav?.journal?.koY ?? ''});filter:blur(${v.nav?.journal?.koB ?? ''})`)}>
+            <span lang="ko" aria-hidden="true" style={sty(`position:absolute;left:50%;top:0;writing-mode:vertical-rl;text-orientation:upright;white-space:nowrap;font-family:'Noto Serif KR', serif;font-weight:600;font-size:19px;letter-spacing:.08em;background-image:linear-gradient(to bottom, rgb(255,196,0) 0%, rgb(255,196,0) 20%, currentColor 60%, currentColor 100%);background-size:100% 300%;background-repeat:no-repeat;background-position:0 ${v.nav?.library?.bp ?? ''};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;transition:opacity .55s ease, transform .7s cubic-bezier(.2,.7,.2,1), filter .55s ease, background-position 1.1s cubic-bezier(.3,.6,.2,1);opacity:${v.nav?.library?.ko ?? ''};transform:translateX(-50%) translateY(${v.nav?.library?.koY ?? ''});filter:blur(${v.nav?.library?.koB ?? ''})`)}>
               {"서재"}
             </span>
           </span>
