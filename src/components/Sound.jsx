@@ -284,7 +284,7 @@ class Component extends DCLogic {
     if (N.saw) { N.out.gain.setTargetAtTime(e > .2 ? .7 * e : 0, now, .03); N.saw.frequency.setTargetAtTime(108 + 22 * Math.sin(pos * .9), now, .2);
       while (c.nextVowel <= pos) { const v = VOWELS[Math.floor(rng(c.seed + (c.nextVowel * 100 | 0))() * VOWELS.length)]; N.b1.frequency.setTargetAtTime(v[0], now, .03); N.b2.frequency.setTargetAtTime(v[1], now, .03); c.nextVowel += .14 + .06 * Math.sin(c.nextVowel * 3); } }
     let lv = e; if (N.file || N.f || N.lead || N.saw) { this.an.getFloatTimeDomainData(this.anBuf); let s = 0; for (let i = 0; i < this.anBuf.length; i++) s += this.anBuf[i] * this.anBuf[i]; lv = clamp(Math.sqrt(s / this.anBuf.length) * 6, 0, 1); }
-    this.live += (lv - this.live) * .3; }
+    this.live += (lv - this.live) * (1 - Math.exp(-(this.dtF || 1 / 60) * 21.4)); }   // by the clock (.3 a frame at 60fps)
   // ---- nav (same as the other pages)
   dotOf(k) { const d = document.querySelector('[data-navk="' + k + '"] [data-navdot]'); if (!d) return null; const r = d.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }
   // kind: 'home' (faders turn back into dots and the panel slides away, Home picks the dots up), 'dive' (the same, and Freediving picks them up:
@@ -296,7 +296,7 @@ class Component extends DCLogic {
   GO = { freediving: this.leave(BASE + 'freediving/?from=sound', 'dive'), sound: this.stay, library: this.leave(BASE + 'library/', 'library') };
   tick = now => {
     this.raf = requestAnimationFrame(this.tick);
-    const dt = Math.min(.05, (now - (this.last || now)) / 1000); this.last = now; this.t += dt;
+    const dt = Math.min(.05, (now - (this.last || now)) / 1000); this.last = now; this.t += dt; this.dtF = dt;
     if (this.arr && (this.t > 4.5 || this.out)) this.arr = null;
     if (this.out) { this.out.t += dt; const lim = this.out.k !== 'other' ? 1.25 : .55;
       if (this.out.t > lim && !this.left) { this.left = true; if (this.out.k !== 'other') try { const o = { ...(this.dotPos || {}) }; o.ink = o.home; sessionStorage.setItem('nav-from', JSON.stringify(o)); } catch (x) {} (window.__leave || (h => { location.href = h; }))(this.out.href); } }
@@ -663,6 +663,7 @@ class Component extends DCLogic {
     if (pieces) {
       const F = this.frags(n), step = amp / FK, par = this.mx * 5, jit = look === 'stark' ? .45 : 1;
       // the played part of the wave dances with the music: each column follows its own band of the spectrum, strongest just behind the playhead
+      const spK = 1 - Math.exp(-(this.dtF || 1 / 60) * 35.9);   // the dancing columns' easing, by the clock (.45 a frame at 60fps)
       let spec = null; if (playX != null && live && this.an) { if (!this.fBuf) this.fBuf = new Uint8Array(this.an.frequencyBinCount); this.an.getByteFrequencyData(this.fBuf); spec = this.fBuf; }
       if (!this.sp || this.sp.length !== n) this.sp = new Float32Array(n);
       // scrub aids. settle: while the playhead is dragged the pieces gather into neat lines (all of them, or only round the pointer for lens);
@@ -673,7 +674,7 @@ class Component extends DCLogic {
       this.stl = (this.stl || 0) + ((scr && sm !== 'off' ? 1 : 0) - (this.stl || 0)) * Math.min(1, dt * 9); if (scr) this.lensX = scr.x;
       if (!this.hhA || this.hhA.length !== n) this.hhA = new Float32Array(n); this.hhA.fill(-1);
       for (let i = 0; i < n; i++) { const x = i * g + g / 2, ig = introG(x); if (ig <= 0) continue;
-        const b = spec && x <= playX ? spec[2 + (i * 37) % 140] / 255 * Math.exp(-(playX - x) / (W * .3)) : 0; this.sp[i] += (b - this.sp[i]) * .45;
+        const b = spec && x <= playX ? spec[2 + (i * 37) % 140] / 255 * Math.exp(-(playX - x) / (W * .3)) : 0; this.sp[i] += (b - this.sp[i]) * spK;
         const hh = this.disp[i] * amp * (.92 + .08 * Math.sin(t * 1.3 + i * .37)) * ig * (1 + 1.2 * this.sp[i]), kc = this.colK[i] ? KINDS[this.colK[i]].cs : TH.neutral, e = playX != null && live ? live * Math.exp(-(((x - playX) / 52) ** 2)) : 0;
         const sk = sm === 'lens' ? this.stl * Math.exp(-(((x - (this.lensX ?? -1e4)) / 110) ** 2)) : this.stl; this.hhA[i] = hh;
         if (ghost || sk > .01) { ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.fillStyle = kc; ctx.globalAlpha = this.alp[i] * (1 - fo) * Math.max(ghost ? .22 : 0, sk); const lw = 1 + sk; ctx.fillRect(x - lw / 2, yB - Math.max(.6, hh), lw, Math.max(1.2, hh * 2)); }

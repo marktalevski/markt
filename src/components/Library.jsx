@@ -57,7 +57,7 @@ class Component extends DCLogic {
   arrive() {
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const anims = this.arrAnims = [], A = (el, kf, o) => { const a = el.animate(kf, o); anims.push(a); return a; };
-    const W = innerWidth, nf = this.nf || {}, from = k => nf[k] || nf[k === 'home' ? 'ink' : k] || navAt(W, k), t0 = 150, step = 110, fly = 620, open = 320;
+    const W = innerWidth, nf = this.nf || {}, from = k => nf[k] || nf[k === 'home' ? 'ink' : k] || navAt(W, k), t0 = 120, step = 90, fly = 540, open = 300;
     // where the mug rests, measured before the books start (the top book's opening scale would carry it along)
     const mugEl = document.querySelector('[data-mug]'), mugL = mugEl ? mugEl.getBoundingClientRect().left : 0;
     const books = this.spines().reverse();
@@ -134,7 +134,7 @@ class Component extends DCLogic {
       // the text and the line fade, the mug slides off to the right, then the books fold back into their dots, top one first, and the dots
       // rise into the menu (or, to Freediving, stay where their books were); the next page picks them up there. It goes once the last dot
       // has arrived
-      const W = innerWidth, fold = 240, fly = 560, step = 90, flights = [];
+      const W = innerWidth, fold = 210, fly = 480, step = 70, flights = [];
       [this.bodyRef.current, document.querySelector('[data-rail]')].forEach(el => el && el.animate([{ opacity: getComputedStyle(el).opacity }, { opacity: 0 }], { duration: 220, fill: 'forwards' }));   // from as they are (the line is hidden with no book open)
       const mug = document.querySelector('[data-mug]'); if (mug) { const r = mug.getBoundingClientRect(); mug.animate([{ translate: '0 0' }, { translate: '-6px 0', offset: .2 }, { translate: `${innerWidth - r.left + 60}px 0` }], { duration: 380, easing: 'ease-in', fill: 'forwards' }); }
       this.spines().forEach(({ el, k, L, rad, dot, asDot }, i) => { const N = navAt(W, k), d = 160 + i * step;

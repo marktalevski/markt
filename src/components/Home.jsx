@@ -952,7 +952,7 @@ class Component extends DCLogic {
       const p = bz(kk); ctx.globalAlpha = 1; ctx.fillStyle = col; ctx.beginPath(); ctx.arc(p[0], p[1], 7 + (/^c\d/.test(k) ? -1.5 : 1) * kk, 0, 6.2832); ctx.fill(); });
     if (this.heads) for (const pg in this.heads) { const h = this.heads[pg]; if (h.t !== T) continue; if (G != null && this.navFrom && this.navFrom[pg]) continue; const hv = pg === 'freediving' ? this.hovT : pg === 'ink' ? this.hovIT * 1.6 : (this.hovPgT[pg] || 0), hs = [...(this.shapeName || '')].reduce((x, ch) => x + ch.charCodeAt(0), 0) + ['freediving', 'sound', 'library'].indexOf(pg) * 7, endR = [5, 8.5, 12.5][hs % 3], r = (pg === 'ink' ? 8 : 7.5 * (1 - h.set) + endR * h.set) + hv * 2 + LABEL.pulseR * this.labelPulse(pg), al = (1 - gone) * this.fadeAt(pg === 'ink' ? 0 : /^c\d$/.test(pg) ? +pg[1] : LINES.findIndex(L => L.page === pg), 1);
       if (al <= 0) continue; ctx.globalAlpha = al; ctx.fillStyle = `rgb(${h.col[0]},${h.col[1]},${h.col[2]})`; ctx.beginPath(); ctx.arc(h.p[0], h.p[1], r, 0, 6.2832); ctx.fill(); ctx.globalAlpha = 1; }
-    this.hovIT += (this.hovI - this.hovIT) * .15;
+    this.hovIT += (this.hovI - this.hovIT) * (1 - Math.exp(-(this.dtF || 1 / 60) * 9.75));   // by the clock (.15 a frame at 60fps), not per frame
     { const b = this.inkRef.current, h = this.heads && this.heads.ink; if (b) { const on = h && h.t === T && T >= this.readyT && G == null; if (h && h.t === T) { b.style.left = h.p[0] + 'px'; b.style.top = h.p[1] + 'px'; } b.style.pointerEvents = on ? 'auto' : 'none'; } }
     if (!this.grainP) this.grainP = ctx.createPattern(this.grainC, 'repeat');
     ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = .35; ctx.fillStyle = this.grainP; ctx.fillRect(0, 0, W, H);

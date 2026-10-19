@@ -222,7 +222,9 @@ class Component extends DCLogic {
       if (this.leaveT > SWIRL_DUR * .85 + 1.25 && !this.left) { this.left = true; (window.__leave || (h => { location.href = h; }))(BASE + '?from=dive'); } }
     if ((this.fromHome || this.fromSound) && !this.navLabDone) { const k = this.state.introDone ? 1 : smooth(clamp((this.introT - (this.fromSound ? 3 : 1.3)) / .9, 0, 1)); if (this.fromSound && k >= 1) document.querySelectorAll('[data-navdot]').forEach(d => { d.style.opacity = '1'; }); document.querySelectorAll('nav[aria-label="Pages"] > [data-navk] > span:last-child').forEach(el => { el.style.opacity = k.toFixed(3); }); if (k >= 1) this.navLabDone = true; }
     if (!this.state.introDone) { this.introT += dt; if (this.introT >= this.introEnd) this.setState({ introDone: true }); }
-    this.p += (this.target - this.p) * (1 - Math.exp(-dt * 5.5));
+    // the dive follows the scroll closely (a time constant of 1/11 s): smooth, without trailing behind slow scrolling. The cards, the orange
+    // line and the squid each follow it in turn, so their rates are kept quick too, or their lags would add up
+    this.p += (this.target - this.p) * (1 - Math.exp(-dt * 11));
     if (Math.abs(this.target - this.p) < .0002) this.p = this.target;
     if (this.state.exp != null && Math.abs(this.target - this.state.exp) > .6) this.setState({ exp: null });
     const f = this.p > -.5 && this.count ? clamp(Math.round(this.p), 0, this.count - 1) : -1;
@@ -264,7 +266,7 @@ class Component extends DCLogic {
       [['--cardPos', 'relative', 'absolute'], ['--cardL', '0px', '348px'], ['--cardT', '0px', '2px'], ['--cardMT', '14px', '0px'], ['--connD', 'none', 'block']].forEach(([k, n, w]) => s(k, narrow ? n : w));
       s('--cardmaxv', Math.round(vh * .58) + 'px');
     }
-    const k2 = 1 - Math.exp(-dt * 9), els = this.els, n = els.length, S = narrow ? 86 : 100;
+    const k2 = 1 - Math.exp(-dt * 16), els = this.els, n = els.length, S = narrow ? 86 : 100;
     const pos = []; let a = narrow ? 64 : 80;
     for (let i = 0; i < n; i++) {
       // an open card under its title (narrow screens) pushes the entries below it down by its height
@@ -621,14 +623,14 @@ class Component extends DCLogic {
         // the orange line runs down the rope from the surface into the nearest post's dot, so it's clear which entry is selected; when the nearest
         // post changes it glides on to the new one (it never stops between posts)
         const fN = this.p > -.5 && pz.length ? clamp(Math.round(this.p), 0, pz.length - 1) : -1, tgt = fN >= 0 ? pz[fN] : 0;
-        this.fillY = this.fillY == null ? tgt : this.fillY + (tgt - this.fillY) * (1 - Math.exp(-dtT * 7)); if (Math.abs(tgt - this.fillY) < .3) this.fillY = tgt;
+        this.fillY = this.fillY == null ? tgt : this.fillY + (tgt - this.fillY) * (1 - Math.exp(-dtT * 12)); if (Math.abs(tgt - this.fillY) < .3) this.fillY = tgt;
         const top = 0, bot = this.fillY; this.ropeDot = fN;
         const fy = o.y + bot, f0 = Math.max(o.y + top, LS, -20), f1 = Math.min(fy, H + 20);
         if (f1 > f0) {
           for (let ya = f0; ya < f1; ya += 18) { const yb = Math.min(f1, ya + 19), pts = []; for (let y = ya; y <= yb; y += 6) pts.push([o.x + Math.sin((y - o.y) * .02) * .7, y]); pts.push([o.x + Math.sin((yb - o.y) * .02) * .7, yb]); this.brush(ctx, pts, 3.6, 1, ya - o.y, ya === LS, false, css(this.fillCol(this.yToM((ya + yb) / 2 - o.y)))); }
         }
         // the squid keeps beside the nearest post, gliding over when it changes (on the rope, so it moves with it as the page scrolls)
-        { const sqT = fN >= 0 ? pz[fN] : (pz[0] || 0); this.sqHY = this.sqHY == null ? sqT : this.sqHY + (sqT - this.sqHY) * (1 - Math.exp(-dtT * 5));
+        { const sqT = fN >= 0 ? pz[fN] : (pz[0] || 0); this.sqHY = this.sqHY == null ? sqT : this.sqHY + (sqT - this.sqHY) * (1 - Math.exp(-dtT * 9));
           const hy = o.y + this.sqHY, vis = this.state.introDone && hy > LS && hy < H + 30; this.octA = (this.octA || 0) + ((vis ? 1 : 0) - (this.octA || 0)) * (1 - Math.exp(-dtT * 5)); if (this.sqI != null && this.sqI < 9) this.octA = Math.max(this.octA, .03);
           if (this.octA > .02) { const vel = dA / Math.max(dtT, .001); this.octV = (this.octV || 0) + (vel - (this.octV || 0)) * (1 - Math.exp(-dtT * 5));
             this.octPh = (this.octPh || 0) + dA * .05 + dtT * (1.1 + 2.5 * clamp(Math.abs(this.octV) / 400, 0, 1));
