@@ -240,13 +240,22 @@ class Component extends DCLogic {
     if (import.meta.env.DEV) window.__sound = this; // a handle for checking the page in development; not in the built site
     this.raf = requestAnimationFrame(this.tick);
   }
-  componentWillUnmount() { cancelAnimationFrame(this.raf); removeEventListener('resize', this.onResize); removeEventListener('wheel', this.onWheel); removeEventListener('keydown', this.onKey); document.removeEventListener('fullscreenchange', this.onFsc); removeEventListener('pointermove', this.onFMove); removeEventListener('click', this.onFClick); removeEventListener('click', this.onWClick); removeEventListener('pointerdown', this.onFDown); removeEventListener('touchstart', this.onTS); removeEventListener('touchend', this.onTE); removeEventListener('pointermove', this.onPM); this.stopNodes(); try { this.ac && this.ac.close(); } catch (e) {} }
+  componentWillUnmount() { if (this.silentEl) this.silentEl.pause(); cancelAnimationFrame(this.raf); removeEventListener('resize', this.onResize); removeEventListener('wheel', this.onWheel); removeEventListener('keydown', this.onKey); document.removeEventListener('fullscreenchange', this.onFsc); removeEventListener('pointermove', this.onFMove); removeEventListener('click', this.onFClick); removeEventListener('click', this.onWClick); removeEventListener('pointerdown', this.onFDown); removeEventListener('touchstart', this.onTS); removeEventListener('touchend', this.onTE); removeEventListener('pointermove', this.onPM); this.stopNodes(); try { this.ac && this.ac.close(); } catch (e) {} }
   componentDidUpdate(prev) { if (prev.style !== this.props.style) { this.t = 0; this.disp = null; this.listBottom = 0; } }
   step(d) { this.goAlbum(this.state.album + d)(); }
   goAlbum = a => () => { a = clamp(a, 0, this.albums.length - 1); if (a === this.state.album) return; this.albDir = a > this.state.album ? 1 : -1; if (this.strip && this.cur) this.stop(); this.flipPrev = this.state.album; this.flipT0 = this.t; this.setState({ album: a, hover: null }); };
   trById(id) { const [a, b] = id.split('-').map(Number); return this.albums[a].tracks[b]; }
   // ---- sound
-  ensureAC() { if (!this.ac) { const AC = window.AudioContext || window.webkitAudioContext; this.ac = new AC(); this.an = this.ac.createAnalyser(); this.an.fftSize = 512; this.vol = this.ac.createGain(); this.an.connect(this.vol); this.vol.connect(this.ac.destination); this.anBuf = new Float32Array(512); } if (this.ac.state === 'suspended') this.ac.resume(); }
+  // iPhones mute Web Audio while the ring / silent switch is on (but not media playback), so the page says it is playing media: Safari 17+
+  // takes navigator.audioSession, older ones switch over when an <audio> element plays alongside (here a silent loop, started on this tap)
+  unmuteIOS() {
+    try { if (navigator.audioSession) { navigator.audioSession.type = 'playback'; return; } } catch (e) {}
+    if (this.silentEl || !/iP(hone|ad|od)|Macintosh/.test(navigator.userAgent) || !('ontouchend' in document)) return;
+    try { const n = 4410, b = new DataView(new ArrayBuffer(44 + n * 2)), w = (o, t) => [...t].forEach((c, i) => b.setUint8(o + i, c.charCodeAt(0)));
+      w(0, 'RIFF'); b.setUint32(4, 36 + n * 2, true); w(8, 'WAVEfmt '); b.setUint32(16, 16, true); b.setUint16(20, 1, true); b.setUint16(22, 1, true); b.setUint32(24, 44100, true); b.setUint32(28, 88200, true); b.setUint16(32, 2, true); b.setUint16(34, 16, true); w(36, 'data'); b.setUint32(40, n * 2, true);
+      const el = new Audio(URL.createObjectURL(new Blob([b.buffer], { type: 'audio/wav' }))); el.loop = true; el.setAttribute('playsinline', ''); el.play().catch(() => {}); this.silentEl = el; } catch (e) {}
+  }
+  ensureAC() { this.unmuteIOS(); if (!this.ac) { const AC = window.AudioContext || window.webkitAudioContext; this.ac = new AC(); this.an = this.ac.createAnalyser(); this.an.fftSize = 512; this.vol = this.ac.createGain(); this.an.connect(this.vol); this.vol.connect(this.ac.destination); this.anBuf = new Float32Array(512); } if (this.ac.state === 'suspended') this.ac.resume(); }
   play(tr, off = 0) {
     this.stopNodes(); this.ensureAC(); const ac = this.ac, now = ac.currentTime, out = ac.createGain(); out.gain.value = 0; out.connect(this.an);
     const N = { out, list: [] }, on = this.props.synth ?? true;
