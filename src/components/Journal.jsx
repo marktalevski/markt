@@ -49,34 +49,39 @@ class Component extends DCLogic {
   // arriving: each book's dot drops from where it is (the menu, or where the last page left it) to the book's place in the stack, bottom
   // book first, and opens out into the book; dots that aren't books (Home, Journal) fly back up to the menu. The mug slides onto the top book
   // last and the text rises in. (Books use the separate scale property, so their own slide-out and hover, on transform, carry on untouched)
+  // the books in the stack, top first, each with its dot (k, its fly-dot element and radius) and where it sits (r, its centre L)
+  spines() {
+    return [...document.querySelectorAll('[data-book]')].map(el => { const k = BOOK_DOT[el.dataset.kind], r = el.getBoundingClientRect();
+      return k && { el, k, r, L: [r.left + r.width / 2, r.top + r.height / 2], rad: DOT_R(k), dot: document.querySelector('[data-fly="' + k + '"]'), asDot: `${(2 * DOT_R(k) / r.width).toFixed(3)} ${(2 * DOT_R(k) / r.height).toFixed(3)}` }; }).filter(Boolean);
+  }
   arrive() {
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const anims = this.arrAnims = [], A = (el, kf, o) => { const a = el.animate(kf, o); anims.push(a); return a; };
     const W = innerWidth, nf = this.nf || {}, from = k => nf[k] || nf[k === 'home' ? 'ink' : k] || navAt(W, k), t0 = 150, step = 110, fly = 620, open = 320;
     // where the mug rests, measured before the books start (the top book's opening scale would carry it along)
     const mugEl = document.querySelector('[data-mug]'), mugL = mugEl ? mugEl.getBoundingClientRect().left : 0;
-    const books = [...document.querySelectorAll('[data-book]')].reverse(), books0 = this.state.books || [];
-    books.forEach((el, i) => { const bk = books0.find(x => 'Read ' + x.title === el.getAttribute('aria-label')), k = bk && BOOK_DOT[bk.kind]; if (!k) return;
-      const r = el.getBoundingClientRect(), L = [r.left + r.width / 2, r.top + r.height / 2], S = from(k), rad = DOT_R(k), d = t0 + i * step, dot = document.querySelector('[data-fly="' + k + '"]'); if (!dot) return;
-      dot.animate(flight(S, [S[0] - 30, S[1] + 70], [L[0], L[1] - 140], L, rad, easeIn, [DOT_COL[k], getComputedStyle(el).backgroundColor], true), { duration: fly, delay: d, fill: 'both' });
-      dot.animate([{ opacity: 1, scale: '1 1' }, { opacity: 0, scale: '2.4 1' }], { duration: open * .6, delay: d + fly, fill: 'forwards' });
-      el.animate([{ scale: `${(2 * rad / r.width).toFixed(3)} ${(2 * rad / r.height).toFixed(3)}`, opacity: 0 }, { opacity: 1, offset: .2 }, { scale: '1.03 1.12', offset: .7 }, { scale: '1 1', opacity: 1 }], { duration: open, delay: d + fly, fill: 'backwards', easing: 'ease-out' }); });
+    const books = this.spines().reverse();
+    books.forEach(({ el, k, L, rad, dot, asDot }, i) => { const S = from(k), d = t0 + i * step; if (!dot) return;
+      A(dot, flight(S, [S[0] - 30, S[1] + 70], [L[0], L[1] - 140], L, rad, easeIn, [DOT_COL[k], getComputedStyle(el).backgroundColor], true), { duration: fly, delay: d, fill: 'both' });
+      A(dot, [{ opacity: 1, scale: '1 1' }, { opacity: 0, scale: '2.4 1' }], { duration: open * .6, delay: d + fly, fill: 'forwards' });
+      A(el, [{ scale: asDot, opacity: 0 }, { opacity: 1, offset: .2 }, { scale: '1.03 1.12', offset: .7 }, { scale: '1 1', opacity: 1 }], { duration: open, delay: d + fly, fill: 'backwards', easing: 'ease-out' }); });
     // a handed-over dot that isn't a book goes up to its place in the menu
     ['home', 'journal'].forEach(k => { if (!nf[k] && !(k === 'home' && nf.ink)) return; const S = from(k), N = navAt(W, k), dot = document.querySelector('[data-fly="' + k + '"]'); if (!dot) return;
-      dot.animate(flight(S, [S[0], S[1] - 120], [N[0] - 30, N[1] + 80], N, DOT_R(k), easeOut, [DOT_COL[k], DOT_COL[k]], true), { duration: fly + 200, delay: t0, fill: 'both' });
-      dot.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 120, delay: t0 + fly + 200, fill: 'forwards' }); });
+      A(dot, flight(S, [S[0], S[1] - 120], [N[0] - 30, N[1] + 80], N, DOT_R(k), easeOut, [DOT_COL[k], DOT_COL[k]], true), { duration: fly + 200, delay: t0, fill: 'both' });
+      A(dot, [{ opacity: 1 }, { opacity: 0 }], { duration: 120, delay: t0 + fly + 200, fill: 'forwards' }); });
     const landed = t0 + (books.length - 1) * step + fly + open, mug = mugEl;
     // the mug slides in along the top book from off the right edge, overshooting a touch and settling back
-    if (mug) { const dx = innerWidth - mugL + 60; mug.animate([{ translate: `${dx}px 0`, easing: 'cubic-bezier(.2,.7,.3,1)' }, { translate: '-7px 0', offset: .78, easing: 'ease-in-out' }, { translate: '0 0' }], { duration: 700, delay: landed + 20, fill: 'backwards' });
+    if (mug) { const dx = innerWidth - mugL + 60; A(mug, [{ translate: `${dx}px 0`, easing: 'cubic-bezier(.2,.7,.3,1)' }, { translate: '-7px 0', offset: .78, easing: 'ease-in-out' }, { translate: '0 0' }], { duration: 700, delay: landed + 20, fill: 'backwards' });
       // hidden until then: while the top book opens out of its dot, its scale would carry the waiting mug into view
-      mug.animate([{ opacity: 0 }, { opacity: 0 }], { duration: landed + 20 }); }
-    const body = this.bodyRef.current; if (body) body.animate([{ opacity: 0, transform: 'translateY(16px)' }, { opacity: 1, transform: 'none' }], { duration: 520, delay: landed + 150, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' });
+      A(mug, [{ opacity: 0 }, { opacity: 0 }], { duration: landed + 20 }); }
+    const body = this.bodyRef.current; if (body) A(body, [{ opacity: 0, transform: 'translateY(16px)' }, { opacity: 1, transform: 'none' }], { duration: 520, delay: landed + 150, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' });
   }
   // a new book: the text lifts away, the column goes back to the top, and the new book's text rises in
   pick(slug) {
-    if (slug === this.state.sel || this.switching) return; this.switching = true;
+    if (slug === this.state.sel || this.switching || this.out) return; this.switching = true;
     const body = this.bodyRef.current; if (body && body.animate) body.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-12px)' }], { duration: 220, easing: 'ease-in', fill: 'forwards' });
-    this.pickT = setTimeout(() => { this.setState({ sel: slug }); const sc = this.scrollRef.current; if (sc) sc.scrollTop = 0;
-      requestAnimationFrame(() => { const bd = this.bodyRef.current; if (bd && bd.animate) { bd.getAnimations().forEach(x => x.cancel()); bd.animate([{ opacity: 0, transform: 'translateY(16px)' }, { opacity: 1, transform: 'none' }], { duration: 420, easing: 'cubic-bezier(.2,.8,.2,1)' }); } this.switching = false; }); }, 230);
+    this.pickT = setTimeout(() => { if (this.out) return; this.setState({ sel: slug }); const sc = this.scrollRef.current; if (sc) sc.scrollTop = 0;
+      requestAnimationFrame(() => { if (this.out) { this.switching = false; return; } const bd = this.bodyRef.current; if (bd && bd.animate) { bd.getAnimations().forEach(x => x.cancel()); bd.animate([{ opacity: 0, transform: 'translateY(16px)' }, { opacity: 1, transform: 'none' }], { duration: 420, easing: 'cubic-bezier(.2,.8,.2,1)' }); } this.switching = false; }); }, 230);
   }
   // where each heading sits down the text, as a ring on the line
   measure() {
@@ -118,21 +123,22 @@ class Component extends DCLogic {
       if (dots) try { const o = {}; document.querySelectorAll('[data-navk]').forEach(el => { const k = el.getAttribute('data-navk'), p = this.dotOf(k); if (p) o[k] = p; }); o.ink = o.home; sessionStorage.setItem('nav-from', JSON.stringify(o)); } catch (x) {}
       const go = () => (window.__leave || (h => { location.href = h; }))(href);
       if (matchMedia('(prefers-reduced-motion: reduce)').matches) { this.setState({ fade: 1 }); setTimeout(go, 480); return; }
-      // the text and the line fade, the mug slides off to the right, then the books fold back into their dots, top one first, and the dots rise into the
-      // menu; the next page picks them up there
-      const W = innerWidth, books0 = this.state.books || [], fold = 240, fly = 560, step = 90;
-      [this.bodyRef.current, document.querySelector('[data-rail]')].forEach(el => el && el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 220, fill: 'forwards' }));
+      // a leave during the arrival: the arrival jumps to its end first, so nothing still waiting to appear pops in over the leave
+      (this.arrAnims || []).forEach(a => { try { a.finish(); } catch (x) {} }); clearTimeout(this.pickT);
+      // the text and the line fade, the mug slides off to the right, then the books fold back into their dots, top one first, and the dots
+      // rise into the menu; the next page picks them up there. It goes once the last dot has arrived
+      const W = innerWidth, fold = 240, fly = 560, step = 90, flights = [];
+      [this.bodyRef.current, document.querySelector('[data-rail]')].forEach(el => el && el.animate([{ opacity: getComputedStyle(el).opacity }, { opacity: 0 }], { duration: 220, fill: 'forwards' }));   // from as they are (the line is hidden with no book open)
       const mug = document.querySelector('[data-mug]'); if (mug) { const r = mug.getBoundingClientRect(); mug.animate([{ translate: '0 0' }, { translate: '-6px 0', offset: .2 }, { translate: `${innerWidth - r.left + 60}px 0` }], { duration: 380, easing: 'ease-in', fill: 'forwards' }); }
-      let end = 0;
-      [...document.querySelectorAll('[data-book]')].forEach((el, i) => { const bk = books0.find(x => 'Read ' + x.title === el.getAttribute('aria-label')), k = bk && BOOK_DOT[bk.kind]; if (!k) return;
-        const r = el.getBoundingClientRect(), L = [r.left + r.width / 2, r.top + r.height / 2], N = navAt(W, k), rad = DOT_R(k), d = 160 + i * step, dot = document.querySelector('[data-fly="' + k + '"]');
-        el.animate([{ scale: '1 1', opacity: 1 }, { scale: `${(2 * rad / r.width).toFixed(3)} ${(2 * rad / r.height).toFixed(3)}`, opacity: 0 }], { duration: fold, delay: d, fill: 'forwards', easing: 'ease-in' });
+      this.spines().forEach(({ el, k, L, rad, dot, asDot }, i) => { const N = navAt(W, k), d = 160 + i * step;
+        el.animate([{ scale: '1 1', opacity: 1 }, { scale: asDot, opacity: 0 }], { duration: fold, delay: d, fill: 'forwards', easing: 'ease-in' });
         if (!dot) return;
         dot.getAnimations().forEach(a => a.cancel());   // its arrival (which ends stretched out and hidden) is over
         dot.animate([{ opacity: 0 }, { opacity: 1 }], { duration: fold * .5, delay: d + fold * .5, fill: 'both' });
-        dot.animate(flight(L, [L[0], L[1] - 140], [N[0] - 30, N[1] + 70], N, rad, easeOut, [getComputedStyle(el).backgroundColor, DOT_COL[k]]), { duration: fly, delay: d + fold * .5, fill: 'both' });
-        end = Math.max(end, d + fold * .5 + fly); });
-      setTimeout(go, end + 60); };
+        flights.push(dot.animate(flight(L, [L[0], L[1] - 140], [N[0] - 30, N[1] + 70], N, rad, easeOut, [getComputedStyle(el).backgroundColor, DOT_COL[k]]), { duration: fly, delay: d + fold * .5, fill: 'both' })); });
+      // with no books to fold, it still waits for the text to fade
+      let gone = false; const once = () => { if (!gone) { gone = true; go(); } };
+      Promise.all(flights.map(a => a.finished)).then(() => setTimeout(once, flights.length ? 60 : 280), once); };
   }
   stay = e => { if (e) e.preventDefault(); };
   GO = { home: this.leave(HOME, true), freediving: this.leave(BASE + 'freediving/'), sound: this.leave(BASE + 'sound/?from=page', true), journal: this.stay };
@@ -251,7 +257,7 @@ function View(v) {
       </div>
       <div style={sty(`position:absolute;right:${v.stackR}px;bottom:0;width:${v.stackW}px;display:flex;flex-direction:column;align-items:flex-end;gap:0`)}>
         {(v.shelf || []).map((s, i) => (
-          <button key={s.title + i} data-book="1" onClick={s.pick} aria-label={'Read ' + s.title} style={{ ...sty(`position:relative;width:${s.w}px;height:${s.h}px;padding:0;border:0;border-radius:${s.rad};cursor:pointer;z-index:${s.z};background:${s.bg};transform:translateX(var(--tx));transition:transform .35s cubic-bezier(.3,1.3,.5,1), filter .35s ease`), '--tx': s.tx + 'px' }}>
+          <button key={s.title + i} data-book="1" data-kind={s.kind} onClick={s.pick} aria-label={'Read ' + s.title} style={{ ...sty(`position:relative;width:${s.w}px;height:${s.h}px;padding:0;border:0;border-radius:${s.rad};cursor:pointer;z-index:${s.z};background:${s.bg};transform:translateX(var(--tx));transition:transform .35s cubic-bezier(.3,1.3,.5,1), filter .35s ease`), '--tx': s.tx + 'px' }}>
             <Spine s={s} sfs={v.sfs} />
             {s.first && <Mug right={v.cupR} />}
           </button>
