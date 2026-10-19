@@ -16,7 +16,6 @@ const GOUACHE = { bujo: ['#3f5fae', '#e9b949'], readings: ['#d4573f', '#f2d3b0']
 // how tall each kind's spine is, against the stack's base height, and the shape of its corners
 const SPINE_H = { bujo: 1.08, readings: .94, quotes: .86, pillow: 1, musings: 1.14 };
 const SPINE_R = { bujo: '2px 4px 4px 2px', readings: '6px 3px 5px 4px / 4px 6px 3px 5px', quotes: '1px', pillow: '10px 4px 4px 10px', musings: '3px 9px 4px 8px / 6px 3px 7px 4px' };
-const KEY = 'journal-wall-v4';
 // each book is one of the menu's dots: it arrives as that dot and opens out into the book, and leaves by folding back into it
 const BOOK_DOT = { bujo: 'freediving', readings: 'sound', quotes: 'c6', pillow: 'c4', musings: 'c5' };
 const DOT_COL = { home: 'rgb(20,20,20)', freediving: 'rgb(24,88,224)', sound: 'rgb(232,34,44)', journal: 'rgb(255,196,0)', c4: 'rgb(255,118,18)', c5: 'rgb(22,168,82)', c6: 'rgb(138,64,214)' };
@@ -37,8 +36,8 @@ class Component extends DCLogic {
   componentDidMount() {
     // arriving under the last page's picture, its dots may be handed over (Sound leaves them where its pads closed), to fly on from there
     try { const nf = JSON.parse(sessionStorage.getItem('nav-from') || 'null'); sessionStorage.removeItem('nav-from'); if (nf && document.getElementById('page-cover')) this.nf = nf; } catch (e) {}
-    const books = load().books; let sv = null; try { sv = localStorage.getItem(KEY); } catch (e) {}
-    this.setState({ books, sel: books.some(x => x.slug === sv) ? sv : books[0] && books[0].slug });
+    // the page opens on the stack alone, no book open yet: the reading side stays blank until one is picked
+    this.setState({ books: load().books, sel: null });
     this.onR = () => this.setState({ vw: innerWidth, vh: innerHeight });
     this.onK = e => { if (/^[1-9]$/.test(e.key) && !e.metaKey && !e.ctrlKey && !e.altKey) { const bk = (this.state.books || [])[+e.key - 1]; if (bk) this.pick(bk.slug); } };
     addEventListener('resize', this.onR); addEventListener('keydown', this.onK);
@@ -66,13 +65,12 @@ class Component extends DCLogic {
     const landed = t0 + (books.length - 1) * step + fly + open, mug = document.querySelector('[data-mug]');
     if (mug) { const r = mug.getBoundingClientRect(); mug.animate([{ translate: `0 ${-(r.bottom + 30)}px`, easing: 'cubic-bezier(.5,0,.85,.4)' }, { translate: '0 0', offset: .72, easing: 'ease-out' }, { translate: '0 -9px', offset: .85, easing: 'ease-in' }, { translate: '0 0' }], { duration: 620, delay: landed - 120, fill: 'backwards' }); }
     const body = this.bodyRef.current; if (body) body.animate([{ opacity: 0, transform: 'translateY(16px)' }, { opacity: 1, transform: 'none' }], { duration: 520, delay: landed + 150, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' });
-    const rail = document.querySelector('[data-rail]'); if (rail) rail.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 400, delay: landed + 150, fill: 'backwards' });
   }
   // a new book: the text lifts away, the column goes back to the top, and the new book's text rises in
   pick(slug) {
     if (slug === this.state.sel || this.switching) return; this.switching = true;
     const body = this.bodyRef.current; if (body && body.animate) body.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-12px)' }], { duration: 220, easing: 'ease-in', fill: 'forwards' });
-    this.pickT = setTimeout(() => { this.setState({ sel: slug }); const sc = this.scrollRef.current; if (sc) sc.scrollTop = 0; try { localStorage.setItem(KEY, slug); } catch (e) {}
+    this.pickT = setTimeout(() => { this.setState({ sel: slug }); const sc = this.scrollRef.current; if (sc) sc.scrollTop = 0;
       requestAnimationFrame(() => { const bd = this.bodyRef.current; if (bd && bd.animate) { bd.getAnimations().forEach(x => x.cancel()); bd.animate([{ opacity: 0, transform: 'translateY(16px)' }, { opacity: 1, transform: 'none' }], { duration: 420, easing: 'cubic-bezier(.2,.8,.2,1)' }); } this.switching = false; }); }, 230);
   }
   // where each heading sits down the text, as a ring on the line
@@ -149,7 +147,7 @@ class Component extends DCLogic {
       return { kind: GOUACHE[x.kind] ? x.kind : 'other', title: x.title, first: i === 0, w: Math.round(stackW - (narrow ? 0 : 14)), h: Math.round(barH * (SPINE_H[x.kind] || 1)), bg: (GOUACHE[x.kind] || ['#888'])[0], rad: SPINE_R[x.kind] || '3px', tx: on ? (narrow ? -12 : -40) : 0, z: on ? 3 : 1, pick: () => this.pick(x.slug) }; });
     return {
       scrollRef: this.scrollRef, bodyRef: this.bodyRef, fillRef: this.fillRef, onScroll: this.onScroll, blocks: this.bc.blocks,
-      railL: lm, railT: 28, railH, rule,
+      railL: lm, railT: 28, railH, rule, railOn: b ? 1 : 0,
       notches: this.state.notchData.map((n, i) => ({ y: n.y, label: n.label, c: rule, o: i === 0 ? 0 : 1, go: () => { const sc = this.scrollRef.current; if (sc) sc.scrollTo({ top: Math.max(0, n.top - 30), behavior: 'smooth' }); } })),
       cupR: Math.round(stackW * .14), shelf, colW, colL: lm, stackW, stackR, sfs,
       padTop: narrow ? 96 : 34, padBot: narrow ? stackH + 40 : 120, fadeTop: narrow ? 80 : 14, fadeBot: narrow ? stackH + 20 : 60, fade: this.state.fade,
@@ -238,7 +236,7 @@ function View(v) {
           ))}
         </div>
       </div>
-      <div data-rail="1" style={sty(`position:absolute;left:${v.railL}px;top:${v.railT}px;height:${v.railH}px;width:3px;border-radius:2px;background:${v.rule}`)}>
+      <div data-rail="1" style={sty(`position:absolute;left:${v.railL}px;top:${v.railT}px;height:${v.railH}px;width:3px;border-radius:2px;background:${v.rule};opacity:${v.railOn};transition:opacity .4s ease`)}>
         {(v.notches || []).map((n, i) => (
           <button key={i} onClick={n.go} title={n.label} aria-label={'Jump to ' + n.label} tabIndex={n.o ? 0 : -1} style={sty(`position:absolute;left:-6px;top:${n.y}px;width:15px;height:15px;margin-top:-7.5px;padding:0;border:0;background:none;cursor:pointer;display:grid;place-items:center;opacity:${n.o};pointer-events:${n.o ? 'auto' : 'none'}`)}>
             <span style={sty(`display:block;width:5px;height:5px;border-radius:50%;background:#fafafa;box-shadow:0 0 0 1.5px ${n.c}`)} />
