@@ -296,17 +296,18 @@ class Component extends DCLogic {
   // ---- nav (same as the other pages)
   dotOf(k) { const d = document.querySelector('[data-navk="' + k + '"] [data-navdot]'); if (!d) return null; const r = d.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }
   // kind: 'home' (faders turn back into dots and the panel slides away, Home picks the dots up), 'dive' (the same, and Freediving picks them up:
-  // they draw its water's surface lines, then go up into its menu), 'other' (plain fade)
+  // they draw its water's surface lines, then go up into its menu), 'journal' (the same, and the Journal's books open out of them), 'other'
+  // (plain fade)
   leave(href, kind) { return e => { if (e) e.preventDefault(); if (this.out) return; this.stop(); this.out = { href, t: 0, k: kind }; }; }
   stay = e => { if (e) e.preventDefault(); };
   goHome = this.leave(HOME, 'home');
-  GO = { freediving: this.leave(BASE + 'freediving/?from=sound', 'dive'), sound: this.stay, journal: this.leave(BASE + 'journal/', 'other') };
+  GO = { freediving: this.leave(BASE + 'freediving/?from=sound', 'dive'), sound: this.stay, journal: this.leave(BASE + 'journal/', 'journal') };
   tick = now => {
     this.raf = requestAnimationFrame(this.tick);
     const dt = Math.min(.05, (now - (this.last || now)) / 1000); this.last = now; this.t += dt;
     if (this.arr && (this.t > 4.5 || this.out)) this.arr = null;
-    if (this.out) { this.out.t += dt; const lim = this.out.k === 'home' || this.out.k === 'dive' ? 1.25 : .55;
-      if (this.out.t > lim && !this.left) { this.left = true; if (this.out.k === 'home' || this.out.k === 'dive') try { const o = { ...(this.dotPos || {}) }; o.ink = o.home; sessionStorage.setItem('nav-from', JSON.stringify(o)); } catch (x) {} (window.__leave || (h => { location.href = h; }))(this.out.href); } }
+    if (this.out) { this.out.t += dt; const lim = this.out.k !== 'other' ? 1.25 : .55;
+      if (this.out.t > lim && !this.left) { this.left = true; if (this.out.k !== 'other') try { const o = { ...(this.dotPos || {}) }; o.ink = o.home; sessionStorage.setItem('nav-from', JSON.stringify(o)); } catch (x) {} (window.__leave || (h => { location.href = h; }))(this.out.href); } }
     this.mx += ((this.mxT || 0) - this.mx) * Math.min(1, dt * 3);
     // the volume fader sets the master gain; squared, so the fader moves through loudness the way the ear hears it (half way down is half as loud)
     if (this.vol) this.vol.gain.setTargetAtTime(Math.pow(this.volume ?? 1, 2), this.ac.currentTime, .05);
