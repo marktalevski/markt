@@ -4,7 +4,7 @@
 // The logic class is the design's own code; View is its template as JSX.
 import React from 'react';
 import { DCLogic, page, sty, BASE } from '../lib/dc.js';
-import { load } from '../lib/library-data.js';
+import { loadBooks } from '../lib/library-data.js';
 import { navAt } from '../lib/nav.js';
 
 const PAGE = 'library';
@@ -36,8 +36,8 @@ class Component extends DCLogic {
   componentDidMount() {
     // arriving under the last page's picture, its dots may be handed over (Sound leaves them where its pads closed), to fly on from there
     try { const nf = JSON.parse(sessionStorage.getItem('nav-from') || 'null'); sessionStorage.removeItem('nav-from'); if (nf && document.getElementById('page-cover')) this.nf = nf; } catch (e) {}
-    // the page opens on the stack alone, no book open yet: the reading side stays blank until one is picked
-    this.setState({ books: load().books, sel: null });
+    // the books are published in site.json; the page opens on the stack alone, no book open yet, the reading side blank until one is picked
+    loadBooks().then(books => this.setState({ books, sel: null }));
     this.onR = () => this.setState({ vw: innerWidth, vh: innerHeight });
     this.onK = e => { if (/^[1-9]$/.test(e.key) && !e.metaKey && !e.ctrlKey && !e.altKey) { const bk = (this.state.books || [])[+e.key - 1]; if (bk) this.pick(bk.slug); } };
     addEventListener('resize', this.onR); addEventListener('keydown', this.onK);
@@ -112,7 +112,7 @@ class Component extends DCLogic {
     const it = b.items || [];
     if (b.kind === 'bujo') (b.months || []).forEach(m => { H(MONTHS[m.month - 1] + ' ' + (b.year || '')); if (m.intention) P(m.intention, true); (m.entries || []).forEach(e => L(e.d + '   ' + e.sym + '   ' + e.text)); });
     else if (b.kind === 'quotes') it.forEach(q => { B.push({ text: '“' + q.text + '”', ff: SERIF, fs: Math.round(fs * 1.55), fst: 'italic', fw: 400, lh: 1.35, ls: '-.01em', c: '#111', m: '1.6em 0 .4em' }); M(q.who || ''); });
-    else if (b.kind === 'pillow') it.forEach(c => { H(c.title); (c.items || []).forEach(x => L('—  ' + x)); });
+    else if (b.kind === 'pillow') it.forEach(c => { H(c.title); (c.items || []).filter(Boolean).forEach(x => L('—  ' + x)); });
     else it.forEach(x => { H(x.title); M(b.kind === 'musings' ? (x.date || '') : (x.source || '')); paras(x.text).forEach(p => P(p)); });
     return B.map((x, i) => Object.assign(x, { h: x.h || i === 0 ? 1 : 0 }));
   }
