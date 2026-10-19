@@ -15,7 +15,10 @@ import Library from '../components/Library.jsx';
       /* the reading column scrolls without a scrollbar: the colour line beside it shows where you are */
       [data-read]::-webkit-scrollbar{display:none}
       /* a book slides out a little under the pointer (the one being read is already out, and stays put) */
-      [data-book]:hover{transform:translateX(min(var(--tx), -12px)) !important;filter:brightness(1.06)}
+      [data-book]:not([data-upright]):hover{transform:translateX(min(var(--tx), -12px)) !important;filter:brightness(1.06)}
+      /* on a phone's shelf the books stand upright, and lift up out of the row instead */
+      [data-upright]:hover{transform:translate(-50%, -50%) rotate(-90deg) translateX(max(var(--tx), 8px)) !important;filter:brightness(1.06)}
+      [data-shelf]::-webkit-scrollbar{display:none}
     </style>
   </Fragment>
   <Library client:only="react" />

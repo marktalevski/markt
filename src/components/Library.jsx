@@ -19,6 +19,8 @@ const SPINE_R = { bujo: '2px 4px 4px 2px', readings: '6px 3px 5px 4px / 4px 6px 
 // each book is one of the menu's dots: it arrives as that dot and opens out into the book, and leaves by folding back into it
 const BOOK_DOT = { bujo: 'freediving', readings: 'sound', quotes: 'c6', pillow: 'c4', musings: 'c5' };
 const DOT_COL = { home: 'rgb(20,20,20)', freediving: 'rgb(24,88,224)', sound: 'rgb(232,34,44)', library: 'rgb(255,196,0)', c4: 'rgb(255,118,18)', c5: 'rgb(22,168,82)', c6: 'rgb(138,64,214)' };
+// on a narrow screen the books stand on a shelf this tall along the bottom
+const SHELF_H = 152;
 const DOT_R = k => /^c\d/.test(k) ? 5.5 : 8;
 // a dot's flight from A to B along a curve (control points C1, C2), as keyframes for its translate (and its colour, from cols[0] to cols[1]);
 // ease shapes its pace, and shown keeps it visible the whole way (and while it waits to set off)
@@ -153,19 +155,22 @@ class Component extends DCLogic {
   renderVals() {
     const { vw, vh, sel } = this.state, books = this.state.books || [], narrow = vw < 760;
     const b = books.find(x => x.slug === sel);
-    // the stack: in the corner on a wide screen, along the bottom on a narrow one
-    const barH = narrow ? 30 : Math.round(clamp(vh * .045, 30, 38)), stackW = narrow ? vw - 32 : Math.round(clamp(vw * .18, 196, 240)), stackR = narrow ? 16 : 0;
-    const stackH = books.length * (barH + 3) + 34;
+    // the stack: in the corner on a wide screen. On a narrow one the books stand upright on a shelf along the bottom instead, one row that scrolls
+    // sideways, so it takes the same room however many books there are (SHELF_H tall), with a small mug at its end
+    const barH = narrow ? 30 : Math.round(clamp(vh * .045, 30, 38)), stackW = narrow ? vw : Math.round(clamp(vw * .18, 196, 240)), stackR = 0;
+    const stackH = narrow ? SHELF_H : books.length * (barH + 3) + 34;
     // the reading column: as wide as the room left of the stack allows, up to 860
     const lm = narrow ? 14 : Math.round(clamp(vw * .02, 16, 32)), avail = narrow ? vw - 36 : vw - stackR - stackW - Math.round(clamp(vw * .05, 40, 80)) - lm, colW = Math.round(Math.min(860, avail));
-    const fs = Math.round(clamp(colW / 40, 16, 20)), sfs = narrow ? 12 : Math.round(clamp(barH * .36, 12, 13));
+    const fs = Math.round(clamp(colW / 40, 16, 20)), sfs = narrow ? 11 : Math.round(clamp(barH * .36, 12, 13));
     if (!this.bc || this.bc.sel !== sel || this.bc.fs !== fs || this.bc.books !== books) this.bc = { sel, fs, books, blocks: b ? this.blocks(b, fs) : [] };
     // the books couldn't be loaded: a quiet line in the reading column says so, instead of an empty page
     if (this.state.loadErr && !b) this.bc.blocks = [{ text: "The books couldn't be loaded just now. Try again in a moment.", ff: MONOF, fs: Math.max(11, Math.round(fs * .6)), fst: 'normal', fw: 400, lh: 1.4, ls: '.08em', c: '#8c8c8c', m: '0', h: 0 }];
     const rule = b ? (GOUACHE[b.kind] || ['#111'])[0] : '#111', railH = Math.max(120, vh - 56); this.railH = railH;
-    // the one being read slides out of the stack (on a narrow screen only a little, the stack being the screen's width)
-    const shelf = books.map((x, i) => { const on = x.slug === sel;
-      return { kind: GOUACHE[x.kind] ? x.kind : 'other', title: x.title, first: i === 0, w: Math.round(stackW - (narrow ? 0 : 14)), h: Math.round(barH * (SPINE_H[x.kind] || 1)), bg: (GOUACHE[x.kind] || ['#888'])[0], rad: SPINE_R[x.kind] || '3px', tx: on ? (narrow ? -12 : -40) : 0, z: on ? 3 : 1, pick: () => this.pick(x.slug) }; });
+    // the one being read slides out of the stack (out to the left; on the shelf, up out of the row). On the shelf each book is the same spine
+    // turned upright: w is its length (now its height on screen), h its thickness (now its width)
+    const shelf = books.map((x, i) => { const on = x.slug === sel, m = SPINE_H[x.kind] || 1;
+      return { kind: GOUACHE[x.kind] ? x.kind : 'other', title: x.title, first: i === 0, w: narrow ? Math.round(122 * (.88 + .12 * m)) : Math.round(stackW - 14), h: narrow ? Math.round(32 * m) : Math.round(barH * m),
+        bg: (GOUACHE[x.kind] || ['#888'])[0], rad: SPINE_R[x.kind] || '3px', tx: on ? (narrow ? 14 : -40) : 0, z: on ? 3 : 1, pick: () => this.pick(x.slug) }; });
     return {
       scrollRef: this.scrollRef, bodyRef: this.bodyRef, fillRef: this.fillRef, onScroll: this.onScroll, blocks: this.bc.blocks,
       // a photo that has loaded moves the headings below it, so the section rings are placed again
@@ -173,7 +178,7 @@ class Component extends DCLogic {
       railL: lm, railT: 28, railH, rule, railOn: b ? 1 : 0,
       notches: this.state.notchData.map((n, i) => ({ y: n.y, label: n.label, c: rule, o: i === 0 ? 0 : 1, go: () => { const sc = this.scrollRef.current; if (sc) sc.scrollTo({ top: Math.max(0, n.top - 30), behavior: 'smooth' }); } })),
       cupR: Math.round(stackW * .14), shelf, colW, colL: lm, stackW, stackR, sfs,
-      padTop: narrow ? 96 : 34, padBot: narrow ? stackH + 40 : 120, fadeTop: narrow ? 80 : 14, fadeBot: narrow ? stackH + 20 : 60, fade: this.state.fade,
+      padTop: narrow ? 96 : 34, padBot: narrow ? stackH + 28 : 120, fadeTop: narrow ? 80 : 14, fadeBot: narrow ? stackH + 6 : 60, upright: narrow, fade: this.state.fade,
       // the menu is dots only here; a dot's name shows while it is under the pointer
       navOff: () => this.setState({ navHov: null }),
       nav: Object.fromEntries(NAV.map(([k]) => { const h = this.state.navHov === k; return [k, { bp: h ? '28%' : '100%', en: h ? 1 : 0, enY: h ? '0px' : '8px', enB: h ? '0px' : '3px', on: () => { if (this.state.navHov !== k) this.setState({ navHov: k }); }, go: this.GO[k] }]; }))
@@ -268,6 +273,19 @@ function View(v) {
         ))}
         <span ref={v.fillRef} aria-hidden="true" style={sty(`position:absolute;left:-5.5px;top:0;width:14px;height:14px;margin-top:-7px;border-radius:50%;background:${v.rule};box-shadow:0 0 0 3px #fafafa;pointer-events:none`)} />
       </div>
+      {v.upright ? (
+        // the shelf: upright spines in a row that scrolls sideways, the open one lifted up out of it, and the mug at the end
+        <div data-shelf="1" style={sty(`position:absolute;left:0;right:0;bottom:0;height:${SHELF_H}px;display:flex;align-items:flex-end;gap:3px;padding:0 16px 0;box-sizing:border-box;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch`)}>
+          {(v.shelf || []).map((s, i) => (
+            <div key={s.title + i} style={sty(`position:relative;flex:none;width:${s.h}px;height:${s.w}px`)}>
+              <button data-book="1" data-upright="1" data-kind={s.kind} onClick={s.pick} aria-label={'Read ' + s.title} style={{ ...sty(`position:absolute;left:50%;top:50%;width:${s.w}px;height:${s.h}px;padding:0;border:0;border-radius:${s.rad};cursor:pointer;z-index:${s.z};background:${s.bg};transform:translate(-50%, -50%) rotate(-90deg) translateX(var(--tx));transition:transform .35s cubic-bezier(.3,1.3,.5,1), filter .35s ease`), '--tx': s.tx + 'px' }}>
+                <Spine s={s} sfs={v.sfs} />
+              </button>
+            </div>
+          ))}
+          <div style={sty('position:relative;flex:none;width:76px;height:0;align-self:flex-end;margin-left:6px')}><span style={sty('position:absolute;right:0;bottom:0;transform:scale(.62);transform-origin:100% 100%')}><span style={sty('position:relative;display:block;width:96px;height:0')}><Mug right={0} /></span></span></div>
+        </div>
+      ) : (
       <div style={sty(`position:absolute;right:${v.stackR}px;bottom:0;width:${v.stackW}px;display:flex;flex-direction:column;align-items:flex-end;gap:0`)}>
         {(v.shelf || []).map((s, i) => (
           <button key={s.title + i} data-book="1" data-kind={s.kind} onClick={s.pick} aria-label={'Read ' + s.title} style={{ ...sty(`position:relative;width:${s.w}px;height:${s.h}px;padding:0;border:0;border-radius:${s.rad};cursor:pointer;z-index:${s.z};background:${s.bg};transform:translateX(var(--tx));transition:transform .35s cubic-bezier(.3,1.3,.5,1), filter .35s ease`), '--tx': s.tx + 'px' }}>
@@ -276,6 +294,7 @@ function View(v) {
           </button>
         ))}
       </div>
+      )}
       {Object.keys(DOT_COL).map(k => <span key={k} data-fly={k} data-navdot="1" aria-hidden="true" style={sty(`position:fixed;left:0;top:0;width:${2 * DOT_R(k)}px;height:${2 * DOT_R(k)}px;border-radius:50%;background:${DOT_COL[k]};opacity:0;pointer-events:none;z-index:125`)} />)}
       <div aria-hidden="true" style={sty(`position:absolute;inset:0;z-index:120;pointer-events:none;background:#fafafa;opacity:${v.fade};transition:opacity .45s ease`)} />
     </div>
