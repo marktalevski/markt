@@ -119,15 +119,21 @@ class Component extends DCLogic {
   }
   dotOf(k) { const d = document.querySelector('[data-navk="' + k + '"] [data-navdot]'); if (!d) return null; const r = d.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }
   // leaving: the page fades to its paper colour, then goes (handing its menu dots' places to the next page, whose dots fly on from them)
+  // dots: true hands the menu dots' places to the next page; 'books' (to Freediving) leaves each book's dot where its book folded, and hands
+  // those places over instead, so the next page's dots set off from the books
   leave(href, dots) {
     return e => { if (e) e.preventDefault(); if (this.out) return; this.out = true;
-      if (dots) try { const o = {}; document.querySelectorAll('[data-navk]').forEach(el => { const k = el.getAttribute('data-navk'), p = this.dotOf(k); if (p) o[k] = p; }); o.ink = o.home; sessionStorage.setItem('nav-from', JSON.stringify(o)); } catch (x) {}
+      const atBooks = dots === 'books' && !matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (dots) try { const o = {}; document.querySelectorAll('[data-navk]').forEach(el => { const k = el.getAttribute('data-navk'), p = this.dotOf(k); if (p) o[k] = p; }); o.ink = o.home;
+        if (atBooks) this.spines().forEach(({ k, L }) => { o[k] = L; });
+        sessionStorage.setItem('nav-from', JSON.stringify(o)); } catch (x) {}
       const go = () => (window.__leave || (h => { location.href = h; }))(href);
       if (matchMedia('(prefers-reduced-motion: reduce)').matches) { this.setState({ fade: 1 }); setTimeout(go, 480); return; }
       // a leave during the arrival: the arrival jumps to its end first, so nothing still waiting to appear pops in over the leave
       (this.arrAnims || []).forEach(a => { try { a.finish(); } catch (x) {} }); clearTimeout(this.pickT);
       // the text and the line fade, the mug slides off to the right, then the books fold back into their dots, top one first, and the dots
-      // rise into the menu; the next page picks them up there. It goes once the last dot has arrived
+      // rise into the menu (or, to Freediving, stay where their books were); the next page picks them up there. It goes once the last dot
+      // has arrived
       const W = innerWidth, fold = 240, fly = 560, step = 90, flights = [];
       [this.bodyRef.current, document.querySelector('[data-rail]')].forEach(el => el && el.animate([{ opacity: getComputedStyle(el).opacity }, { opacity: 0 }], { duration: 220, fill: 'forwards' }));   // from as they are (the line is hidden with no book open)
       const mug = document.querySelector('[data-mug]'); if (mug) { const r = mug.getBoundingClientRect(); mug.animate([{ translate: '0 0' }, { translate: '-6px 0', offset: .2 }, { translate: `${innerWidth - r.left + 60}px 0` }], { duration: 380, easing: 'ease-in', fill: 'forwards' }); }
@@ -135,14 +141,15 @@ class Component extends DCLogic {
         el.animate([{ scale: '1 1', opacity: 1 }, { scale: asDot, opacity: 0 }], { duration: fold, delay: d, fill: 'forwards', easing: 'ease-in' });
         if (!dot) return;
         dot.getAnimations().forEach(a => a.cancel());   // its arrival (which ends stretched out and hidden) is over
-        dot.animate([{ opacity: 0 }, { opacity: 1 }], { duration: fold * .5, delay: d + fold * .5, fill: 'both' });
+        const show = dot.animate([{ opacity: 0 }, { opacity: 1 }], { duration: fold * .5, delay: d + fold * .5, fill: 'both' });
+        if (atBooks) { dot.style.translate = `${L[0] - rad}px ${L[1] - rad}px`; dot.style.backgroundColor = DOT_COL[k]; flights.push(show); return; }
         flights.push(dot.animate(flight(L, [L[0], L[1] - 140], [N[0] - 30, N[1] + 70], N, rad, easeOut, [getComputedStyle(el).backgroundColor, DOT_COL[k]]), { duration: fly, delay: d + fold * .5, fill: 'both' })); });
       // with no books to fold, it still waits for the text to fade
       let gone = false; const once = () => { if (!gone) { gone = true; go(); } };
       Promise.all(flights.map(a => a.finished)).then(() => setTimeout(once, flights.length ? 60 : 280), once); };
   }
   stay = e => { if (e) e.preventDefault(); };
-  GO = { home: this.leave(HOME, true), freediving: this.leave(BASE + 'freediving/?from=page', true), sound: this.leave(BASE + 'sound/?from=page', true), library: this.stay };
+  GO = { home: this.leave(HOME, true), freediving: this.leave(BASE + 'freediving/?from=page', 'books'), sound: this.leave(BASE + 'sound/?from=page', true), library: this.stay };
   renderVals() {
     const { vw, vh, sel } = this.state, books = this.state.books || [], narrow = vw < 760;
     const b = books.find(x => x.slug === sel);
@@ -269,7 +276,7 @@ function View(v) {
           </button>
         ))}
       </div>
-      {Object.keys(DOT_COL).map(k => <span key={k} data-fly={k} aria-hidden="true" style={sty(`position:fixed;left:0;top:0;width:${2 * DOT_R(k)}px;height:${2 * DOT_R(k)}px;border-radius:50%;background:${DOT_COL[k]};opacity:0;pointer-events:none;z-index:125`)} />)}
+      {Object.keys(DOT_COL).map(k => <span key={k} data-fly={k} data-navdot="1" aria-hidden="true" style={sty(`position:fixed;left:0;top:0;width:${2 * DOT_R(k)}px;height:${2 * DOT_R(k)}px;border-radius:50%;background:${DOT_COL[k]};opacity:0;pointer-events:none;z-index:125`)} />)}
       <div aria-hidden="true" style={sty(`position:absolute;inset:0;z-index:120;pointer-events:none;background:#fafafa;opacity:${v.fade};transition:opacity .45s ease`)} />
     </div>
     <nav aria-label="Pages" style={sty("position:fixed;right:12px;top:12px;display:flex;flex-direction:row;align-items:flex-start;z-index:130;color:#111")}>
