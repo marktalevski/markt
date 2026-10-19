@@ -7,10 +7,15 @@ import Journal from '../components/Journal.jsx';
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;600&amp;display=swap" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..500&amp;family=JetBrains+Mono:wght@300;400;500&amp;display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&amp;family=Geist:wght@300..700&amp;family=Geist+Mono:wght@400;500&amp;display=swap" />
     <style is:inline>
-      html,body{margin:0;height:100%;overflow:hidden;background:#f5f3ee}
-      a{color:inherit}a:hover{color:inherit;opacity:.6}nav a:hover{opacity:1}
+      html,body{margin:0;height:100%;overflow:hidden;background:#fafafa}
+      a{color:#111}a:hover{color:#111;opacity:.6}nav a:hover{opacity:1}
+      @keyframes steamRise{0%{transform:translateY(10px) scaleY(.8);opacity:0}35%{opacity:1}100%{transform:translateY(-18px) scaleY(1.05);opacity:0}}
+      /* the reading column scrolls without a scrollbar: the colour line beside it shows where you are */
+      [data-read]::-webkit-scrollbar{display:none}
+      /* a book slides out a little under the pointer (the one being read is already out, and stays put) */
+      [data-book]:hover{transform:translateX(min(var(--tx), -12px)) !important;filter:brightness(1.06)}
     </style>
   </Fragment>
   <Journal client:only="react" />
