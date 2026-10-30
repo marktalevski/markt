@@ -5,7 +5,6 @@
 // sleep and yawn (resting); dance (a piece is playing: o.move and o.mp say which move and how far in); and the little turns a beat pad sets
 // off: wave, jump, ink, jet, happy, spin, yawn. o: { tau: seconds since the mode began, lv: loudness 0..1, ink: the colour for notes and stars }
 export const SQUID_W = 22, SQUID_H = 20;
-export const SQUID_IDLES = ['idle', 'sleep', 'yawn'];
 // the dance's twenty moves, all on the spot, and how many beats each lasts
 export const SQUID_MOVES = { sway: 4, spin: 2, hop: 4, shimmy: 4, jumpspin: 2, breakdance: 4, pose: 2, squish: 4, clap: 4, robot: 4,
   twist: 4, armwave: 4, bob: 4, float: 4, backflip: 2, stomp: 4, disco: 4, upside: 4, spin360: 2, headbang: 4 };
@@ -23,7 +22,7 @@ const s01 = v => Math.max(0, Math.min(1, v)), sm = v => v * v * (3 - 2 * v);
 export function squid(mode, t, o = {}) {
   const tau = o.tau ?? t, lv = o.lv ?? 0, ink = o.ink || '#ffd84a';
   // rot: how far she's turned (0 upright, mantle up)
-  let rot = 0, spin = mode === 'dance' ? t * 6 : 0, bx = 11, by = 11, rx = 6.3, ry = 5.9, aL = -.35, aR = -.35, fL = [0, 0], fR = [0, 0], edx = 0, eyes = 'open', mouth = 'none', flip = false;
+  let rot = 0, bx = 11, by = 11, rx = 6.3, ry = 5.9, aL = -.35, aR = -.35, fL = [0, 0], fR = [0, 0], edx = 0, eyes = 'open', mouth = 'none', flip = false, flipY = false;
   const fx = [];   // extra cells: notes, stars, Zs, sparkles
   const add = (shape, x, y, col) => shape.forEach(([q, r]) => fx.push([Math.round(x) + q, Math.round(y) + r, col]));
   const blink = (t % 3.7) < .13;
@@ -66,7 +65,7 @@ export function squid(mode, t, o = {}) {
     // float: swells a little and drifts in the air, arms paddling slowly
     else if (mv === 'float') { rx = 7.1; ry = 6.8; by = 9.6 + .9 * Math.sin(mp * Math.PI); aL = aR = .4 + .5 * Math.sin(mp * Math.PI * 2); fL = fR = [0, -1]; mouth = 'puff'; }
     // backflip: a crouch, a big jump turning over at the top, and a squashed landing
-    else if (mv === 'backflip') { const c = mp / 2; let h = 0, sq = 0; if (c < .12) sq = c / .12; else if (c < .82) { const u = (c - .12) / .7; h = Math.sin(u * Math.PI) * 4.8; o.flipY = u > .3 && u < .7; } else sq = 1 - (c - .82) / .18;
+    else if (mv === 'backflip') { const c = mp / 2; let h = 0, sq = 0; if (c < .12) sq = c / .12; else if (c < .82) { const u = (c - .12) / .7; h = Math.sin(u * Math.PI) * 4.8; flipY = u > .3 && u < .7; } else sq = 1 - (c - .82) / .18;
       by -= h; ry *= 1 - .14 * sq; rx *= 1 + .1 * sq; by += sq * .8; aL = aR = h > .5 ? 1.25 : -.5; eyes = h > .5 ? 'shut' : 'open'; mouth = h > .5 ? 'big' : 'smile'; }
     // stomp: heavy stomps, one foot then the other, a shake on each landing
     else if (mv === 'stomp') { const sd = beat % 2 ? 1 : -1, lift = up * 2; if (sd < 0) fL = [0, -lift]; else fR = [0, -lift]; bx += land * (Math.random() - .5) * .9; ry *= 1 - .08 * land; aL = aR = .1; eyes = 'open'; mouth = land > .3 ? 'big' : 'smile'; }
@@ -103,7 +102,7 @@ export function squid(mode, t, o = {}) {
     const c = tau % 1.6; if (c < 1) { flip = Math.floor(c * 8) % 2 === 1; aL = aR = .25; eyes = 'shut'; by -= Math.sin(c * Math.PI) * 1.2; }
     else { aL = 1.3; aR = -.2; eyes = 'open'; mouth = 'smile'; add(STAR, 18, 3, ink); }
   }
-  return { bx, by, rx, ry, aL, aR, fL, fR, edx, eyes, mouth, flip, flipY: !!o.flipY, fx, rot };
+  return { bx, by, rx, ry, aL, aR, fL, fR, edx, eyes, mouth, flip, flipY, fx, rot };
 }
 
 // the pose as lit cells [x, y, colour]: a pointed mantle with fins at its tip, a white streak down it, big round eyes (^^ with a pink blush when

@@ -5,7 +5,8 @@
 import React from 'react';
 import { DCLogic, page, sty, BASE, assetUrl } from '../lib/dc.js';
 import { loadBooks } from '../lib/library-data.js';
-import { navAt } from '../lib/nav.js';
+import { cubicAt } from '../lib/rope.js';
+import { navAt, navDots, handNavFrom, takeNavFrom, leaveTo } from '../lib/nav.js';
 
 const PAGE = 'library';
 const HOME = BASE + '?from=dive';
@@ -24,20 +25,21 @@ const SHELF_H = 152;
 const DOT_R = k => /^c\d/.test(k) ? 5.5 : 8;
 // a dot's flight from A to B along a curve (control points C1, C2), as keyframes for its translate (and its colour, from cols[0] to cols[1]);
 // ease shapes its pace, and shown keeps it visible the whole way (and while it waits to set off)
-const flight = (A, C1, C2, B, r, ease, cols, shown) => { const out = []; for (let q = 0; q <= 18; q++) { const u = ease(q / 18), a = (1 - u) ** 3, b = 3 * (1 - u) ** 2 * u, c = 3 * (1 - u) * u * u, d = u ** 3;
-  out.push({ offset: q / 18, translate: `${(a * A[0] + b * C1[0] + c * C2[0] + d * B[0] - r).toFixed(1)}px ${(a * A[1] + b * C1[1] + c * C2[1] + d * B[1] - r).toFixed(1)}px`, backgroundColor: q < 9 ? cols[0] : cols[1], ...(shown ? { opacity: 1 } : {}) }); } return out; };
+const flight = (A, C1, C2, B, r, ease, cols, shown) => { const out = []; for (let q = 0; q <= 18; q++) { const p = cubicAt(A, C1, C2, B, ease(q / 18));
+  out.push({ offset: q / 18, translate: `${(p[0] - r).toFixed(1)}px ${(p[1] - r).toFixed(1)}px`, backgroundColor: q < 9 ? cols[0] : cols[1], ...(shown ? { opacity: 1 } : {}) }); } return out; };
 const easeIn = u => u * u * (1.6 - .6 * u), easeOut = u => 1 - easeIn(1 - u);
 const paras = s => (s || '').split(/\n\s*\n/).map(x => x.trim()).filter(Boolean);
 const SERIF = "'Newsreader', Georgia, serif", SANS = "'Geist', sans-serif", MONOF = "'Geist Mono', monospace";
-const NAV = [['home', 'Home', 'rgb(20,20,20)'], ['freediving', 'Freediving', 'rgb(24,88,224)'], ['sound', 'Sound', 'rgb(232,34,44)'], ['library', 'Library', 'rgb(255,196,0)']];
+const NAV = [['home', 'Home'], ['freediving', 'Freediving'], ['sound', 'Sound'], ['library', 'Library']];
+const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 class Component extends DCLogic {
   // arriving under the last page's picture (see Base.astro) there is no fade in from blank paper: the picture gives way straight to the page
-  state = { books: null, vw: innerWidth, vh: innerHeight, fade: document.getElementById('page-cover') ? 0 : 1, sel: null, navHov: null, sec: 0, notchData: [] };
+  state = { books: null, vw: innerWidth, vh: innerHeight, fade: document.getElementById('page-cover') ? 0 : 1, sel: null, navHov: null, notchData: [] };
   scrollRef = React.createRef(); bodyRef = React.createRef(); fillRef = React.createRef();
   componentDidMount() {
     // arriving under the last page's picture, its dots may be handed over (Sound leaves them where its pads closed), to fly on from there
-    try { const nf = JSON.parse(sessionStorage.getItem('nav-from') || 'null'); sessionStorage.removeItem('nav-from'); if (nf && document.getElementById('page-cover')) this.nf = nf; } catch (e) {}
+    { const nf = takeNavFrom(); if (nf && document.getElementById('page-cover')) this.nf = nf; }
     // the books are published in site.json; the page opens on the stack alone, no book open yet, the reading side blank until one is picked
     loadBooks().then(books => this.setState({ books: books || [], loadErr: !books, sel: null }));
     this.onR = () => this.setState({ vw: innerWidth, vh: innerHeight });
@@ -57,7 +59,7 @@ class Component extends DCLogic {
       return k && { el, k, r, L: [r.left + r.width / 2, r.top + r.height / 2], rad: DOT_R(k), dot: document.querySelector('[data-fly="' + k + '"]'), asDot: `${(2 * DOT_R(k) / r.width).toFixed(3)} ${(2 * DOT_R(k) / r.height).toFixed(3)}` }; }).filter(Boolean);
   }
   arrive() {
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (reducedMotion()) return;
     const anims = this.arrAnims = [], A = (el, kf, o) => { const a = el.animate(kf, o); anims.push(a); return a; };
     const W = innerWidth, nf = this.nf || {}, from = k => nf[k] || nf[k === 'home' ? 'ink' : k] || navAt(W, k), t0 = 120, step = 90, fly = 540, open = 300;
     // where the mug rests, measured before the books start (the top book's opening scale would carry it along)
@@ -91,7 +93,6 @@ class Component extends DCLogic {
     const range = Math.max(1, sc.scrollHeight - sc.clientHeight), rh = this.railH || 300, key = [this.state.sel, sc.scrollHeight, sc.clientHeight, rh].join();
     if (key === this.mKey) return; this.mKey = key;
     const els = [...body.querySelectorAll('p[data-h="1"]')];
-    this.hTops = els.map(el => el.offsetTop);
     this.setState({ notchData: els.map(el => ({ y: Math.round(clamp((el.offsetTop - 30) / range, 0, 1) * rh), label: el.textContent, top: el.offsetTop })) });
     this.onScroll();
   }
@@ -100,8 +101,6 @@ class Component extends DCLogic {
     const sc = this.scrollRef.current, fl = this.fillRef.current; if (!sc) return;
     const range = Math.max(1, sc.scrollHeight - sc.clientHeight), p = Math.min(1, sc.scrollTop / range);
     if (fl) fl.style.transform = 'translateY(' + (p * (this.railH || 300)).toFixed(1) + 'px)';
-    const tops = this.hTops || []; let a = 0; for (let i = 0; i < tops.length; i++) if (tops[i] <= sc.scrollTop + sc.clientHeight * .3) a = i;
-    if (a !== this.state.sec) this.setState({ sec: a });
   };
   // the book as a run of text blocks: its title and subtitle, then headings, meta lines, paragraphs, list lines and quotes as its kind lays them out
   blocks(b, fs) {
@@ -119,18 +118,15 @@ class Component extends DCLogic {
     else it.forEach(x => { H(x.title); M(b.kind === 'musings' ? (x.date || '') : (x.source || '')); if (x.image) B.push({ img: assetUrl(x.image), alt: x.title || '', m: '.2em 0 1.4em' }); paras(x.text).forEach(p => P(p)); });
     return B.map((x, i) => Object.assign(x, { h: x.h || i === 0 ? 1 : 0 }));
   }
-  dotOf(k) { const d = document.querySelector('[data-navk="' + k + '"] [data-navdot]'); if (!d) return null; const r = d.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }
   // leaving: the page fades to its paper colour, then goes (handing its menu dots' places to the next page, whose dots fly on from them)
   // dots: true hands the menu dots' places to the next page; 'books' (to Freediving) leaves each book's dot where its book folded, and hands
   // those places over instead, so the next page's dots set off from the books
   leave(href, dots) {
     return e => { if (e) e.preventDefault(); if (this.out) return; this.out = true;
-      const atBooks = dots === 'books' && !matchMedia('(prefers-reduced-motion: reduce)').matches;
-      if (dots) try { const o = {}; document.querySelectorAll('[data-navk]').forEach(el => { const k = el.getAttribute('data-navk'), p = this.dotOf(k); if (p) o[k] = p; }); o.ink = o.home;
-        if (atBooks) this.spines().forEach(({ k, L }) => { o[k] = L; });
-        sessionStorage.setItem('nav-from', JSON.stringify(o)); } catch (x) {}
-      const go = () => (window.__leave || (h => { location.href = h; }))(href);
-      if (matchMedia('(prefers-reduced-motion: reduce)').matches) { this.setState({ fade: 1 }); setTimeout(go, 480); return; }
+      const atBooks = dots === 'books' && !reducedMotion();
+      if (dots) { const o = navDots(); if (atBooks) this.spines().forEach(({ k, L }) => { o[k] = L; }); handNavFrom(o); }
+      const go = () => leaveTo(href);
+      if (reducedMotion()) { this.setState({ fade: 1 }); setTimeout(go, 480); return; }
       // a leave during the arrival: the arrival jumps to its end first, so nothing still waiting to appear pops in over the leave
       (this.arrAnims || []).forEach(a => { try { a.finish(); } catch (x) {} }); clearTimeout(this.pickT);
       // the text and the line fade, the mug slides off to the right, then the books fold back into their dots, top one first, and the dots
@@ -157,10 +153,10 @@ class Component extends DCLogic {
     const b = books.find(x => x.slug === sel);
     // the stack: in the corner on a wide screen. On a narrow one the books stand upright on a shelf along the bottom instead, one row that scrolls
     // sideways, so it takes the same room however many books there are (SHELF_H tall), with a small mug at its end
-    const barH = narrow ? 30 : Math.round(clamp(vh * .045, 30, 38)), stackW = narrow ? vw : Math.round(clamp(vw * .18, 196, 240)), stackR = 0;
+    const barH = narrow ? 30 : Math.round(clamp(vh * .045, 30, 38)), stackW = narrow ? vw : Math.round(clamp(vw * .18, 196, 240));
     const stackH = narrow ? SHELF_H : books.length * (barH + 3) + 34;
     // the reading column: as wide as the room left of the stack allows, up to 860
-    const lm = narrow ? 14 : Math.round(clamp(vw * .02, 16, 32)), avail = narrow ? vw - 36 : vw - stackR - stackW - Math.round(clamp(vw * .05, 40, 80)) - lm, colW = Math.round(Math.min(860, avail));
+    const lm = narrow ? 14 : Math.round(clamp(vw * .02, 16, 32)), avail = narrow ? vw - 36 : vw - stackW - Math.round(clamp(vw * .05, 40, 80)) - lm, colW = Math.round(Math.min(860, avail));
     const fs = Math.round(clamp(colW / 40, 16, 20)), sfs = narrow ? 11 : Math.round(clamp(barH * .36, 12, 13));
     if (!this.bc || this.bc.sel !== sel || this.bc.fs !== fs || this.bc.books !== books) this.bc = { sel, fs, books, blocks: b ? this.blocks(b, fs) : [] };
     // the books couldn't be loaded: a quiet line in the reading column says so, instead of an empty page
@@ -177,7 +173,7 @@ class Component extends DCLogic {
       onImg: () => { this.mKey = null; this.measure(); },
       railL: lm, railT: 28, railH, rule, railOn: b ? 1 : 0,
       notches: this.state.notchData.map((n, i) => ({ y: n.y, label: n.label, c: rule, o: i === 0 ? 0 : 1, go: () => { const sc = this.scrollRef.current; if (sc) sc.scrollTo({ top: Math.max(0, n.top - 30), behavior: 'smooth' }); } })),
-      cupR: Math.round(stackW * .14), shelf, colW, colL: lm, stackW, stackR, sfs,
+      cupR: Math.round(stackW * .14), shelf, colW, colL: lm, stackW, sfs,
       padTop: narrow ? 96 : 34, padBot: narrow ? stackH + 28 : 120, fadeTop: narrow ? 80 : 14, fadeBot: narrow ? stackH + 6 : 60, upright: narrow, fade: this.state.fade,
       // the menu is dots only here; a dot's name shows while it is under the pointer
       navOff: () => this.setState({ navHov: null }),
@@ -286,7 +282,7 @@ function View(v) {
           <div style={sty('position:relative;flex:none;width:76px;height:0;align-self:flex-end;margin-left:6px')}><span style={sty('position:absolute;right:0;bottom:0;transform:scale(.62);transform-origin:100% 100%')}><span style={sty('position:relative;display:block;width:96px;height:0')}><Mug right={0} /></span></span></div>
         </div>
       ) : (
-      <div style={sty(`position:absolute;right:${v.stackR}px;bottom:0;width:${v.stackW}px;display:flex;flex-direction:column;align-items:flex-end;gap:0`)}>
+      <div style={sty(`position:absolute;right:0;bottom:0;width:${v.stackW}px;display:flex;flex-direction:column;align-items:flex-end;gap:0`)}>
         {(v.shelf || []).map((s, i) => (
           <button key={s.title + i} data-book="1" data-kind={s.kind} onClick={s.pick} aria-label={'Read ' + s.title} style={{ ...sty(`position:relative;width:${s.w}px;height:${s.h}px;padding:0;border:0;border-radius:${s.rad};cursor:pointer;z-index:${s.z};background:${s.bg};transform:translateX(var(--tx));transition:transform .35s cubic-bezier(.3,1.3,.5,1), filter .35s ease`), '--tx': s.tx + 'px' }}>
             <Spine s={s} sfs={v.sfs} />
@@ -299,20 +295,20 @@ function View(v) {
       <div aria-hidden="true" style={sty(`position:absolute;inset:0;z-index:120;pointer-events:none;background:#fafafa;opacity:${v.fade};transition:opacity .45s ease`)} />
     </div>
     <nav aria-label="Pages" style={sty("position:fixed;right:12px;top:12px;display:flex;flex-direction:row;align-items:flex-start;z-index:130;color:#111")}>
-      {NAV.map(([k, en, col]) => (
-        <a key={k} href={k === 'home' ? BASE + '?from=dive' : BASE + k + '/'} onClick={v.nav?.[k]?.go} aria-label={en} aria-current={k === PAGE ? 'page' : undefined} data-navk={k} onMouseEnter={v.nav?.[k]?.on} onMouseLeave={v.navOff} onFocus={v.nav?.[k]?.on} onBlur={v.navOff} style={sty("display:flex;flex-direction:column;align-items:center;gap:8px;width:24px;height:156px;padding:8px 0 0;box-sizing:border-box;border:0;background:none;color:inherit;text-decoration:none;cursor:pointer;font-family:'Newsreader', Georgia, serif;font-size:13px;line-height:1")}>
-          <span data-navdot="1" style={sty(`width:16px;height:16px;border-radius:50%;background:${col};flex:none`)} />
+      {NAV.map(([k, en]) => (
+        <a key={k} href={k === 'home' ? HOME : BASE + k + '/'} onClick={v.nav?.[k]?.go} aria-label={en} aria-current={k === PAGE ? 'page' : undefined} data-navk={k} onMouseEnter={v.nav?.[k]?.on} onMouseLeave={v.navOff} onFocus={v.nav?.[k]?.on} onBlur={v.navOff} style={sty("display:flex;flex-direction:column;align-items:center;gap:8px;width:24px;height:156px;padding:8px 0 0;box-sizing:border-box;border:0;background:none;color:inherit;text-decoration:none;cursor:pointer;font-family:'Newsreader', Georgia, serif;font-size:13px;line-height:1")}>
+          <span data-navdot="1" style={sty(`width:16px;height:16px;border-radius:50%;background:${DOT_COL[k]};flex:none`)} />
           <span style={sty("position:relative;display:block;width:100%;height:116px")}>
-            <span lang="en" data-lab="nav" aria-hidden="true" style={sty(`position:absolute;left:50%;top:0;writing-mode:vertical-rl;text-orientation:sideways;white-space:nowrap;font-family:Papyrus, 'Papyrus-Regular', 'Newsreader', Georgia, serif;font-weight:400;font-size:19px;letter-spacing:.02em;background-image:linear-gradient(to bottom, ${col} 0%, ${col} 20%, currentColor 60%, currentColor 100%);background-size:100% 300%;background-repeat:no-repeat;background-position:0 ${v.nav?.[k]?.bp ?? ''};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;transition:opacity .55s ease, transform .7s cubic-bezier(.2,.7,.2,1), filter .55s ease, background-position 1.1s cubic-bezier(.3,.6,.2,1);opacity:${v.nav?.[k]?.en ?? 0};transform:translateX(-50%) translateY(${v.nav?.[k]?.enY ?? ''});filter:blur(${v.nav?.[k]?.enB ?? ''});pointer-events:none`)}>
+            <span lang="en" data-lab="nav" aria-hidden="true" style={sty(`position:absolute;left:50%;top:0;writing-mode:vertical-rl;text-orientation:sideways;white-space:nowrap;font-family:Papyrus, 'Papyrus-Regular', 'Newsreader', Georgia, serif;font-weight:400;font-size:19px;letter-spacing:.02em;background-image:linear-gradient(to bottom, ${DOT_COL[k]} 0%, ${DOT_COL[k]} 20%, currentColor 60%, currentColor 100%);background-size:100% 300%;background-repeat:no-repeat;background-position:0 ${v.nav?.[k]?.bp ?? ''};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;transition:opacity .55s ease, transform .7s cubic-bezier(.2,.7,.2,1), filter .55s ease, background-position 1.1s cubic-bezier(.3,.6,.2,1);opacity:${v.nav?.[k]?.en ?? 0};transform:translateX(-50%) translateY(${v.nav?.[k]?.enY ?? ''});filter:blur(${v.nav?.[k]?.enB ?? ''});pointer-events:none`)}>
               {en}
             </span>
           </span>
         </a>
       ))}
       <span aria-hidden="true" style={sty("display:flex;flex-direction:row;align-items:flex-start")}>
-        {[['c4', 'rgb(255,118,18)'], ['c5', 'rgb(22,168,82)'], ['c6', 'rgb(138,64,214)']].map(([k, col]) => (
+        {['c4', 'c5', 'c6'].map(k => (
           <span key={k} data-navk={k} style={sty("width:16px;height:32px;display:grid;place-items:center")}>
-            <span data-navdot="1" style={sty(`width:11px;height:11px;border-radius:50%;background:${col}`)} />
+            <span data-navdot="1" style={sty(`width:11px;height:11px;border-radius:50%;background:${DOT_COL[k]}`)} />
           </span>
         ))}
       </span>

@@ -23,8 +23,10 @@ function mark() {
   if (bar) for (const b of bar.children) { const on = b.dataset.name === cur; b.style.background = on ? '#141414' : 'transparent'; b.style.color = on ? '#f5f3ee' : '#141414'; }
 }
 
+// waits for Home to start (it sets window.__home); on any other page it never does, so it gives up after ten seconds
+let tries = 0;
 function build() {
-  const h = home(); if (!h || !h.shapeName) { setTimeout(build, 200); return; }
+  const h = home(); if (!h || !h.shapeName) { if (++tries < 50) setTimeout(build, 200); return; }
   // alphabetical here (← / → follow this order too); Home's own list stays as it is
   const names = [...(h.constructor.SHAPES || [])].sort();
   const box = document.createElement('div');
@@ -52,5 +54,4 @@ function build() {
   setInterval(mark, 500);
 }
 
-// only on Home, which is the page that sets window.__home
-if (/\/markt\/?$/.test(location.pathname) || /\/markt\/index\.html$/.test(location.pathname)) build();
+build();

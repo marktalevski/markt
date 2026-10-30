@@ -9,15 +9,18 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 // the deck needs about this much width; on a narrower screen (a phone) it is laid out at this width and the whole thing scaled down to fit,
 // rather than squeezing its three panels into each other. deckScale is that factor (1 on wider screens)
-export const DECK_MIN_W = 920;
+const DECK_MIN_W = 920;
 // a phone held upright gets a deck of its own instead (deckPhone): taller, the screen and pads big enough to use
 export const isPhone = (W, H) => W < 640 && H >= W * 1.15;
 export const deckScale = (W, H) => isPhone(W, H ?? Infinity) ? 1 : Math.min(1, W / DECK_MIN_W);
 // the deck where it is on screen (what pointer handling, hit areas and the other pages use)
+// (asked for several times a frame and on every pointer move, so the last size's layout is kept; nothing writes into it)
+const scaled = (v, s) => typeof v === 'number' ? v * s : Array.isArray(v) ? v.map(x => scaled(x, s)) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, scaled(x, s)])) : v;
+let geoMemo = null;
 export function deckGeo(W, H) {
-  const s = deckScale(W, H); if (s >= 1) return deckGeoV(W, H);
-  const sc = v => typeof v === 'number' ? v * s : Array.isArray(v) ? v.map(sc) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, sc(x)])) : v;
-  return sc(deckGeoV(W / s, H / s));
+  if (geoMemo && geoMemo.W === W && geoMemo.H === H) return geoMemo.G;
+  const s = deckScale(W, H), G = s >= 1 ? deckGeoV(W, H) : scaled(deckGeoV(W / s, H / s), s);
+  geoMemo = { W, H, G }; return G;
 }
 // the deck at its own size (what the drawing uses, under a scale of deckScale(W)): W and H are the screen's, divided by deckScale
 export function deckGeoV(W, H) {

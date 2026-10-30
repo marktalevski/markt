@@ -5,13 +5,19 @@
 //   GET  <base>__editor/sound/  ->  src/data/sound.json (the editor reads it here rather than importing it, so saving doesn't reload the editor)
 import fs from 'node:fs';
 import path from 'node:path';
+import { Transform } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 
 const DIRS = ['audio', 'images/sound', 'images/library', 'images/entries'];
 const MAX = 300 * 1024 * 1024;
 
 const body = req => new Promise((res, rej) => { const parts = []; let n = 0;
-  req.on('data', c => { n += c.length; if (n > MAX) { rej(new Error('File too large')); req.destroy(); } else parts.push(c); });
+  req.on('data', c => { n += c.length; if (n > MAX) { rej(new Error('Too large')); req.destroy(); } else parts.push(c); });
   req.on('end', () => res(Buffer.concat(parts))); req.on('error', rej); });
+// an upload goes straight to its file as it arrives (it can be a long piece of music), stopping if it grows past MAX; a failed one is removed
+const saveTo = async (req, file) => { let n = 0;
+  const cap = new Transform({ transform(c, _, cb) { n += c.length; cb(n > MAX ? new Error('File too large') : null, c); } });
+  try { await pipeline(req, cap, fs.createWriteStream(file)); } catch (e) { fs.rmSync(file, { force: true }); throw e; } };
 const send = (res, code, obj) => { res.statusCode = code; res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(obj)); };
 // a plain, safe file name, made unique if another file already has it
 const nameFor = (dir, raw) => {
@@ -23,20 +29,20 @@ export function editorApi({ root, publicDir }) {
   return async (req, res, next) => {
     const url = new URL(req.url, 'http://x'), m = url.pathname.match(/\/__editor\/(upload|save|sound)\/?$/);
     if (!m) return next();
-    if (m[1] === 'sound') { try { return send(res, 200, JSON.parse(fs.readFileSync(path.join(root, 'src/data/sound.json'), 'utf8'))); } catch (e) { return send(res, 200, { albums: [] }); } }
+    if (m[1] === 'sound') { try { return send(res, 200, JSON.parse(await fs.promises.readFile(path.join(root, 'src/data/sound.json'), 'utf8'))); } catch (e) { return send(res, 200, { albums: [] }); } }
     if (req.method !== 'POST') return send(res, 405, { error: 'POST only' });
     try {
       if (m[1] === 'upload') {
         const dir = url.searchParams.get('dir'); if (!DIRS.includes(dir)) return send(res, 400, { error: 'Unknown folder' });
         const abs = path.join(publicDir, dir); fs.mkdirSync(abs, { recursive: true });
-        const name = nameFor(abs, url.searchParams.get('name') || 'file'); fs.writeFileSync(path.join(abs, name), await body(req));
+        const name = nameFor(abs, url.searchParams.get('name') || 'file'); await saveTo(req, path.join(abs, name));
         return send(res, 200, { path: dir + '/' + name });
       }
       const d = JSON.parse((await body(req)).toString('utf8'));
       if (!d.site || !Array.isArray(d.site.entries) || !d.sound || !Array.isArray(d.sound.albums)) return send(res, 400, { error: 'Nothing to save' });
-      fs.writeFileSync(path.join(publicDir, 'data/site.json'), JSON.stringify(d.site, null, 2) + '\n');
       fs.mkdirSync(path.join(root, 'src/data'), { recursive: true });
-      fs.writeFileSync(path.join(root, 'src/data/sound.json'), JSON.stringify(d.sound, null, 2) + '\n');
+      await Promise.all([fs.promises.writeFile(path.join(publicDir, 'data/site.json'), JSON.stringify(d.site, null, 2) + '\n'),
+        fs.promises.writeFile(path.join(root, 'src/data/sound.json'), JSON.stringify(d.sound, null, 2) + '\n')]);
       return send(res, 200, { ok: true });
     } catch (e) { return send(res, 500, { error: String(e.message || e) }); }
   };

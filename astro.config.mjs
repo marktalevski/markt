@@ -11,7 +11,7 @@ const editorLocalOnly = {
   hooks: {
     'astro:config:setup': ({ command, config, injectRoute, injectScript }) => {
       if (command !== 'dev') return;
-      paths = { root: fileURLToPath(config.root), publicDir: fileURLToPath(config.publicDir), base: config.base.replace(/\/?$/, '/') };
+      paths = { root: fileURLToPath(config.root), publicDir: fileURLToPath(config.publicDir) };
       injectRoute({ pattern: '/editor', entrypoint: './src/editor/editor.astro' });
       injectScript('page', `import '/src/dev/symbol-picker.js';`);
     },

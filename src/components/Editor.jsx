@@ -2,6 +2,7 @@
 // The logic class is the design's own code; View is its template as JSX.
 import React from 'react';
 import { DCLogic, page, sty, BASE, assetUrl } from '../lib/dc.js';
+import { load, loadDraft, save, newId } from '../lib/site-data.js';
 
 // the tabs: the dive log's entries, Sound's albums and the Library's books
 const ARROWS = { down: 'Freediving', up: 'Sound', right: 'Library' };
@@ -26,16 +27,21 @@ const shrink = file => new Promise((res, rej) => { const img = new Image(), url 
   img.onload = () => { const s = Math.min(1, 1600 / Math.max(img.width, img.height)), c = document.createElement('canvas'); c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
     c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url); c.toBlob(b => b ? res(b) : rej(new Error('Could not read that image')), 'image/jpeg', .85); };
   img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('Could not read that image')); }; img.src = url; });
+// the file just picked in a file input, which is cleared so picking the same file again still counts
+const takeFile = ev => { const f = ev.target.files && ev.target.files[0]; ev.target.value = ''; return f; };
 const uploadPhoto = async (file, dir) => upload(await shrink(file), dir, file.name.replace(/\.[^.]+$/, '') + '.jpg');
 // a sound file's length in seconds (0 if the browser can't read it)
-const durOf = file => file.arrayBuffer().then(b => new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 1, 44100).decodeAudioData(b)).then(buf => Math.round(buf.duration)).catch(() => 0);
+const durOf = file => new Promise(res => { const a = new Audio(), url = URL.createObjectURL(file), done = d => { URL.revokeObjectURL(url); res(Math.round(d) || 0); };
+  a.preload = 'metadata'; a.onloadedmetadata = () => done(isFinite(a.duration) ? a.duration : 0); a.onerror = () => done(0); a.src = url; });
 // Sound's albums as saved in the project (src/data/sound.json)
+// what site.json holds: the profile, Freediving's entries (its 'down' line only) and the Library's books
+const siteOf = d => ({ profile: d.profile, entries: (d.entries || []).filter(e => e.line === 'down'), books: d.books || [] });
 const loadAlbums = () => fetch(BASE + '__editor/sound/', { cache: 'no-cache' }).then(r => r.json()).then(d => Array.isArray(d.albums) ? d.albums : []).catch(() => []);
 const fmtDur = s => s ? Math.floor(s / 60) + ':' + String(Math.round(s % 60)).padStart(2, '0') : '';
 // a photo field: a preview, Upload (into dir) and Remove; the photo is stored by its path
 class PhotoPick extends React.Component {
   state = { busy: false, err: '' };
-  pick = ev => { const f = ev.target.files && ev.target.files[0]; ev.target.value = ''; if (!f) return; this.setState({ busy: true, err: '' });
+  pick = ev => { const f = takeFile(ev); if (!f) return; this.setState({ busy: true, err: '' });
     uploadPhoto(f, this.props.dir).then(p => { this.setState({ busy: false }); this.props.onChange(p); }, e => this.setState({ busy: false, err: e.message })); };
   render() { const v = this.props.value;
     return (<div style={sty('display:flex;flex-direction:column;gap:8px')}><span style={sty(LAB)}>{this.props.label || 'Photo'}</span>
@@ -65,8 +71,8 @@ const SAVED = "Saved automatically in this browser. Save to site, then push, to 
 class AlbumEditor extends React.Component {
   state = { busy: null, err: '' };
   set(p) { this.props.onChange({ ...this.props.album, ...p }); }
-  pickAudio(i, tracks, ev) {
-    const f = ev.target.files && ev.target.files[0]; ev.target.value = ''; if (!f) return; this.setState({ busy: i, err: '' });
+  pickAudio(i, ev) {
+    const f = takeFile(ev); if (!f) return; this.setState({ busy: i, err: '' });
     Promise.all([upload(f, 'audio', f.name), durOf(f)]).then(([src, dur]) => { this.setState({ busy: null }); const t = this.props.album.tracks || []; this.set({ tracks: t.map((x, j) => j === i ? { ...x, src, dur: dur || x.dur } : x) }); },
       e => this.setState({ busy: null, err: e.message }));
   }
@@ -90,7 +96,7 @@ class AlbumEditor extends React.Component {
         <div style={sty('display:flex;gap:10px;align-items:center;flex-wrap:wrap')}>
           <span style={sty(LAB)}>{'Sound file'}</span>
           <span style={sty("font-family:'JetBrains Mono', monospace;font-size:12px;color:#10232c")}>{t.src ? t.src.replace(/^audio\//, '') + (t.dur ? '  ·  ' + fmtDur(t.dur) : '') : 'none yet (plays a stand-in)'}</span>
-          <label style={sty(BTN + ';display:flex;align-items:center')}>{this.state.busy === i ? 'Uploading…' : t.src ? 'Replace' : 'Upload'}<input type="file" accept="audio/*" onChange={ev => this.pickAudio(i, tracks, ev)} style={sty('display:none')} /></label>
+          <label style={sty(BTN + ';display:flex;align-items:center')}>{this.state.busy === i ? 'Uploading…' : t.src ? 'Replace' : 'Upload'}<input type="file" accept="audio/*" onChange={ev => this.pickAudio(i, ev)} style={sty('display:none')} /></label>
           {t.src ? <audio controls preload="none" src={assetUrl(t.src)} style={sty('height:32px')} /> : null}
           {t.src ? <button onClick={() => upd({ src: '' })} style={sty(BTN + ';border:0;background:none;color:#5b6b70')}>{'Remove'}</button> : null}
         </div>
@@ -175,7 +181,7 @@ class Component extends DCLogic {
   state = { data: null, line: 'down', selId: null, selBook: null, selAlbum: null, note: '' };
 
   componentDidMount() {
-    import('../lib/site-data.js').then(m => { this.m = m; return Promise.all([m.loadDraft(), m.load(), loadAlbums()]); }).then(([data, pub, siteAlbums]) => {
+    const pub = load(); Promise.all([loadDraft(pub), pub, loadAlbums()]).then(([data, pub, siteAlbums]) => {
       // a working copy from before Sound's albums were editable gets the site's albums
       if (!Array.isArray(data.albums)) data.albums = siteAlbums;
       // a working copy whose books or albums differ from the site's: either edited here, or older than the site (and saving it would undo
@@ -187,7 +193,7 @@ class Component extends DCLogic {
 
   commit(data, extra) {
     let note = '';
-    try { this.m.save(data); } catch (e) { note = 'Storage full: use smaller images or image links.'; }
+    try { save(data); } catch (e) { note = 'Storage full: use smaller images or image links.'; }
     this.setState({ data, note, ...(extra || {}) });
   }
   patch(p) {
@@ -198,7 +204,7 @@ class Component extends DCLogic {
 
   addEntry = () => {
     const d = this.state.data;
-    const e = { id: this.m.newId(), line: this.state.line, title: 'New entry', date: new Date().toISOString().slice(0, 10), short: '', body: '', tags: '', image: '', link: '' };
+    const e = { id: newId(), line: this.state.line, title: 'New entry', date: new Date().toISOString().slice(0, 10), short: '', body: '', tags: '', image: '', link: '' };
     this.commit({ ...d, entries: [...d.entries, e] }, { selId: e.id });
   };
   deleteEntry = () => {
@@ -207,33 +213,32 @@ class Component extends DCLogic {
     this.commit({ ...d, entries: d.entries.filter(e => e.id !== this.state.selId) }, { selId: null });
   };
   onImageFile = ev => {
-    const file = ev.target.files && ev.target.files[0]; ev.target.value = ''; if (!file) return;
+    const file = takeFile(ev); if (!file) return;
     this.setState({ note: 'Uploading the photo…' });
     uploadPhoto(file, 'images/entries').then(p => { this.patch({ image: p }); }, e => this.setState({ note: e.message }));
   };
   // writes the site's files in the project (site.json and sound.json) through the editor helper; pushing then publishes them
   saveSite = () => {
-    const d = this.state.data, site = { profile: d.profile, entries: (d.entries || []).filter(e => e.line === 'down'), books: d.books || [] };
+    const d = this.state.data, site = siteOf(d);
     fetch(BASE + '__editor/save/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ site, sound: { albums: d.albums || [] } }) })
       .then(r => r.json().then(j => { if (!r.ok) throw new Error(j.error || 'Save failed'); this.setState({ note: 'Saved to the site\'s files. Push them to publish.' }); }))
       .catch(e => this.setState({ note: 'Could not save: ' + e.message }));
   };
   exportJson = () => {
     // a backup of everything the editor holds (Import brings it back)
-    const d = this.state.data, out = { profile: d.profile, entries: (d.entries || []).filter(e => e.line === 'down'), books: d.books || [], albums: d.albums || [] };
+    const d = this.state.data, out = { ...siteOf(d), albums: d.albums || [] };
     const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'site-backup.json'; a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   };
   importJson = ev => {
-    const file = ev.target.files && ev.target.files[0]; if (!file) return;
+    const file = takeFile(ev); if (!file) return;
     file.text().then(t => {
       try { const d = JSON.parse(t); if (!Array.isArray(d.entries)) throw 0; this.commit({ profile: d.profile || { name: 'Your Name', intro: '' }, entries: d.entries, books: Array.isArray(d.books) ? d.books : (this.state.data.books || []), albums: Array.isArray(d.albums) ? d.albums : (this.state.data.albums || []) }, { selId: null, selBook: null, selAlbum: null }); }
       catch (e) { this.setState({ note: 'That file is not a valid export.' }); }
     });
-    ev.target.value = '';
   };
-  resetSample = () => { if (confirm('Throw away your changes and go back to the published entries?')) Promise.all([this.m.seed(), loadAlbums()]).then(([d, albums]) => this.commit({ ...d, albums }, { selId: null, selBook: null, selAlbum: null, note: '' })); };
+  resetSample = () => { if (confirm('Throw away your changes and go back to the published entries?')) Promise.all([load(), loadAlbums()]).then(([d, albums]) => this.commit({ ...d, albums }, { selId: null, selBook: null, selAlbum: null, note: '' })); };
 
   renderVals() {
     const d = this.state.data, line = this.state.line;
@@ -247,12 +252,13 @@ class Component extends DCLogic {
     const raw = entries.find(e => e.id === this.state.selId);
     const sel = raw ? { title: '', date: '', short: '', body: '', link: '', image: '', line: 'up', ...raw, tags: Array.isArray(raw.tags) ? raw.tags.join(', ') : (raw.tags || '') } : null;
     const isData = sel && sel.image.startsWith('data:');
+    const isEntries = !isBooks && !isAlbums;
     const profile = (d && d.profile) || { name: '', intro: '' };
     const setProfile = k => e => this.commit({ ...d, profile: { ...profile, [k]: e.target.value } });
     return {
       tabs: ['down', 'up', 'right'].map(L => ({ arrow: ARROWS[L], count: counts[L], bg: L === line ? '#10232c' : '#fff', fg: L === line ? '#f2f0e9' : '#10232c', pick: () => this.setState({ line: L, selId: null, selBook: null, selAlbum: null }) })),
       lineArrow: ARROWS[line],
-      isBooks, isAlbums, isEntries: !isBooks && !isAlbums, book, bookKey: this.state.selBook,
+      isBooks, isAlbums, isEntries, book, bookKey: this.state.selBook,
       album, albumKey: sa, albumFirst: sa === 0, albumLast: sa === albums.length - 1,
       onAlbum: na => putAlbums(albums.map((x, i) => i === sa ? na : x)),
       moveAlbum: dd => { const j = sa + dd; if (j < 0 || j >= albums.length) return; const a2 = albums.slice(); [a2[sa], a2[j]] = [a2[j], a2[sa]]; putAlbums(a2, { selAlbum: j }); },
@@ -261,7 +267,7 @@ class Component extends DCLogic {
       saveSite: this.saveSite,
       onBook: nb => this.commit({ ...d, books: books.map((x, i) => i === this.state.selBook ? nb : x) }),
       list: isAlbums ? albums.map((a, i) => ({ title: a.title || 'Untitled', meta: (a.tracks || []).length + ' pieces' + ((a.tracks || []).length ? '' : ' · not shown until it has one'), bg: i === sa ? '#dfe9e8' : 'transparent', pick: () => this.setState({ selAlbum: i }) })) : isBooks ? books.map((b, i) => ({ title: b.title || 'Untitled', meta: KIND_NAME[b.kind] || b.kind, bg: i === this.state.selBook ? '#dfe9e8' : 'transparent', pick: () => this.setState({ selBook: i }) })) : list.map((e, i) => ({ title: e.title || 'Untitled', meta: `${String(i + 1).padStart(2, '0')}  ·  ${fmt(e.date)}`, bg: e.id === this.state.selId ? '#dfe9e8' : 'transparent', pick: () => this.setState({ selId: e.id }) })),
-      hasSel: !isBooks && !isAlbums && !!sel, noSel: isAlbums ? !album : isBooks ? !book : !sel, sel: sel || {},
+      hasSel: isEntries && !!sel, noSel: isAlbums ? !album : isBooks ? !book : !sel, sel: sel || {},
       hasImage: !!(sel && sel.image), imageBg: sel && sel.image ? `url("${assetUrl(sel.image)}")` : 'none', imageUrl: sel && !isData ? sel.image : '', imagePlaceholder: isData ? 'Uploaded image (upload or paste a link to replace)' : 'Upload a photo, or paste an image link',
       on: { title: this.field('title'), date: this.field('date'), line: this.field('line'), short: this.field('short'), body: this.field('body'), link: this.field('link'), tags: this.field('tags'), image: this.field('image') },
       onImageFile: this.onImageFile, clearImage: () => this.patch({ image: '' }),
@@ -324,7 +330,7 @@ function View(v) {
         {"\n    "}
         <label style={sty("display:flex;flex-direction:column;gap:6px;flex:1 1 220px;max-width:360px")}>
           {"\n      "}
-          <span style={sty("font-family:'JetBrains Mono', monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#4a5b61")}>
+          <span style={sty(LAB)}>
             {"Name"}
           </span>
           {"\n      "}
@@ -334,7 +340,7 @@ function View(v) {
         {"\n    "}
         <label style={sty("display:flex;flex-direction:column;gap:6px;flex:2 1 320px;max-width:620px")}>
           {"\n      "}
-          <span style={sty("font-family:'JetBrains Mono', monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#4a5b61")}>
+          <span style={sty(LAB)}>
             {"Intro line (optional)"}
           </span>
           {"\n      "}
@@ -414,7 +420,7 @@ function View(v) {
                   {"\n            "}
                   <label style={sty("display:flex;flex-direction:column;gap:6px")}>
                     {"\n              "}
-                    <span style={sty("font-family:'JetBrains Mono', monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#4a5b61")}>
+                    <span style={sty(LAB)}>
                       {"Title"}
                     </span>
                     {"\n              "}
@@ -424,7 +430,7 @@ function View(v) {
                   {"\n            "}
                   <label style={sty("display:flex;flex-direction:column;gap:6px")}>
                     {"\n              "}
-                    <span style={sty("font-family:'JetBrains Mono', monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#4a5b61")}>
+                    <span style={sty(LAB)}>
                       {"Date"}
                     </span>
                     {"\n              "}
@@ -438,17 +444,17 @@ function View(v) {
                 {"\n          "}
                 <label style={sty("display:flex;flex-direction:column;gap:6px")}>
                   {"\n            "}
-                  <span style={sty("font-family:'JetBrains Mono', monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#4a5b61")}>
+                  <span style={sty(LAB)}>
                     {"Short text"}
                   </span>
                   {"\n            "}
-                  <input value={v.sel?.short} onChange={v.on?.short} style={sty("height:40px;padding:0 12px;border:1px solid rgba(16,35,44,.2);border-radius:6px;background:#fff")} />
+                  <input value={v.sel?.short} onChange={v.on?.short} style={sty(INP)} />
                   {"\n          "}
                 </label>
                 {"\n          "}
                 <div style={sty("display:flex;flex-direction:column;gap:8px")}>
                   {"\n            "}
-                  <span style={sty("font-family:'JetBrains Mono', monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#4a5b61")}>
+                  <span style={sty(LAB)}>
                     {"Image"}
                   </span>
                   {"\n            "}
@@ -485,21 +491,21 @@ function View(v) {
                   {"\n            "}
                   <label style={sty("display:flex;flex-direction:column;gap:6px")}>
                     {"\n              "}
-                    <span style={sty("font-family:'JetBrains Mono', monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#4a5b61")}>
+                    <span style={sty(LAB)}>
                       {"Link"}
                     </span>
                     {"\n              "}
-                    <input value={v.sel?.link} onChange={v.on?.link} placeholder="https://" style={sty("height:40px;padding:0 12px;border:1px solid rgba(16,35,44,.2);border-radius:6px;background:#fff")} />
+                    <input value={v.sel?.link} onChange={v.on?.link} placeholder="https://" style={sty(INP)} />
                     {"\n            "}
                   </label>
                   {"\n            "}
                   <label style={sty("display:flex;flex-direction:column;gap:6px")}>
                     {"\n              "}
-                    <span style={sty("font-family:'JetBrains Mono', monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#4a5b61")}>
+                    <span style={sty(LAB)}>
                       {"Tags, comma separated"}
                     </span>
                     {"\n              "}
-                    <input value={v.sel?.tags} onChange={v.on?.tags} style={sty("height:40px;padding:0 12px;border:1px solid rgba(16,35,44,.2);border-radius:6px;background:#fff")} />
+                    <input value={v.sel?.tags} onChange={v.on?.tags} style={sty(INP)} />
                     {"\n            "}
                   </label>
                   {"\n          "}
@@ -507,11 +513,11 @@ function View(v) {
                 {"\n          "}
                 <label style={sty("display:flex;flex-direction:column;gap:6px")}>
                   {"\n            "}
-                  <span style={sty("font-family:'JetBrains Mono', monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#4a5b61")}>
+                  <span style={sty(LAB)}>
                     {"Body · empty line starts a new paragraph"}
                   </span>
                   {"\n            "}
-                  <textarea value={v.sel?.body} onChange={v.on?.body} rows="12" style={sty("padding:12px;border:1px solid rgba(16,35,44,.2);border-radius:6px;background:#fff;line-height:1.6;resize:vertical;font-family:'Newsreader', Georgia, serif;font-size:17px")} />
+                  <textarea value={v.sel?.body} onChange={v.on?.body} rows="12" style={sty(TXT)} />
                   {"\n          "}
                 </label>
                 {"\n          "}

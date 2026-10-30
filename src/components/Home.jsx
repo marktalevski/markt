@@ -3,8 +3,8 @@
 import React from 'react';
 import { DCLogic, page, sty, BASE } from '../lib/dc.js';
 import { deckGeo, padOf } from '../lib/deck.js';
-import { navAt, NAV_Y } from '../lib/nav.js';
-import { ropeX } from '../lib/rope.js';
+import { navAt, NAV_Y, handNavFrom, leaveTo } from '../lib/nav.js';
+import { ropeX, waveY, surfaceY, cubicAt } from '../lib/rope.js';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const smooth = x => x * x * (3 - 2 * x);
@@ -40,6 +40,13 @@ const miniWave = (x0, y0, w, h, o = {}) => { const [s, T] = miniFit(x0, y0, w, h
 // the small waves sit in one row under the big one, evenly spaced and alternately high and low (blue rides the big wave)
 const WAVES = [[3, -1.6, .66, 1.6, 1.0, {}], ...[1, 4, 5, 2, 6].map((li, k) => [li, -2.25 + k * .85, k % 2 ? 1.74 : 1.52, .6, 1, {}])];
 const SHAPES = ['enso', 'spiral', 'triforce', 'triskele', 'wave', 'maple', 'octopus', 'hangul', 'spring', 'mountain', 'vinyl', 'camera', 'book', 'onsen', 'lotus', 'coffee', 'headphones', 'plane', 'gameboy', 'longfins', 'egg', 'samurai', 'muaythai'];
+// symbols drawn as several separate strokes (their ink tails off quickly at each stroke's end), those whose hidden links between
+// strokes are hidden completely, and those whose page lines follow their own colour path all the way to the label
+const MULTI = new Set(['hangul', 'maple', 'triskele', 'octopus', 'spring', 'plane', 'onsen', 'mountain', 'muaythai', 'gameboy', 'longfins', 'egg', 'samurai']);
+const HIDE_LIFT = new Set([...MULTI, 'coffee', 'wave']);
+const CP_DIRECT = new Set(['wave', 'lotus', 'octopus', 'headphones', 'maple', 'samurai', 'hangul', 'book', 'mountain', 'plane', 'spring', 'muaythai']);
+const DOT_KEYS = ['ink', 'freediving', 'sound', 'library', 'c4', 'c5', 'c6'];
+const isTouch = () => typeof matchMedia !== 'undefined' && matchMedia('(hover: none)').matches;
 // page: which section this colour leads to (blue → freediving)
 // hover fade, like watercolour bleeding into paper: every other line washes from the start of its stroke to its tail, all in step.
 // seconds for the wash to cross a stroke, opacity reached, width of the wet edge (share of the stroke), how much that edge wanders
@@ -125,6 +132,8 @@ const easeIO = k => .5 - .5 * Math.cos(Math.PI * k);
 const blueRide = (() => { const o = []; cat([[-1.05, .7], [-.62, .48], [-.3, .1], [-.06, -.3], [.2, -.57], [.48, -.66], [.72, -.63]], 10, (x, y) => o.push([x, y]));
   for (const p of goldSpiral([.72, -.38], .25, -Math.PI / 2, .92, 44)) o.push(p); return o; })();
 const catW = (ctrl, n, w0, w1) => { const o = []; cat(ctrl, n, (x, y) => o.push([x, y])); return o.map((p, i) => [p[0], p[1], w0 + (w1 - w0) * i / Math.max(1, o.length - 1)]); };
+// a hidden link between two strokes of a symbol (drawn at no weight), so one line runs through them all
+const hc = (a, b) => Array.from({ length: 16 }, (_, q) => [a[0] + (b[0] - a[0]) * q / 15, a[1] + (b[1] - a[1]) * q / 15, .001]);
 function shapeOf(name, cx, cy, R) {
   const blooms = [], colorPaths = {}, P = [], push = (x, y, w = 1) => P.push([cx + x * R, cy + y * R, w]), extra = [];
   const strokes = list => list.forEach((st2, k) => {
@@ -146,17 +155,8 @@ function shapeOf(name, cx, cy, R) {
     strokes([a1, hc(a1[a1.length - 1], a2[0]), a2, hc(a2[a2.length - 1], a0[0]), a0]);
     st = [0, 1.24];
   }
-  else if (name === 'fox') {
-    const t = .12, hc = (a, b) => Array.from({ length: 16 }, (_, q) => [a[0] + (b[0] - a[0]) * q / 15, a[1] + (b[1] - a[1]) * q / 15, .001]);
-    const body = catW([[-.55, 1.12], [-.05, 1.13], [.52, 1.12], [.34, 1.0], [.3, .55], [.32, .15], [.4, -.18], [.56, -.38], [.84, -.48], [.78, -.56], [.56, -.64], [.42, -.74], [.38, -1.14], [.24, -.82], [.13, -1.08], [.04, -.74], [-.06, -.42], [-.18, .02], [-.42, .45], [-.54, .82], [-.55, 1.12]], 14, 1.15, 1.05);
-    const tail = catW([[-.46, .7], [-.56, .46], [-.6, 0], [-.54, -.44], [-.5, -.76], [-.66, -.6], [-.84, -.22], [-.9, .32], [-.78, .82], [-.56, 1.0]], 12, .7, 1.0);
-    const leg = catW([[-.22, .58], [-.02, .8], [.06, 1.1]], 8, .85, .6), bib = catW([[.0, -.36], [.18, -.12], [.4, -.2]], 8, .85, .7);
-    strokes([tail, hc(tail[tail.length - 1], leg[0]), leg, hc(leg[leg.length - 1], bib[0]), bib, hc(bib[bib.length - 1], body[0]), body]);
-    extra.push([cx + .5 * R, cy - .6 * R]);
-    st = [.1, 1.4];
-  }
   else if (name === 'longfins') {
-    const t = .12, hc = (a, b) => Array.from({ length: 16 }, (_, q) => [a[0] + (b[0] - a[0]) * q / 15, a[1] + (b[1] - a[1]) * q / 15, .001]);
+    
     const fin = (sx, rot) => { const c = Math.cos(rot), sn = Math.sin(rot), P2 = [[0, -1.12], [.17, -1.05], [.2, -.78], [.18, -.5], [.26, -.1], [.34, .5], [.38, 1.05], [.24, 1.2], [0, 1.1], [-.24, 1.2], [-.38, 1.05], [-.34, .5], [-.26, -.1], [-.18, -.5], [-.2, -.78], [-.17, -.05 - 1], [0, -1.12]];
       return catW(P2.map(p => [sx + p[0] * c - p[1] * sn, p[0] * sn + p[1] * c]), 10, 1.05, 1.05); };
     const f1 = fin(-.4, .16), f2 = fin(.4, -.16);
@@ -166,7 +166,7 @@ function shapeOf(name, cx, cy, R) {
     st = [0, 1.42];
   }
   else if (name === 'gameboy') {
-    const t = .12, hc = (a, b) => Array.from({ length: 16 }, (_, q) => [a[0] + (b[0] - a[0]) * q / 15, a[1] + (b[1] - a[1]) * q / 15, .001]);
+    
     const rr = (x0, y0, x1, y1, r, rBR) => { const o = [], arcq = (c0, c1, a0, rad) => { for (let q = 0; q <= 8; q++) { const a = a0 + q / 8 * Math.PI / 2; o.push([c0 + Math.cos(a) * rad, c1 + Math.sin(a) * rad, 1]); } };
       arcq(x0 + r, y0 + r, Math.PI, r); arcq(x1 - r, y0 + r, -Math.PI / 2, r); arcq(x1 - rBR, y1 - rBR, 0, rBR); arcq(x0 + r, y1 - r, Math.PI / 2, r); o.push(o[0].slice()); return o; };
     const body = rr(-.68, -1.12, .68, 1.12, .07, .34), scr = rr(-.5, -.94, .5, -.14, .05, .05).map(p => [p[0], p[1], .8]);
@@ -178,7 +178,7 @@ function shapeOf(name, cx, cy, R) {
     st = [-.95, 1.2];
   }
   else if (name === 'wave') {
-    const t = .001, hc = (a, b) => Array.from({ length: 16 }, (_, q) => [a[0] + (b[0] - a[0]) * q / 15, a[1] + (b[1] - a[1]) * q / 15, t]);
+    
     const back = catW(WAVE_BACK, 12, .7, 1.1), cur = [], c = WAVE_C;
     // the curl is a golden spiral round the heart of the wave
     for (const p of goldSpiral(c, WAVE_R, -Math.PI / 2, WAVE_TURNS, 70, u => 1.05 - .4 * u)) cur.push(p);
@@ -187,20 +187,20 @@ function shapeOf(name, cx, cy, R) {
     st = [-.25, 1.25];
   }
 
-  else if (name === 'egg') { const t = .001, hc = (a, b) => Array.from({ length: 16 }, (_, q) => [a[0] + (b[0] - a[0]) * q / 15, a[1] + (b[1] - a[1]) * q / 15, t]);
+  else if (name === 'egg') { 
     // sunny side up, seen at a slight angle: wobbly white with a thickness edge underneath, a domed yolk with a shine and a soft shadow
     const wob = EGG_WOB, white = Array.from({ length: 91 }, (_, q) => { const a = Math.PI * .55 + q / 90 * Math.PI * 2.03; return [...eggWhite(a, 1), 1]; });
     const edge = []; for (let q = 0; q <= 40; q++) { const a = Math.PI * .18 + q / 40 * Math.PI * .64, rr = wob(a); edge.push([Math.cos(a) * 1.3 * rr * .97, .02 + Math.sin(a) * .86 * rr + .1, .6 + .3 * Math.sin(Math.PI * q / 40)]); }
     const Y = [.18, -.12], yolk = Array.from({ length: 61 }, (_, q) => { const a = -Math.PI * .6 + q / 60 * Math.PI * 2.02; return [Y[0] + Math.cos(a) * .5, Y[1] + Math.sin(a) * .42, 1.1]; });
     const shine = catW([[Y[0] - .3, Y[1] - .02], [Y[0] - .22, Y[1] - .2], [Y[0] - .04, Y[1] - .28]], 6, .85, .7);
     const seq = [white, yolk, shine], list = []; seq.forEach((q, k) => { if (k) list.push(hc(seq[k - 1][seq[k - 1].length - 1], q[0])); list.push(q); }); strokes(list); st = [0, 1.25]; }
-  else if (name === 'samurai') { const t = .001, hc = (a, b) => Array.from({ length: 16 }, (_, q) => [a[0] + (b[0] - a[0]) * q / 15, a[1] + (b[1] - a[1]) * q / 15, t]), list = [];
+  else if (name === 'samurai') { const list = [];
     const ring = (x, y, k) => { const o = [], a0 = -1.9 + k * .7; for (let q = 0; q <= 30; q++) { const a = a0 + q / 30 * TAU * 1.06; o.push([x + Math.cos(a) * .14, y + .33 + Math.sin(a) * .14, .8 + .3 * Math.sin(q / 30 * Math.PI)]); } return o; };
     const parts = [[-.26, -.94], [.26, -.94], [-.26, -.6], [.26, -.6], [-.26, -.26], [.26, -.26]].map(([x, y], k) => ring(x, y, k));
     parts.push([[0, .33, .9], [.24, .69, 1], [-.24, .69, 1], [0, .33, .9], [.05, .41, .8]]);
     parts.forEach((q, k) => { if (k) list.push(hc(parts[k - 1][parts[k - 1].length - 1], q[0])); list.push(q); }); strokes(list); st = [0, 1.05]; }
   else if (name === 'muaythai') { // a Muay Thai bag on its ring, swivel and straps, just kicked from the left so it swings a little to the right
-    const t = .001, hc = (a, b) => Array.from({ length: 16 }, (_, q) => [a[0] + (b[0] - a[0]) * q / 15, a[1] + (b[1] - a[1]) * q / 15, t]);
+    
     const lin = (a, b, w = 1) => { const n = Math.max(2, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / .03)); return Array.from({ length: n + 1 }, (_, q) => [a[0] + (b[0] - a[0]) * q / n, a[1] + (b[1] - a[1]) * q / n, w]); };
     const ell = (c, rx, ry, a0, a1, n, w) => Array.from({ length: n + 1 }, (_, q) => { const a = a0 + (a1 - a0) * q / n; return [c[0] + Math.cos(a) * rx, c[1] + Math.sin(a) * ry, w]; });
     const ring = ell([0, -1.27], .07, .07, Math.PI / 2, Math.PI / 2 + TAU, 24, .8), hang = lin([0, -1.2], [0, -.98]), strapL = lin([0, -.98], [-.36, -.7], .85);
@@ -209,13 +209,13 @@ function shapeOf(name, cx, cy, R) {
     const seq = [[...ring, ...hang, ...strapL, ...bodyPts, ...strapR], rim, band1, band2], list = []; seq.forEach((q, k) => { if (k) list.push(hc(seq[k - 1][seq[k - 1].length - 1], q[0])); list.push(q); });
     strokes(list.map(q => q.map(BAG_ROT))); st = BAG_ROT(BAG_LINES.find(l => l.li === 3).path.slice(-1)[0]); }
   else if (name === 'triforce') { lineTo([[0, .82], [-1.05, .82], [0, -.98], [1.05, .82], [0, .82], [-.525, -.08], [.525, -.08], [0, .82]]); st = [0, 1.2]; }
-  else if (name === 'mountain') { const t = .12, hc = (a, b) => Array.from({ length: 16 }, (_, q) => [a[0] + (b[0] - a[0]) * q / 15, a[1] + (b[1] - a[1]) * q / 15, .001]), chain = seq => { const list = []; seq.forEach((q, k) => { if (k) list.push(hc(seq[k - 1][seq[k - 1].length - 1], q[0])); list.push(q); }); strokes(list); }; const sun = []; for (let q = 0; q <= 60; q++) { const a = -.6 + q / 60 * TAU; sun.push([.98 + Math.cos(a) * .26, -.62 + Math.sin(a) * .26, .8]); } chain([sun, catW([[-1.75, .72], [-1.2, .48], [-.75, .05], [-.42, -.42], [-.22, -.7], [-.08, -.62], [.08, -.72], [.22, -.68], [.45, -.38], [.8, .06], [1.25, .48], [1.75, .72]], 14, 1, 1)]); st = [0, 1.05]; }
+  else if (name === 'mountain') { const chain = seq => { const list = []; seq.forEach((q, k) => { if (k) list.push(hc(seq[k - 1][seq[k - 1].length - 1], q[0])); list.push(q); }); strokes(list); }; const sun = []; for (let q = 0; q <= 60; q++) { const a = -.6 + q / 60 * TAU; sun.push([.98 + Math.cos(a) * .26, -.62 + Math.sin(a) * .26, .8]); } chain([sun, catW([[-1.75, .72], [-1.2, .48], [-.75, .05], [-.42, -.42], [-.22, -.7], [-.08, -.62], [.08, -.72], [.22, -.68], [.45, -.38], [.8, .06], [1.25, .48], [1.75, .72]], 14, 1, 1)]); st = [0, 1.05]; }
   else if (name === 'vinyl') { lineTo([[1.45, -1.15], [1.35, -.35], [.7, -.12]]); circ([0, 0], 1.0, -.17, 1, 160); for (let q = 1; q <= 260; q++) { const u = q / 260, a = -.17 + u * TAU * 2.2, r = 1.0 - .55 * u; push(Math.cos(a) * r, Math.sin(a) * r); } { const a0 = -.17 + TAU * 2.2; circ([0, 0], .3, a0, 1, 60); circ([0, 0], .07, a0, 1, 20); } st = [-.6, 1.3]; }
   else if (name === 'camera') { lineTo([[-1.3, .1], [-1.3, -.32], [-1.15, -.45], [-.75, -.45], [-.66, -.72], [-.24, -.72], [-.15, -.45], [1.15, -.45], [1.3, -.32], [1.3, .6], [1.15, .75], [-1.15, .75], [-1.3, .6], [-1.3, .1], [-.48, .15]]); circ([0, .15], .48, Math.PI, 1, 90); circ([0, .15], .26, Math.PI, 1, 60); st = [0, 1.15]; }
   else if (name === 'book') { cv([[0, .72], [-.6, .55], [-1.35, .62]]); lineTo([[-1.35, .62], [-1.35, -.6]]); cv([[-1.35, -.6], [-.6, -.7], [0, -.48]]); lineTo([[0, -.48], [0, .72]]); cv([[0, .72], [.6, .55], [1.35, .62]]); lineTo([[1.35, .62], [1.35, -.6]]); cv([[1.35, -.6], [.6, -.7], [0, -.48]]); st = [0, 1.05]; }
-  else if (name === 'onsen') { const t = .12, hc = (a, b) => Array.from({ length: 16 }, (_, q) => [a[0] + (b[0] - a[0]) * q / 15, a[1] + (b[1] - a[1]) * q / 15, .001]), chain = seq => { const list = []; seq.forEach((q, k) => { if (k) list.push(hc(seq[k - 1][seq[k - 1].length - 1], q[0])); list.push(q); }); strokes(list); }; const ov = []; for (let k = 0; k <= 30; k++) { const th = Math.PI + .78 - k / 30 * (Math.PI + 1.56); ov.push([Math.cos(th) * 1.08, .32 + Math.sin(th) * .62, 1]); } chain([ov, ...[[-.42, -.78], [0, -.98], [.42, -.78]].map(([x, top]) => catW([[x, .58], [x + .12, .32], [x - .08, .05], [x + .1, -.24], [x - .04, (top - .24) / 2 - .12], [x + .04, top]], 10, 1, .6))]); st = [0, 1.25]; }
+  else if (name === 'onsen') { const chain = seq => { const list = []; seq.forEach((q, k) => { if (k) list.push(hc(seq[k - 1][seq[k - 1].length - 1], q[0])); list.push(q); }); strokes(list); }; const ov = []; for (let k = 0; k <= 30; k++) { const th = Math.PI + .78 - k / 30 * (Math.PI + 1.56); ov.push([Math.cos(th) * 1.08, .32 + Math.sin(th) * .62, 1]); } chain([ov, ...[[-.42, -.78], [0, -.98], [.42, -.78]].map(([x, top]) => catW([[x, .58], [x + .12, .32], [x - .08, .05], [x + .1, -.24], [x - .04, (top - .24) / 2 - .12], [x + .04, top]], 10, 1, .6))]); st = [0, 1.25]; }
   else if (name === 'lotus') { cv([[-1.55, .72], [-.8, .62], [0, .55]]); const B = [0, .55]; [[-1.25, .9, .22], [-.65, 1.15, .28], [0, 1.45, .3], [.65, 1.15, .28], [1.25, .9, .22]].forEach(([a, Lp, wp]) => { const d = [Math.sin(a), -Math.cos(a)], n = [Math.cos(a), Math.sin(a)], T = [B[0] + d[0] * Lp, B[1] + d[1] * Lp]; cv([B, [B[0] + d[0] * Lp * .5 - n[0] * wp, B[1] + d[1] * Lp * .5 - n[1] * wp], T, [B[0] + d[0] * Lp * .5 + n[0] * wp, B[1] + d[1] * Lp * .5 + n[1] * wp], B], 16); }); cv([[0, .55], [.8, .62], [1.55, .72]]); st = [0, 1.1]; }
-  else if (name === 'coffee') { const t = .001, hc = (a, b) => Array.from({ length: 16 }, (_, q) => [a[0] + (b[0] - a[0]) * q / 15, a[1] + (b[1] - a[1]) * q / 15, t]);
+  else if (name === 'coffee') { 
     // 3/4 view latte: rim, coffee surface, heart in the foam, rosetta lines, bowl, handle, a highlight
     const ell = (c, rx, ry, a0, turns, n, w) => Array.from({ length: n + 1 }, (_, q) => { const a = a0 + q / n * Math.PI * 2 * turns; return [c[0] + Math.cos(a) * rx, c[1] + Math.sin(a) * ry, w]; });
     const rim = ell([0, -.36], 1.0, .3, Math.PI, 1.02, 60, 1), liq = ell([0, -.32], .84, .21, Math.PI * .95, 1.0, 50, .65);
@@ -283,16 +283,6 @@ function shapeOf(name, cx, cy, R) {
     for (let k = 0; k < ring.length - 1; k++) { const a = ring[k], b = ring[k + 1], n = Math.max(2, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / .03)); for (let q = k ? 1 : 0; q <= n; q++) out.push([a[0] + (b[0] - a[0]) * q / n, a[1] + (b[1] - a[1]) * q / n, .72]); }
     strokes([out]);
     st = [0, -.9];
-  }
-  else if (name === 'frog') {
-    const t = .12, hc = (a, b) => Array.from({ length: 16 }, (_, q) => [a[0] + (b[0] - a[0]) * q / 15, a[1] + (b[1] - a[1]) * q / 15, .001]);
-    const body = catW([[-.55, .95], [-.95, .6], [-1.02, .05], [-.85, -.35], [-.75, -.62], [-.6, -.85], [-.35, -.8], [-.28, -.5], [0, -.42], [.28, -.5], [.35, -.8], [.6, -.85], [.75, -.62], [.85, -.35], [1.02, .05], [.95, .6], [.55, .95], [0, .88], [-.55, .95]], 14, 1.15, 1.0);
-    const smile = catW([[-.46, .04], [-.24, .22], [0, .27], [.24, .22], [.46, .04]], 12, .8, .8);
-    const hand = sd => catW([[sd * .3, .9], [sd * .34, 1.06], [sd * .5, 1.16], [sd * .68, 1.1], [sd * .72, .93]], 10, 1.15, 1.05);
-    const hL = hand(-1), hR = hand(1);
-    strokes([body, hc(body[body.length - 1], smile[0]), smile, hc(smile[smile.length - 1], hL[0]), hL, hc(hL[hL.length - 1], hR[0]), hR]);
-    extra.push([cx - .53 * R, cy - .62 * R], [cx + .53 * R, cy - .62 * R]);
-    st = [0, 1.4];
   }
   else { for (let i = 0; i <= 360; i++) { const u = i / 360, th = Math.PI * .5 + .35 + u * Math.PI * 2 * .9, wob = 1 + .018 * Math.sin(u * 5 + 1); push(Math.cos(th) * wob, Math.sin(th) * wob); } st = [0, 1.12]; }
   { const S = u => [cx + u[0] * R, cy + u[1] * R], vis = i => (P[i][2] ?? 1) >= .2;
@@ -369,9 +359,9 @@ function shapeOf(name, cx, cy, R) {
         const A0 = ride[ride.length - 1], nx = ride[Math.max(0, ride.length - 3)], tx0 = A0[0] - nx[0], ty0 = A0[1] - nx[1], tl0 = Math.hypot(tx0, ty0) || 1, sg = ((E[0] - A0[0]) * -ty0 + (E[1] - A0[1]) * tx0) >= 0 ? 1 : -1, off = 7;
         for (let k = 0; k < ride.length; k++) { const a = ride[Math.max(0, k - 2)], b = ride[Math.min(ride.length - 1, k + 2)], tx = b[0] - a[0], ty = b[1] - a[1], tl = Math.hypot(tx, ty) || 1, f = Math.min(1, k / 6); pts.push([ride[k][0] - ty / tl * off * sg * f, ride[k][1] + tx / tl * off * sg * f]); }
         const A = pts[pts.length - 1], T = [tx0 / tl0, ty0 / tl0], dd = Math.hypot(E[0] - A[0], E[1] - A[1]), k1 = Math.min(dd * .6, R * .45), C1 = [A[0] + T[0] * k1, A[1] + T[1] * k1], C2 = [E[0] + (C1[0] - E[0]) * .3, E[1] + (C1[1] - E[1]) * .3];
-        for (let q = 1; q <= 24; q++) { const u = q / 24, a = (1 - u) ** 3, b = 3 * (1 - u) ** 2 * u, c = 3 * (1 - u) * u * u, d = u ** 3; pts.push([a * A[0] + b * C1[0] + c * C2[0] + d * E[0], a * A[1] + b * C1[1] + c * C2[1] + d * E[1]]); } }
+        for (let q = 1; q <= 24; q++) pts.push(cubicAt(A, C1, C2, E, q / 24)); }
       colorPaths[sp.li] = chaikin(resample(pts.map(p => [p[0], p[1], sp.w || 1]), CP_STEP), 1); } }
-  const glyph = ['egg', 'samurai', 'hangul', 'spring', 'octopus', 'maple', 'signature', 'triskele', 'frog', 'plane', 'triforce', 'onsen', 'mountain', 'muaythai', 'coffee', 'fox', 'gameboy', 'longfins'].includes(name);
+  const glyph = ['egg', 'samurai', 'hangul', 'spring', 'octopus', 'maple', 'triskele', 'plane', 'triforce', 'onsen', 'mountain', 'muaythai', 'coffee', 'gameboy', 'longfins'].includes(name);
   const gRes = name === 'hangul' ? [6, 3] : [7, 3];
   let Q = glyph ? chaikin(resample(P, gRes[0]), gRes[1]) : chaikin(resample(P, 20), 4);
   if (['wave'].includes(name)) Q = chaikin(resample(loopify(resample(Q, 4), R), 4), 1);
@@ -433,7 +423,6 @@ class Component extends DCLogic {
   }
 
   shapeWanted() { const ok = x => SHAPES.includes(x); if (ok(this.override)) return this.override; const s = this.props.shape; return ok(s) ? s : ok(this.pick) ? this.pick : 'enso'; }
-  waveY(x, k, t) { return k * 16 + Math.sin(x * .011 + t * .6 + k * 1.3) * 7 * (1 - k * .25) + Math.sin(x * .029 - t * .9 + k * 2) * 3; }
 
   // how far a symbol reaches either side of its centre, in units of R (measured once per symbol)
   extentOf(name) { this.extC = this.extC || {}; if (this.extC[name]) return this.extC[name]; const U = 100, S = shapeOf(name, 0, 0, U); let m = 0;
@@ -449,7 +438,6 @@ class Component extends DCLogic {
     const nrm = a => a.map((p, i) => { const q = a[Math.min(a.length - 1, i + 1)], r2 = a[Math.max(0, i - 1)], tx = q[0] - r2[0], ty = q[1] - r2[1], l = Math.hypot(tx, ty) || 1; return [-ty / l, tx / l]; });
     const SN = nrm(SP);
     const curv = SP.map((p, i) => { if (i < 2 || i > NS - 3) return 0; const a = Math.atan2(p[1] - SP[i - 2][1], p[0] - SP[i - 2][0]), b = Math.atan2(SP[i + 2][1] - p[1], SP[i + 2][0] - p[0]); let d = Math.abs(b - a); if (d > Math.PI) d = Math.PI * 2 - d; return d; });
-    const TAILF = { signature: .55, vinyl: .45, triforce: .55, muaythai: .6 }[this.shapeName], avoidTail = TAILF ? SP.slice(Math.floor(NS * TAILF)).filter((p, i) => i % 3 === 0 && (p[2] ?? 1) >= .2) : null;
     const near = S => { let b = 1e9, bi = 0; SP.forEach((p, i) => { const d = Math.hypot(p[0] - S[0], p[1] - S[1]); if (d < b) { b = d; bi = i; } }); return bi; };
     { const okF = S => S[0] > (W < 720 ? 44 : 70) && S[0] < W - (W < 720 ? 44 : 70) && S[1] > 66 && S[1] < H - 70 && SP.every(p => !(p[0] > S[0] - 80 && p[0] < S[0] + 80 && p[1] > S[1] - 30 && p[1] < S[1] + 80));
       if (!okF(this.station)) { const ox = this.station[0] - cx, oy = this.station[1] - cy, ol = Math.hypot(ox, oy) || 1; for (let d = 12; d <= 240; d += 12) { const S2 = [this.station[0] + ox / ol * d, this.station[1] + oy / ol * d]; if (okF(S2)) { this.station = S2; break; } } } }
@@ -464,17 +452,13 @@ class Component extends DCLogic {
     const stIs = { freediving: fdI, sound: near(sSnd), library: near(sLib) }; const ends = [this.station, sSnd, sLib];
     const SB = 48, secR = new Array(SB).fill(0), sec = E => ((Math.floor((Math.atan2(E[1] - cy, E[0] - cx) + Math.PI) / (2 * Math.PI) * SB)) % SB + SB) % SB;
     SP.forEach(q => { if ((q[2] ?? 1) < .2) return; const k = sec(q), r = Math.hypot(q[0] - cx, q[1] - cy); if (r > secR[k]) secR[k] = r; });
+    const secMax = k => Math.max(secR[k], secR[(k + 1) % SB], secR[(k + SB - 1) % SB]);
     const SPv = SP.filter((q, i) => (q[2] ?? 1) >= .2 && i % 2 === 0);
-    const outside = E => { const k = sec(E); return Math.hypot(E[0] - cx, E[1] - cy) > Math.max(secR[k], secR[(k + 1) % SB], secR[(k + SB - 1) % SB]) + 22; };
-    const outsideM = (x, y) => { const E = [x, y], k = sec(E); return Math.hypot(x - cx, y - cy) > Math.max(secR[k], secR[(k + 1) % SB], secR[(k + SB - 1) % SB]) - 4; };
+    const outside = E => { const k = sec(E); return Math.hypot(E[0] - cx, E[1] - cy) > secMax(k) + 22; };
+    const outsideM = (x, y) => { const E = [x, y], k = sec(E); return Math.hypot(x - cx, y - cy) > secMax(k) - 4; };
     const clearPt = (E, d) => outside(E) && ends.slice(0, 3).every(A => !(Math.abs(E[0] - A[0]) < 150 && Math.abs(E[1] - A[1]) < 58)) && E[0] > 24 && E[0] < W - 24 && E[1] > 24 && E[1] < H - 24 && SP.every(q => (q[2] ?? 1) < .2 || Math.hypot(q[0] - E[0], q[1] - E[1]) > d) && ends.every((A, ai) => Math.hypot(A[0] - E[0], A[1] - E[1]) > (ai < 3 ? 110 : 75));
-    const bez = (out, A, B, C, D, n) => { for (let i = 1; i <= n; i++) { const u = i / n, a = (1 - u) ** 3, b = 3 * (1 - u) ** 2 * u, c = 3 * (1 - u) * u * u, d = u ** 3; out.push([a * A[0] + b * B[0] + c * C[0] + d * D[0], a * A[1] + b * B[1] + c * C[1] + d * D[1]]); } };
-    const B0 = [cx, cy + R * .05];
-    this.body = B0;
-    const XA = a => [cx + Math.cos(a) * R * 1.65, cy + Math.sin(a) * R * 1.35];
-    const MIX = { 4: [1, 2, XA(-2.3)], 5: [2, 3, XA(-.4)], 6: [3, 1, XA(1.9)] };
-    const via = { 1: [MIX[4][2], MIX[6][2]], 2: [MIX[4][2], MIX[5][2]], 3: [MIX[5][2], MIX[6][2]] };
-    const WIN = {}; { const okI = SP.map(q => { if ((q[2] ?? 1) < .5) return 0; const k = sec(q), r = Math.hypot(q[0] - cx, q[1] - cy); return r >= .8 * Math.max(secR[k], secR[(k + 1) % SB], secR[(k + SB - 1) % SB]) ? 1 : 0; });
+    const bez = (out, A, B, C, D, n) => { for (let i = 1; i <= n; i++) out.push(cubicAt(A, B, C, D, i / n)); };
+    const WIN = {}; { const okI = SP.map(q => { if ((q[2] ?? 1) < .5) return 0; const k = sec(q), r = Math.hypot(q[0] - cx, q[1] - cy); return r >= .8 * secMax(k) ? 1 : 0; });
       const pre = [0]; okI.forEach((v, i) => pre.push(pre[i] + v)); const hidP = [0]; SP.forEach((q, i) => hidP.push(hidP[i] + ((q[2] ?? 1) < .2 ? 1 : 0))); const hidN = (a, b) => hidP[b + 1] - hidP[a]; const frac = (a, b) => (pre[b + 1] - pre[a]) / Math.max(1, b - a + 1);
       const cen = (a, b) => { const m = SP[Math.floor((a + b) / 2)], e2 = SP[b]; return [(m[0] * 2 + e2[0]) / 3, (m[1] * 2 + e2[1]) / 3]; }, taken = [], takenS = [], samp = (a, b) => { const o = []; for (let i = a; i <= b; i += 4) o.push(SP[i]); return o; }, mdOf = (a, b) => { if (!takenS.length) return R; const S = samp(a, b); let t = 0; for (const p of S) { let m = 1e9; for (const q of takenS) { const d = (p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2; if (d < m) m = d; } t += Math.sqrt(m); } return t / S.length; };
       const spanOf = L => Math.min(NS - 1, Math.max(this.shapeName === 'hangul' ? 30 : 50, Math.floor((L.page ? .22 : this.shapeName === 'hangul' ? .12 : .3) * NS)));
@@ -488,12 +472,12 @@ class Component extends DCLogic {
         if (!best) { const sp2 = Math.max(24, Math.floor(sp * .5)); for (let st = 0; st + sp2 < NS; st += 4) { if (hidN(st, st + sp2) > 0) continue; const c = cen(st, st + sp2), md = mdOf(st, st + sp2), sc = frac(st, st + sp2) + 1.4 * Math.min(1, md / (R * .7)); if (!best || sc > best[0]) best = [sc, st, st + sp2, c]; } }
         if (best) { WIN[li] = [best[1], best[2], !!best[4]]; taken.push(best[3]); takenS.push(...samp(best[1], best[2])); } }); }
     this.paths = LINES.map((L, li) => {
-      const span = Math.min(NS - 1, Math.max(this.shapeName === 'hangul' || this.shapeName === 'signature' ? 30 : 50, Math.floor((L.page ? .22 : this.shapeName === 'hangul' ? .12 : .34) * NS)));
+      const span = Math.min(NS - 1, Math.max(this.shapeName === 'hangul' ? 30 : 50, Math.floor((L.page ? .22 : this.shapeName === 'hangul' ? .12 : .34) * NS)));
       let i0, i1;
       if (L.keep) { i0 = 0; i1 = NS - 1; }
-      else if (L.page) { var stI = stIs[L.page]; var rev = WIN[li][2]; i0 = WIN[li][0]; i1 = WIN[li][1]; }
+      else if (L.page) { var rev = WIN[li][2]; i0 = WIN[li][0]; i1 = WIN[li][1]; }
       else if (WIN[li]) { i0 = WIN[li][0]; i1 = WIN[li][1]; }
-      else { const LIM = { spiral: .7, wave: .6, frog: .5, octopus: .45, hangul: .9, signature: .5, triforce: .5, vinyl: .45, muaythai: .55, triskele: .36, gameboy: .42, longfins: .32, fox: .55 }, lim = LIM[this.shapeName] ? Math.floor(NS * LIM[this.shapeName]) : NS - 1; i0 = Math.floor(L.u * .9 * lim); i1 = Math.min(lim, i0 + span); if (i1 - i0 < span) i0 = Math.max(0, i1 - span); }
+      else { const LIM = { spiral: .7, wave: .6, octopus: .45, hangul: .9, triforce: .5, vinyl: .45, muaythai: .55, triskele: .36, gameboy: .42, longfins: .32 }, lim = LIM[this.shapeName] ? Math.floor(NS * LIM[this.shapeName]) : NS - 1; i0 = Math.floor(L.u * .9 * lim); i1 = Math.min(lim, i0 + span); if (i1 - i0 < span) i0 = Math.max(0, i1 - span); }
       const arc = [], z = [], cw = [], wl = [];
       for (let i = i0; i <= i1; i++) {
         const sAlong = (i - i0) * 4.5, ph = i * 4.5 * (Math.PI * 2 / 520);
@@ -505,10 +489,10 @@ class Component extends DCLogic {
       if (CPp) { arc.length = 0; z.length = 0; cw.length = 0; wl.length = 0; CPp.forEach(p => { arc.push([p[0], p[1]]); z.push(.35); cw.push(Math.max(.35, p[2] ?? 1)); wl.push(p[2] ?? 1); }); }
       else if (!L.keep) { const sm = avg(avg(arc, 4), 4); for (let q = 0; q < arc.length; q++) arc[q] = sm[q]; }
       if (!L.keep && !L.page && !CPp && WIN[li] && WIN[li][2]) { arc.reverse(); z.reverse(); cw.reverse(); wl.reverse(); }
-      if (!L.keep && !L.page && !CPp && arc.length > 4) { let j = arc.length - 1; const isOut = p => { const k = sec(p); return Math.hypot(p[0] - cx, p[1] - cy) >= .86 * Math.max(secR[k], secR[(k + 1) % SB], secR[(k + SB - 1) % SB]); }, jmin = Math.floor(arc.length * .45); const outT = q => { if (q < 5) return true; const p = arc[q], pp = arc[q - 4], tx = p[0] - pp[0], ty = p[1] - pp[1], tl = Math.hypot(tx, ty) || 1, ox = p[0] - cx, oy = p[1] - cy, ol = Math.hypot(ox, oy) || 1; return (tx * ox + ty * oy) / (tl * ol) > -.15; }; while (j > jmin && !(isOut(arc[j]) && outT(j))) j--; if (j <= jmin) { j = arc.length - 1; while (j > jmin && !isOut(arc[j])) j--; } if (j < arc.length - 1 && j > 6) { arc.length = j + 1; z.length = j + 1; cw.length = j + 1; wl.length = j + 1; } }
+      if (!L.keep && !L.page && !CPp && arc.length > 4) { let j = arc.length - 1; const isOut = p => { const k = sec(p); return Math.hypot(p[0] - cx, p[1] - cy) >= .86 * secMax(k); }, jmin = Math.floor(arc.length * .45); const outT = q => { if (q < 5) return true; const p = arc[q], pp = arc[q - 4], tx = p[0] - pp[0], ty = p[1] - pp[1], tl = Math.hypot(tx, ty) || 1, ox = p[0] - cx, oy = p[1] - cy, ol = Math.hypot(ox, oy) || 1; return (tx * ox + ty * oy) / (tl * ol) > -.15; }; while (j > jmin && !(isOut(arc[j]) && outT(j))) j--; if (j <= jmin) { j = arc.length - 1; while (j > jmin && !isOut(arc[j])) j--; } if (j < arc.length - 1 && j > 6) { arc.length = j + 1; z.length = j + 1; cw.length = j + 1; wl.length = j + 1; } }
       if (!L.keep && !L.page && !CPp && arc.length > 4) { const e = arc[arc.length - 1], pe = arc[arc.length - 4], tl1 = Math.hypot(e[0] - pe[0], e[1] - pe[1]) || 1, te1 = [(e[0] - pe[0]) / tl1, (e[1] - pe[1]) / tl1], ox = e[0] - cx, oy = e[1] - cy, ol = Math.hypot(ox, oy) || 1;
         let dx = te1[0] * .5 + ox / ol, dy = te1[1] * .5 + oy / ol; const dl = Math.hypot(dx, dy) || 1; dx /= dl; dy /= dl; let E = [e[0] + dx * 30, e[1] + dy * 30];
-        const ringR = a => { const k = ((Math.floor((a + Math.PI) / (2 * Math.PI) * SB)) % SB + SB) % SB; return Math.max(secR[k], secR[(k + 1) % SB], secR[(k + SB - 1) % SB], secR[(k + 2) % SB], secR[(k + SB - 2) % SB]) + 34 + (RING_EXTRA[this.shapeName] || 0); };
+        const ringR = a => { const k = ((Math.floor((a + Math.PI) / (2 * Math.PI) * SB)) % SB + SB) % SB; return Math.max(secMax(k), secR[(k + 2) % SB], secR[(k + SB - 2) % SB]) + 34 + (RING_EXTRA[this.shapeName] || 0); };
         const ae = Math.atan2(e[1] - cy, e[0] - cx); let best = null; this.runA = this.runA || []; const adiff = (x, y) => { let d = Math.abs(x - y) % (2 * Math.PI); return d > Math.PI ? 2 * Math.PI - d : d; };
         const overlaps = (a0, a1) => this.runA.some(([b0, b1]) => { const n = 16; let o = 0; for (let q = 0; q <= n; q++) { const a = a0 + (a1 - a0) * q / n; let lo = Math.min(b0, b1), hi = Math.max(b0, b1); let aa = a; while (aa < lo - Math.PI) aa += 2 * Math.PI; while (aa > hi + Math.PI) aa -= 2 * Math.PI; if (aa >= lo - .12 && aa <= hi + .12) o++; } return o > 4; });
         const crs = Math.cos(ae) * te1[1] - Math.sin(ae) * te1[0], tsg = crs >= 0 ? 1 : -1, outD = Math.cos(ae) * te1[0] + Math.sin(ae) * te1[1];
@@ -517,14 +501,14 @@ class Component extends DCLogic {
         if (!best) { const r = ringR(ae); best = [[cx + Math.cos(ae) * r, cy + Math.sin(ae) * r], ae, r]; }
         E = best[0]; ends.push(E); const n0 = arc.length;
         { let da = best[1] - ae; while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI;
-          const hd = 26 + 40 * Math.max(0, -outD), seg = [e], cub = (P0, C1, C2, P1, n) => { for (let q = 1; q <= n; q++) { const u = q / n, a = (1 - u) ** 3, b = 3 * (1 - u) ** 2 * u, c = 3 * (1 - u) * u * u, d = u ** 3; seg.push([a * P0[0] + b * C1[0] + c * C2[0] + d * P1[0], a * P0[1] + b * C1[1] + c * C2[1] + d * P1[1]]); } };
+          const hd = 26 + 40 * Math.max(0, -outD), seg = [e], cub = (P0, C1, C2, P1, n) => { for (let q = 1; q <= n; q++) seg.push(cubicAt(P0, C1, C2, P1, q / n)); };
           if (Math.abs(da) < .36) { const ox = E[0] - cx, oy = E[1] - cy, ol = Math.hypot(ox, oy) || 1; cub(e, [e[0] + te1[0] * hd, e[1] + te1[1] * hd], [E[0] - ox / ol * hd * .6, E[1] - oy / ol * hd * .6], E, 18); }
           else { const dS = Math.sign(da), aW = ae + dS * .18, rW = ringR(aW), W0 = [cx + Math.cos(aW) * rW, cy + Math.sin(aW) * rW], tg = [-Math.sin(aW) * dS, Math.cos(aW) * dS];
             cub(e, [e[0] + te1[0] * hd, e[1] + te1[1] * hd], [W0[0] - tg[0] * hd * .8, W0[1] - tg[1] * hd * .8], W0, 16);
             const da2 = da - dS * .18, m = Math.max(2, Math.ceil(Math.abs(da2) / .05)), rEnd = best[2] - ringR(best[1]); for (let q = 1; q <= m; q++) { const u = q / m, a = aW + da2 * u, r = ringR(a) + rEnd * u; seg.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]); } }
           const sm = avg(avg(avg(seg, 3), 3), 3); sm[0] = e; sm[sm.length - 1] = E; for (let q = 1; q < sm.length; q++) arc.push(sm[q]); }
         for (let q = n0; q < arc.length; q++) { z.push(.3); cw.push(1); wl.push(1); } }
-      if (L.page && !(CPp && (this.shapeName === 'wave' || this.shapeName === 'lotus' || this.shapeName === 'octopus' || this.shapeName === 'headphones' || this.shapeName === 'maple' || this.shapeName === 'samurai' || this.shapeName === 'hangul' || this.shapeName === 'book' || this.shapeName === 'mountain' || this.shapeName === 'plane' || this.shapeName === 'spring' || this.shapeName === 'muaythai'))) {
+      if (L.page && !(CPp && CP_DIRECT.has(this.shapeName))) {
         if (rev) { arc.reverse(); z.reverse(); cw.reverse(); wl.reverse(); }
         { const S0 = this.stations[L.page], lim = Math.floor(arc.length * .45); let popped = 0;
           while (arc.length > 12 && popped < lim) { const e1 = arc[arc.length - 1], p1 = arc[arc.length - 5], tx = e1[0] - p1[0], ty = e1[1] - p1[1], tl = Math.hypot(tx, ty) || 1, sx = S0[0] - e1[0], sy = S0[1] - e1[1], sl = Math.hypot(sx, sy) || 1;
@@ -538,12 +522,10 @@ class Component extends DCLogic {
           for (let q = n0; q < arc.length; q++) { z.push(.1); cw.push(1); wl.push(1); } }
       }
       const ang = -Math.PI / 2 + li / LINES.length * Math.PI * 2 + .3, sg = li % 2 ? 1 : -1, ten = [];
-      { const far = Math.hypot(W, H) * .62, LXd = ropeX(W), wx0 = -20 + li * (W + 40) / 7, NA = this.navArrive && !this.trans ? this.navArrive[L.keep ? 'ink' : L.page || 'c' + li] : null, P0 = this.fromPts ? this.fromPts[li] : NA ? NA.slice() : this.fromDive ? [wx0, Math.max(H * .26, 190) + this.waveY(wx0 - LXd, li % 3, 0) + (li % 3) * 0] : [cx + Math.cos(ang) * far, cy + Math.sin(ang) * far], Mx = [cx + Math.cos(ang + sg * .8) * R * 1.45, cy + Math.sin(ang + sg * .8) * R * 1.45];
-        const C1 = this.fromPts ? [P0[0] + (P0[0] - cx) * .7 + sg * 60, P0[1] + (P0[1] - cy) * .7 - 40] : NA ? [P0[0] - 160, P0[1] + sg * 50] : this.fromDive ? [P0[0] + 140, P0[1] + 30] : [P0[0] + Math.cos(ang + sg * 1.6) * far * .35, P0[1] + Math.sin(ang + sg * 1.6) * far * .35], C2 = [Mx[0] + Math.cos(ang + sg * .2) * R * .9, Mx[1] + Math.sin(ang + sg * .2) * R * .9];
-        ten.push(P0); for (let q = 1; q <= 60; q++) { const u = q / 60, a = (1 - u) ** 3, b = 3 * (1 - u) ** 2 * u, c = 3 * (1 - u) * u * u, d = u ** 3; ten.push([a * P0[0] + b * C1[0] + c * C2[0] + d * Mx[0], a * P0[1] + b * C1[1] + c * C2[1] + d * Mx[1]]); } }
+      { const far = Math.hypot(W, H) * .62, LXd = ropeX(W), wx0 = -20 + li * (W + 40) / 7, NA = this.navArrive && !this.trans ? this.navArrive[L.keep ? 'ink' : L.page || 'c' + li] : null, P0 = NA ? NA.slice() : this.fromDive ? [wx0, surfaceY(H) + waveY(wx0 - LXd, li % 3, 0)] : [cx + Math.cos(ang) * far, cy + Math.sin(ang) * far], Mx = [cx + Math.cos(ang + sg * .8) * R * 1.45, cy + Math.sin(ang + sg * .8) * R * 1.45];
+        const C1 = NA ? [P0[0] - 160, P0[1] + sg * 50] : this.fromDive ? [P0[0] + 140, P0[1] + 30] : [P0[0] + Math.cos(ang + sg * 1.6) * far * .35, P0[1] + Math.sin(ang + sg * 1.6) * far * .35], C2 = [Mx[0] + Math.cos(ang + sg * .2) * R * .9, Mx[1] + Math.sin(ang + sg * .2) * R * .9];
+        ten.push(P0); bez(ten, P0, C1, C2, Mx, 60); }
       const TR = this.trans && this.trans[li]; if (TR) { ten.length = 0; TR.pts.forEach(p => ten.push(p)); }
-      else if (this.mixIntro && !this.fromDive && via[li]) { const P0 = ten[0], c = [P0, via[li][0], via[li][1]]; ten.length = 0; cat([P0, P0, c[1], c[2], [c[2][0] + (c[2][0] - c[1][0]) * .15, c[2][1] + (c[2][1] - c[1][1]) * .15]], 22, (x, y) => ten.push([x, y])); }
-      else if (this.mixIntro && !this.fromDive && MIX[li]) { const X = MIX[li][2], ox = X[0] - cx, oy = X[1] - cy, ol = Math.hypot(ox, oy) || 1; ten.length = 0; for (let q = 0; q <= 12; q++) ten.push([X[0] - oy / ol * q * 4, X[1] + ox / ol * q * 4]); }
       const M = ten[ten.length - 1], Mp = ten[ten.length - 2], md = Math.hypot(M[0] - Mp[0], M[1] - Mp[1]) || 1, dm = [(M[0] - Mp[0]) / md, (M[1] - Mp[1]) / md];
       const J = arc[0], tl = Math.hypot(arc[1][0] - J[0], arc[1][1] - J[1]) || 1, tg = [(arc[1][0] - J[0]) / tl, (arc[1][1] - J[1]) / tl];
       const pts = ten.slice();
@@ -555,14 +537,8 @@ class Component extends DCLogic {
       const arc0 = pts.length; for (let i = 1; i < arc.length; i++) pts.push(arc[i]);
       const s = [0]; for (let i = 1; i < pts.length; i++) s[i] = s[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
       const zz = [], cc = [], wt = [], nT = TR ? ten.length : 0; for (let i = 0; i < pts.length; i++) { const o = i < nT; zz.push(i >= arc0 ? z[i - arc0 + 1] : o ? TR.z[i] ?? 0 : TR ? .15 : 0); cc.push(i >= arc0 ? cw[i - arc0 + 1] : o ? TR.cw[i] ?? 1 : 1); wt.push(i >= arc0 ? wl[i - arc0 + 1] ?? 1 : o ? TR.wt[i] ?? 1 : 1); }
-      return { L, pts, s, zA: zz, cw: cc, wt, spawn: false, d: L.d, tr: !!TR, oldLen: TR ? s[ten.length - 1] : 0, len: s[s.length - 1], entry: s[arc0 - 1], arc0, ph: li * 1.7 };
+      return { L, pts, s, zA: zz, cw: cc, wt, d: L.d, tr: !!TR, oldLen: TR ? s[ten.length - 1] : 0, len: s[s.length - 1], entry: s[arc0 - 1], arc0, ph: li * 1.7 };
     });
-    if (this.mixIntro && !this.trans && !this.fromDive) for (const li of [4, 5, 6]) {
-      const [pa, pb, X] = MIX[li], arr = [pa, pb].map(pi => { const P = this.paths[pi]; let bi = 0, bd = 1e9; P.pts.forEach((p, q) => { const d = Math.hypot(p[0] - X[0], p[1] - X[1]); if (d < bd) { bd = d; bi = q; } });
-        const sx = P.s[bi], dur = this.durOf(P), head = k => P.len * easeIO(k);
-        let lo = 0, hi = 1; for (let it = 0; it < 30; it++) { const mid = (lo + hi) / 2; if (head(mid) >= sx) hi = mid; else lo = mid; } return P.d + hi * dur; });
-      this.paths[li].d = Math.max(arr[0], arr[1]) + .05;
-    }
     if (this.shapeName === 'spring' && !this.trans && !this.fromDive) { const ink = this.paths[0], e = this.endOf(ink); this.paths.forEach((P, li) => { if (this.colorPaths[li] && !P.tr) P.d = Math.max(P.d ?? P.L.d, e - this.durOf(P) + .3); }); }
     // label placement: decided once, against every settled stroke
     { const pts = []; this.paths.forEach(P => P.pts.forEach((p, i) => { if (i >= P.arc0 && (!P.L.keep || (P.wt[i] ?? 1) >= .2)) pts.push(p); }));
@@ -579,19 +555,19 @@ class Component extends DCLogic {
   goDive = () => {
     if (this.go != null || this.T < this.readyT) return;
     if (this.tapReveal('freediving')) return;
-    const { W, H, cx, cy, R } = this.geo, SY = Math.max(H * .26, 190);
+    const { W, H, cx, cy, R } = this.geo, SY = surfaceY(H);
     // strokes draw the surface, buoy and flag first, then carry on up into their menu dots
     const LX = ropeX(W), BS = clamp(W / 900, .75, 1), NX = k => navAt(W, k)[0], NY = NAV_Y;
-    const bz = (A, C1, C2, B, n) => { const o = []; for (let i = 1; i <= n; i++) { const u = i / n, a = (1 - u) ** 3, b = 3 * (1 - u) ** 2 * u, c = 3 * (1 - u) * u * u, dd = u ** 3; o.push([a * A[0] + b * C1[0] + c * C2[0] + dd * B[0], a * A[1] + b * C1[1] + c * C2[1] + dd * B[1]]); } return o; };
+    const bz = (A, C1, C2, B, n) => { const o = []; for (let i = 1; i <= n; i++) o.push(cubicAt(A, C1, C2, B, i / n)); return o; };
     // start off-screen like the Freediving page's surface, so the line reaches the left edge
-    const surf = k => { const o = []; for (let x = -20; x <= W - 6; x += 9) o.push([x, SY + this.waveY(x - LX, k, 0)]); return o; };
+    const surf = k => { const o = []; for (let x = -20; x <= W - 6; x += 9) o.push([x, SY + waveY(x - LX, k, 0)]); return o; };
     const mkX = (o) => { const F = o.feat, f0p = F[0], lead = bz(o.start, o.c1, o.c2 || [f0p[0] - 50, f0p[1] - 110], f0p, 44), fl = F[F.length - 1], fp = F[F.length - 2], tl = Math.hypot(fl[0] - fp[0], fl[1] - fp[1]) || 1, E = o.end;
       const rise = bz(fl, o.r1 || [fl[0] + (fl[0] - fp[0]) / tl * 70, fl[1] + (fl[1] - fp[1]) / tl * 70 - 50], o.rx != null && o.rx < -100 ? [E[0] + o.rx, E[1] + 20] : [E[0] + (o.rx ?? -40), E[1] + 130], E, 40);
       const pre = o.circ || [o.start], pts = pre.concat(lead, F.slice(1), rise), f0 = pre.length + lead.length - 1; return { ...o, pts, f0, f1: f0 + F.length - 1 }; };
     const P = this.paths[0], circ = P.pts.slice(P.arc0), e = circ[circ.length - 1], pe = circ[circ.length - 2], tl = Math.hypot(e[0] - pe[0], e[1] - pe[1]) || 1, tg = [(e[0] - pe[0]) / tl, (e[1] - pe[1]) / tl];
     let cl = 0; for (let i = 1; i < circ.length; i++) cl += Math.hypot(circ[i][0] - circ[i - 1][0], circ[i][1] - circ[i - 1][1]);
     const hd = k => this.heads && this.heads[k] ? this.heads[k].p.slice() : [cx, cy + R];
-    const s0 = surf(0), s1 = surf(1), s2 = surf(2), B = [LX, SY + this.waveY(0, 0, 0) - 2];
+    const s0 = surf(0), s1 = surf(1), s2 = surf(2), B = [LX, SY + waveY(0, 0, 0) - 2];
     const coil = []; for (let q = 0; q <= 10; q++) { const u = q / 10; coil.push([B[0] + (-17 + 34 * u) * BS, B[1] + Math.sin(u * Math.PI) * 2 * BS]); }
     const flag = []; for (let q = 0; q <= 8; q++) { const u = q / 8; flag.push([B[0] + (1 + 20 * u) * BS, B[1] + (-39 + Math.sin(u * Math.PI) * 1.2) * BS]); }
     this.exits = [
@@ -609,7 +585,7 @@ class Component extends DCLogic {
     if (this.go != null || this.T < this.readyT) return;
     if (this.tapReveal(pg)) return;
     this.exits = []; this.navFrom = {};
-    ['ink', 'freediving', 'sound', 'library', 'c4', 'c5', 'c6'].forEach(k => { const h = this.heads && this.heads[k]; if (h) this.navFrom[k] = { p: h.p.slice(), col: h.col }; });
+    DOT_KEYS.forEach(k => { const h = this.heads && this.heads[k]; if (h) this.navFrom[k] = { p: h.p.slice(), col: h.col }; });
     this.dest = pg === 'sound' ? BASE + 'sound/?from=page' : BASE + 'library/'; this.go = 0;
   };
   goSound = this.goPage('sound'); goLibrary = this.goPage('library');
@@ -618,12 +594,11 @@ class Component extends DCLogic {
   endOf(P) { return P.tr ? P.L.d * .6 + (1.6 + (P.len - P.oldLen) / 900) / P.L.spd : (P.d ?? P.L.d) + this.durOf(P); }
   // the ink dot calls this with a click event and gets a random symbol; the local symbol picker (src/dev/symbol-picker.js) passes a name
   shuffle = (name) => {
-    if (this.go != null || this.morph || !this.paths || this.T < this.readyT) return false;
-    const grab = () => this.paths.map(P => P.pts.slice(P.arc0 - 1));
-    this.trans = this.paths.map(P => { const c = P.cut0 || 0; return { pts: P.pts.slice(c), z: P.zA.slice(c), cw: P.cw.slice(c), wt: P.wt.slice(c) }; }); const old = grab(), opts = SHAPES.filter(x => x !== this.shapeName); this.fromPts = null;
+    if (this.go != null || !this.paths || this.T < this.readyT) return false;
+    this.trans = this.paths.map(P => { const c = P.cut0 || 0; return { pts: P.pts.slice(c), z: P.zA.slice(c), cw: P.cw.slice(c), wt: P.wt.slice(c) }; });
     this.override = SHAPES.includes(name) ? name : pickShape(this.shapeName);
     this.build(this.geo.W, this.geo.H);
-    this.T = 0; this.go = null; this.oldPaths = null; return true;
+    this.T = 0; this.go = null; return true;
   };
   static SHAPES = SHAPES;
   hoverOn = () => { this.hov = 1; };
@@ -672,7 +647,7 @@ class Component extends DCLogic {
   // 0..1 through the dot's pulse as the last absorbed letter arrives
   labelPulse(pg) { const s = this.labs && this.labs[pg]; if (!s || s.pk == null) return 0; const u = clamp((s.pk - (LABEL.time - LABEL.letter * .35)) / LABEL.pulse, 0, 1); return Math.sin(Math.PI * u); }
   // touch screens have no hover: the first tap shows the label, the second goes there
-  tapReveal(pg) { if (typeof matchMedia === 'undefined' || !matchMedia('(hover: none)').matches) return false; const s = this.labs && this.labs[pg]; if (s && s.on) return false;
+  tapReveal(pg) { if (!isTouch()) return false; const s = this.labs && this.labs[pg]; if (s && s.on) return false;
     if (pg === 'freediving') this.hov = 1; else this.hovPg[pg] = 1;
     if (!this.offTap) { this.offTap = e => { if (e.target.closest && e.target.closest('button[aria-label]')) return; this.hov = 0; this.hovPg.sound = this.hovPg.library = 0; }; document.addEventListener('pointerdown', this.offTap); }
     return true; }
@@ -692,11 +667,11 @@ class Component extends DCLogic {
     this.fadeTick(dt); this.dtF = Math.max(0, dt);
     // leaving: the last frame is kept (window.__leave) and shown by the next page while it loads, so there's no blank moment in between
     if (this.go != null) { this.go += dt; if (this.go > (this.dest ? (/\/sound\//.test(this.dest) ? 1.3 : 2.05) : 4.05) && !this.left) { this.left = true; // Sound picks the menu dots up where they are and drops them onto its beat pads
-      if (/\/sound\//.test(this.dest || '')) try { const o = {}; ['ink', 'freediving', 'sound', 'library', 'c4', 'c5', 'c6'].forEach(k => { const f = this.navFrom && this.navFrom[k]; o[k] = f ? f.p : sndDrop(k, innerWidth, innerHeight); }); o.home = o.ink; sessionStorage.setItem('nav-from', JSON.stringify(o)); } catch (e) {}
-      (window.__leave || (h => { location.href = h; }))(this.dest || BASE + 'freediving/?from=home'); } }
+      if (/\/sound\//.test(this.dest || '')) { const o = {}; DOT_KEYS.forEach(k => { const f = this.navFrom && this.navFrom[k]; o[k] = f ? f.p : sndDrop(k, innerWidth, innerHeight); }); handNavFrom(o); }
+      leaveTo(this.dest || BASE + 'freediving/?from=home'); } }
     // once the symbol has settled (drawn, its transition over, nothing hovered, fading or with labels moving) the picture doesn't change, so it
     // isn't redrawn every frame; any hover, shuffle or resize wakes it
-    { const L = this.labs || {}, near = (a, b) => Math.abs((a || 0) - (b || 0)) < .002, still = this.go == null && !this.morph && !this.trans && !this.oldPaths && this.T > (this.readyT ?? 99) + 3
+    { const L = this.labs || {}, near = (a, b) => Math.abs((a || 0) - (b || 0)) < .002, still = this.go == null && !this.trans && this.T > (this.readyT ?? 99) + 3
         && near(this.hovT, this.hov) && near(this.hovIT, this.hovI) && ['sound', 'library'].every(k => near(this.hovPgT[k], this.hovPg[k])) && (this.fadeC || []).every(c => c === 0 || c === FADE.sweep) && Object.values(L).every(x => x.rest && x.pk == null),
         sig = innerWidth + 'x' + innerHeight + ':' + this.shapeName + ':' + (this.fadeC || []).join() + ':' + this.hov + this.hovI + (this.hovPg.sound || 0) + (this.hovPg.library || 0);
       if (still && this.stillSig === sig) return; this.stillSig = still ? sig : null; }
@@ -711,106 +686,71 @@ class Component extends DCLogic {
     if (!this.geo || this.geo.W !== W || this.geo.H !== H || this.shapeName !== this.shapeWanted()) { const changed = this.geo && this.shapeName !== this.shapeWanted(); this.build(W, H); if (changed) this.T = 0; }
     const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
     ctx.fillStyle = '#f5f3ee'; ctx.fillRect(0, 0, W, H);
-    const T = this.T, G = this.go, { cx, cy, R } = this.geo, LX = ropeX(W), SY = Math.max(H * .26, 190);
+    const T = this.T, G = this.go, { cx, cy, R } = this.geo, LX = ropeX(W), SY = surfaceY(H);
     const gone = G == null ? 0 : smooth(clamp(G / .5, 0, 1));
 
-    // octopus body: an ink pool the arms grow out of
-    const lastEnd = Math.max(...this.paths.map(P => this.endOf(P)));
     this.readyT = this.endOf(this.paths[0]) + .3;
-    const bodyA = 0;
     if (this.fromDive && !this.navArrive && T < 2) { const wa = 1 - smooth(clamp((T - .3) / 1.4, 0, 1)); ctx.lineCap = 'round';
-      [[3.2, .9, '20,20,20'], [1.8, .55, '0,158,224'], [1.1, .3, '34,86,186']].forEach((st, k) => { ctx.strokeStyle = `rgba(${st[2]},${st[1] * wa})`; ctx.lineWidth = st[0]; ctx.beginPath(); for (let x = -20; x <= W + 20; x += 10) { const y = SY + this.waveY(x - LX, k, T); x === -20 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke(); }); }
-    if (bodyA > .01) {
-      const [bx, by] = this.body, br = R * .2 * (.6 + .4 * smooth(clamp(T / .6, 0, 1)));
-      ctx.fillStyle = 'rgb(20,20,20)';
-      for (let l = 0; l < 3; l++) { ctx.globalAlpha = bodyA * (.62 - l * .16); ctx.beginPath(); for (let i = 0; i <= 30; i++) { const an = i / 30 * 6.2832, rr = br * (1 + l * .25) * (1 + .1 * Math.sin(an * 3 + l + T) + .06 * Math.sin(an * 5 - T)); i ? ctx.lineTo(bx + Math.cos(an) * rr, by + Math.sin(an) * rr) : ctx.moveTo(bx + Math.cos(an) * rr, by + Math.sin(an) * rr); } ctx.closePath(); ctx.fill(); }
-      ctx.globalAlpha = 1;
-    }
-
-    if (this.fromPts && T > 6) this.fromPts = null;
+      [[3.2, .9, '20,20,20'], [1.8, .55, '0,158,224'], [1.1, .3, '34,86,186']].forEach((st, k) => { ctx.strokeStyle = `rgba(${st[2]},${st[1] * wa})`; ctx.lineWidth = st[0]; ctx.beginPath(); for (let x = -20; x <= W + 20; x += 10) { const y = SY + waveY(x - LX, k, T); x === -20 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke(); }); }
     if (this.trans && T > 8) this.trans = null;
-    let morphK = -1;
-    if (this.morph) {
-      morphK = clamp((performance.now() - this.morph.t0) / 1800, 0, 1);
-      const k = smooth(morphK), rs = (a, n) => Array.from({ length: n }, (_, i) => { const f = i / (n - 1) * (a.length - 1), j = Math.floor(f), t = f - j, p = a[j], q = a[Math.min(a.length - 1, j + 1)]; return [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t]; });
-      ctx.lineCap = 'round';
-      [1, 2, 3, 4, 5, 6, 0].forEach(li => {
-        const L = LINES[li], A = rs(this.morph.old[li], 150), B = rs(this.morph.nw[li], 150), th = Math.sin(Math.PI * k) * .55 * (li % 2 ? 1 : -1), push = 1 + .18 * Math.sin(Math.PI * k);
-        ctx.strokeStyle = `rgb(${L.col[0]},${L.col[1]},${L.col[2]})`;
-        for (let i = 0; i < 149; i++) {
-          const pt = j => { const x = A[j][0] + (B[j][0] - A[j][0]) * k - cx, y = A[j][1] + (B[j][1] - A[j][1]) * k - cy; return [cx + (x * Math.cos(th) - y * Math.sin(th)) * push, cy + (x * Math.sin(th) + y * Math.cos(th)) * push]; };
-          const p0 = pt(i), p1 = pt(i + 1), taper = Math.min(1, i / 12, (148 - i) / 18);
-          ctx.globalAlpha = L.keep ? .95 : .55 + .35 * taper; ctx.lineWidth = Math.max(.6, L.w * (L.keep ? 1 : .75) * (1 - .35 * Math.sin(Math.PI * k)) * taper);
-          ctx.beginPath(); ctx.moveTo(p0[0], p0[1]); ctx.lineTo(p1[0], p1[1]); ctx.stroke();
-        }
-      });
-      ctx.globalAlpha = 1;
-      if (morphK >= 1) this.morph = null;
-    }
-    const quads = [], NIB = -.65, HF = [-.4, -.13, .16, .41];
-    if (morphK >= 0 && morphK < 1) {
-      [this.btnRef, this.sndRef, this.libRef].forEach(r => { if (r.current) { r.current.style.opacity = '0'; r.current.style.pointerEvents = 'none'; } });
-      if (!this.grainP) this.grainP = ctx.createPattern(this.grainC, 'repeat');
-      ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = .35; ctx.fillStyle = this.grainP; ctx.fillRect(0, 0, W, H); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1; return;
-    }
-    const oldCut = this.oldPaths && T < 1.8 ? smooth(clamp(T / 1.6, 0, 1)) : -1; if (oldCut < 0) this.oldPaths = null;
-    let pidc = 0, inkPid = null, topPid = null; const runs = (this.oldPaths ? this.oldPaths.map(P => [P, 1]) : []).concat(this.paths.map(P => [P, 0]));
-    for (const [P, isOld] of runs) {
-      const tr = P.tr, L = P.L, dur = tr ? (1.6 + (P.len - P.oldLen) / 900) / L.spd : this.durOf(P), k = isOld ? 1 : clamp((T - (tr ? L.d * .6 : (P.d ?? L.d))) / dur, 0, 1); if ((k <= 0 && !tr) || (L.keep && G != null && !this.dest)) continue; const pid = ++pidc; if (L.keep && !isOld) inkPid = pid;
+    const quads = [], NIB = -.65, multi = MULTI.has(this.shapeName), hideLift = HIDE_LIFT.has(this.shapeName);
+    let pidc = 0, inkPid = null, topPid = null;
+    for (const P of this.paths) {
+      const tr = P.tr, L = P.L, dur = tr ? (1.6 + (P.len - P.oldLen) / 900) / L.spd : this.durOf(P), k = clamp((T - (tr ? L.d * .6 : (P.d ?? L.d))) / dur, 0, 1); if ((k <= 0 && !tr) || (L.keep && G != null && !this.dest)) continue; const pid = ++pidc; if (L.keep) inkPid = pid;
       // spring: red draws the cherry blossoms, the focus, so it is painted last and at full strength, over every other colour
-      if (!isOld && L === LINES[1] && this.shapeName === 'spring') topPid = pid;
+      if (L === LINES[1] && this.shapeName === 'spring') topPid = pid;
       const newL = P.len - P.entry, ek = tr ? easeIO(k) : 0, bodyL = tr ? P.oldLen + (newL - P.oldLen) * smooth(k) : 0;
-      const h = tr ? P.oldLen + (P.len - P.oldLen) * ek : P.len * easeIO(k), tEnd = (P.d ?? L.d) + dur, fin = isOld || tr ? 1 : smooth(clamp((T - tEnd) / 1.2, 0, 1));
-      const cut = isOld ? P.entry + (P.len - P.entry) * oldCut : tr ? h - bodyL - 1 : -1e9; P.cut0 = tr ? Math.max(0, P.s.findIndex(v => v >= cut)) : P.arc0 - 1;
+      const h = tr ? P.oldLen + (P.len - P.oldLen) * ek : P.len * easeIO(k), tEnd = (P.d ?? L.d) + dur, fin = tr ? 1 : smooth(clamp((T - tEnd) / 1.2, 0, 1));
+      const cut = tr ? h - bodyL - 1 : -1e9, hasCP = !!this.colorPaths[LINES.indexOf(L)]; P.cut0 = tr ? Math.max(0, P.s.findIndex(v => v >= cut)) : P.arc0 - 1;
       const pts = [], ws = [], as = [], zs = [], ss = [], dry = [];
       for (let i = 0; i < P.pts.length; i++) {
         // the tip (and a retreating tail) sit exactly where they should, between stored points, so slow motion glides instead of hopping a point at a time
         let s = P.s[i], pt = P.pts[i], tipEnd = false;
         if (s > h) { if (!i || P.s[i - 1] >= h) break; pt = lerpPt(P.pts[i - 1], pt, (h - P.s[i - 1]) / (s - P.s[i - 1])); s = h; tipEnd = true; }
         if (s < cut) { const s1 = P.s[i + 1]; if (s1 == null || s1 <= cut) continue; pt = lerpPt(pt, P.pts[i + 1], (cut - s) / (s1 - s)); s = cut; }
-        const behind = isOld ? 1e4 : h - s, isArc = i >= P.arc0 || (tr && !isOld), ue = clamp(s / P.entry, 0, 1), join = smooth(clamp((s - P.entry) / 120, 0, 1));
+        const behind = h - s, isArc = i >= P.arc0 || tr, ue = clamp(s / P.entry, 0, 1), join = smooth(clamp((s - P.entry) / 120, 0, 1));
         // arm (entry) stays like a tentacle while travelling, then retracts
         const tailP = -160 + (P.entry + 160) * fin; let a = isArc || tr ? 1 : clamp((s - tailP) / 160, 0, 1) * clamp(1 - Math.max(0, behind - P.entry * .9) / 200, 0, 1);
         const zE = -.4 + 1.2 * Math.sin(Math.PI * ue) + .25 * Math.sin(s * .02 + P.ph);
         const z = tr ? P.zA[i] : zE + (P.zA[i] - zE) * join, sc = L.keep || (!isArc && !tr) ? Math.pow(L.keep ? 2.4 : 2.6, z - (isArc ? .05 : 0)) : Math.max(.35, Math.pow(2.4, z));
         if (!L.keep || this.dest) a *= 1 - gone;
-        if (!isArc && !tr && !isOld) { const fo = smooth(clamp((T - tEnd + .6) / .8, 0, 1)), stub = L.keep ? smooth(clamp(1 - (P.entry - s) / 55, 0, 1)) : 0; a *= 1 - fo * (1 - stub); }
-        const onS = !isOld && !tr && (this.fromPts || this.fromDive || P.spawn);
+        if (!isArc && !tr) { const fo = smooth(clamp((T - tEnd + .6) / .8, 0, 1)), stub = L.keep ? smooth(clamp(1 - (P.entry - s) / 55, 0, 1)) : 0; a *= 1 - fo * (1 - stub); }
+        const onS = !tr && this.fromDive;
         const armW = isArc || tr ? 1 : onS ? .35 + .9 * smooth(clamp(ue / .3, 0, 1)) * (1 - .3 * ue) : .5 + 1.1 * (1 - ue);
         let w = L.w * sc * armW * P.cw[i] * Math.min(1, .5 + behind / 50) * (onS ? Math.min(1, .42 + s / 90) : Math.min(1, .45 + s / 70));
         if (onS && !isArc) a *= (.55 + .35 * ue) * clamp(s / 150, 0, 1);
         let dr = tr ? (1 - clamp((s - cut) / 120, 0, 1)) * .35 : isArc ? 0 : clamp((behind - P.entry * .6) / 300, 0, 1) * .7;
         if (tr) w *= Math.pow(clamp((s - cut) / 120, 0, 1), .65) / Math.min(1, .45 + s / 70);
-        if (isArc) { const TRV = tr && !isOld, E0 = TRV ? Math.max(0, cut) : P.entry, L0 = TRV ? h : P.len, ua = clamp((s - E0) / Math.max(1, L0 - E0), 0, 1), sa = clamp((s - E0) / 40, 0, 1); const press = ua < .04 ? .75 + .55 * smooth(ua / .04) : ua < .12 ? 1.3 - .3 * smooth((ua - .04) / .08) : 1; const multi = ['signature', 'hangul', 'maple', 'triskele', 'octopus', 'spring', 'frog', 'plane', 'onsen', 'mountain', 'muaythai', 'fox', 'gameboy', 'longfins', 'egg', 'samurai'].includes(this.shapeName), se = (L.keep ? P.len : L0) - s, hl = multi ? 50 : Math.min(150, (L0 - E0) * .4), harai = se < hl ? .42 + .58 * smooth(se / hl) : 1; w *= (L.keep ? press : 1) * (multi ? 1 : 1 - .12 * ua) * harai * (L.keep ? 1 : Math.sqrt(Math.max(.1, sa))); if (L.keep) { dr = multi ? smooth(clamp((70 - se) / 70, 0, 1)) * .6 : smooth(clamp((50 - se) / 50, 0, 1)) * .35; w *= 1 + this.hovT * .12; } else if (!L.page) dr = clamp((s - (L0 - 200)) / 200, 0, 1) * .8; }
-        if (P.wt[i] < (L.keep && this.shapeName === 'samurai' ? .5 : .2) || (this.colorPaths[LINES.indexOf(L)] && i >= P.arc0 && P.wt[i] < .5)) { a *= ['hangul', 'signature', 'maple', 'triskele', 'frog', 'spring', 'octopus', 'plane', 'onsen', 'mountain', 'muaythai', 'coffee', 'fox', 'gameboy', 'longfins', 'egg', 'samurai', 'wave'].includes(this.shapeName) ? 0 : .06; w *= .4; } else if (P.wt[i] < 1) a *= clamp(.25 + .75 * P.wt[i], 0, 1); if (isOld) { const tp = clamp((s - cut) / 120, 0, 1); w *= Math.pow(tp, .65); a *= Math.min(1, tp * 1.5); }
+        if (isArc) { const E0 = tr ? Math.max(0, cut) : P.entry, L0 = tr ? h : P.len, ua = clamp((s - E0) / Math.max(1, L0 - E0), 0, 1), sa = clamp((s - E0) / 40, 0, 1); const press = ua < .04 ? .75 + .55 * smooth(ua / .04) : ua < .12 ? 1.3 - .3 * smooth((ua - .04) / .08) : 1; const se = (L.keep ? P.len : L0) - s, hl = multi ? 50 : Math.min(150, (L0 - E0) * .4), harai = se < hl ? .42 + .58 * smooth(se / hl) : 1; w *= (L.keep ? press : 1) * (multi ? 1 : 1 - .12 * ua) * harai * (L.keep ? 1 : Math.sqrt(Math.max(.1, sa))); if (L.keep) { dr = multi ? smooth(clamp((70 - se) / 70, 0, 1)) * .6 : smooth(clamp((50 - se) / 50, 0, 1)) * .35; w *= 1 + this.hovT * .12; } else if (!L.page) dr = clamp((s - (L0 - 200)) / 200, 0, 1) * .8; }
+        if (P.wt[i] < (L.keep && this.shapeName === 'samurai' ? .5 : .2) || (hasCP && i >= P.arc0 && P.wt[i] < .5)) { a *= hideLift ? 0 : .06; w *= .4; } else if (P.wt[i] < 1) a *= clamp(.25 + .75 * P.wt[i], 0, 1);
         // page lines fade a little towards their start; not spring's red, whose start is the blossoms
         if (L.page && !(L === LINES[1] && this.shapeName === 'spring')) a = Math.min(1, a / .94) * (.62 + .38 * Math.pow(clamp(1 - (h - s) / 900, 0, 1), 1.2));
         else if (!L.keep && isArc) { const nh = smooth(clamp(1 - (h - s) / 220, 0, 1)); a *= (.72 + .28 * Math.pow(.5 + .5 * Math.sin(s * .006 + P.ph * 2.3), 1.5)) * (1 - nh) + nh; }
-        if (!L.keep && !isOld) { const nh = smooth(clamp(1 - (h - s) / 90, 0, 1)), wb = (L.w || 8) * .55; if (w < wb) w += (wb - w) * nh; }
+        if (!L.keep) { const nh = smooth(clamp(1 - (h - s) / 90, 0, 1)), wb = (L.w || 8) * .55; if (w < wb) w += (wb - w) * nh; }
         pts.push(pt); ws.push(w); as.push(clamp(a, 0, 1) * .94); zs.push(z); ss.push(s); dry.push(dr);
         if (tipEnd) break;
       }
       const n = pts.length; if (n < 2) continue;
-      if (!isOld) { this.heads = this.heads || {}; this.heads[L.keep ? 'ink' : L.page || 'c' + LINES.indexOf(L)] = { p: pts[n - 1], a: as[n - 1], w: ws[n - 1], col: L.col, t: T, set: smooth(clamp((T - tEnd + .4) / 1.0, 0, 1)) }; }
-      const col = `rgb(${L.col[0]},${L.col[1]},${L.col[2]})`, colL = `rgb(${L.col.map(v => Math.round(v + (255 - v) * .5)).join(',')})`, colDa = L.col.map(v => Math.round(v * .86)), colD = `rgb(${colDa.join(',')})`, N2 = [];
-      for (let i = 0; i < n; i++) { const q = pts[Math.min(n - 1, i + 1)], pr = pts[Math.max(0, i - 1)]; let tx = q[0] - pr[0], ty = q[1] - pr[1]; const tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl; N2.push([-ty, tx]); ws[i] *= L.keep && this.shapeName === 'signature' ? .2 + .62 * Math.pow(Math.max(0, ty), 1.4) + .06 * Math.abs(ty) + .42 * Math.pow(1 - Math.abs(ty), 4) : .72 + .28 * Math.abs(Math.sin(Math.atan2(ty, tx) - NIB)); if (!L.keep) as[i] *= clamp(.7 + .3 * ws[i] / (L.w * 1.3), .7, 1); }
+      this.heads = this.heads || {}; this.heads[L.keep ? 'ink' : L.page || 'c' + LINES.indexOf(L)] = { p: pts[n - 1], col: L.col, t: T, set: smooth(clamp((T - tEnd + .4) / 1.0, 0, 1)) };
+      const col = `rgb(${L.col[0]},${L.col[1]},${L.col[2]})`, N2 = [];
+      for (let i = 0; i < n; i++) { const q = pts[Math.min(n - 1, i + 1)], pr = pts[Math.max(0, i - 1)]; let tx = q[0] - pr[0], ty = q[1] - pr[1]; const tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl; N2.push([-ty, tx]); ws[i] *= .72 + .28 * Math.abs(Math.sin(Math.atan2(ty, tx) - NIB)); if (!L.keep) as[i] *= clamp(.7 + .3 * ws[i] / (L.w * 1.3), .7, 1); }
       if (L.keep && n > 4) { const ds2 = Math.max(.5, (ss[n - 1] - ss[0]) / (n - 1)), r2 = Math.max(1, Math.round(24 / ds2)); for (const arr of [dry, as]) for (let pass = 0; pass < 3; pass++) { const pre = [0]; for (let i = 0; i < n; i++) pre.push(pre[i] + arr[i]); const o = []; for (let i = 0; i < n; i++) { if (arr === as && arr[i] < .005) { o.push(0); continue; } const lo = Math.max(0, i - r2), hi = Math.min(n - 1, i + r2); o.push((pre[hi + 1] - pre[lo]) / (hi - lo + 1)); } for (let i = 0; i < n; i++) arr[i] = arr === as ? Math.min(o[i], arr[i] + .5) : o[i]; } }
       if (!L.keep && n > 4) { // blur opacity/width along the stroke so no step changes survive
         const ds = Math.max(.5, (ss[n - 1] - ss[0]) / (n - 1)), blur = (arr, px, keep0) => { const r = Math.max(1, Math.round(px / ds)); for (let pass = 0; pass < 2; pass++) { const pre = [0]; for (let i = 0; i < n; i++) pre.push(pre[i] + arr[i]); const o = arr.slice(); for (let i = 0; i < n; i++) { if (keep0 && arr[i] === 0) continue; const lo = Math.max(0, i - r), hi = Math.min(n - 1, i + r); o[i] = (pre[hi + 1] - pre[lo]) / (hi - lo + 1); } for (let i = 0; i < n; i++) arr[i] = o[i]; } };
         const a0 = as[0], a1 = as[n - 1]; blur(as, 28, false); blur(ws, 10, false); as[0] = Math.min(as[0], a0); as[n - 1] = Math.min(as[n - 1], a1);
       }
-      const quad = (i0, o0, i1, o1, hw0, hw1, a, z, cc, sub = 0, qb = 0) => { const p0 = pts[i0], p1 = pts[i1], n0 = N2[i0], n1 = N2[i1];
+      const quad = (i0, o0, i1, o1, hw0, hw1, a, z) => { const p0 = pts[i0], p1 = pts[i1], n0 = N2[i0], n1 = N2[i1];
         const c0 = [p0[0] + n0[0] * o0, p0[1] + n0[1] * o0], c1 = [p1[0] + n1[0] * o1, p1[1] + n1[1] * o1];
-        quads.push({ z, a, col: cc || col, rgb: sub === 1 ? colDa : L.col, brgb: L.col, base: sub === 1 ? qb : 0, pid, sub, mul: false, ink: !!L.keep, q: [[c0[0] - n0[0] * hw0, c0[1] - n0[1] * hw0], [c1[0] - n1[0] * hw1, c1[1] - n1[1] * hw1], [c1[0] + n1[0] * hw1, c1[1] + n1[1] * hw1], [c0[0] + n0[0] * hw0, c0[1] + n0[1] * hw0]] }); };
+        quads.push({ z, a, col, pid, ink: !!L.keep, q: [[c0[0] - n0[0] * hw0, c0[1] - n0[1] * hw0], [c1[0] - n1[0] * hw1, c1[1] - n1[1] * hw1], [c1[0] + n1[0] * hw1, c1[1] + n1[1] * hw1], [c0[0] + n0[0] * hw0, c0[1] + n0[1] * hw0]] }); };
       { const sw = smooth1(ws, 5), box = (arr, r) => { const c = [0]; for (let q = 1; q < n; q++) c[q] = c[q - 1] + (arr[q] + arr[q - 1]) / 2 * (ss[q] - ss[q - 1]); const o = []; let lo = 0, hi = 0; for (let q = 0; q < n; q++) { while (ss[lo] < ss[q] - r) lo++; if (hi < q) hi = q; while (hi < n - 1 && ss[hi + 1] <= ss[q] + r) hi++; const span = ss[hi] - ss[lo]; o.push(span > 1e-6 ? (c[hi] - c[lo]) / span : arr[q]); } return o; }, sa2 = box(box(as, 32), 32); for (let q = 0; q < n; q++) { ws[q] = sw[q]; as[q] = sa2[q] * smooth(clamp(sa2[q] / .25, 0, 1)); } }
       // each line's trail runs over the part you can see: from where its stroke begins (after the hidden lead-in it flew in on) to its tail
-      if (!isOld && this.fadeC) { const li = LINES.indexOf(L), x0 = tr ? ss[0] : Math.max(ss[0], P.entry), xl = Math.max(1, ss[n - 1] - x0); for (let q = 0; q < n; q++) as[q] *= this.fadeAt(li, clamp((ss[q] - x0) / xl, 0, 1)); }
-      const cap = (ci) => { const r = ws[ci] / 2, c = pts[ci], q = []; if (r < .6 || as[ci] < .02) return; for (let k3 = 0; k3 < 12; k3++) { const an = k3 / 12 * 6.2832; q.push([c[0] + Math.cos(an) * r, c[1] + Math.sin(an) * r]); } quads.push({ z: zs[ci], a: as[ci] * (1 - dry[ci] * .9), col, rgb: L.col, pid, sub: 9, mul: false, ink: !!L.keep, q }); };
+      if (this.fadeC) { const li = LINES.indexOf(L), x0 = tr ? ss[0] : Math.max(ss[0], P.entry), xl = Math.max(1, ss[n - 1] - x0); for (let q = 0; q < n; q++) as[q] *= this.fadeAt(li, clamp((ss[q] - x0) / xl, 0, 1)); }
+      const cap = (ci) => { const r = ws[ci] / 2, c = pts[ci], q = []; if (r < .6 || as[ci] < .02) return; for (let k3 = 0; k3 < 12; k3++) { const an = k3 / 12 * 6.2832; q.push([c[0] + Math.cos(an) * r, c[1] + Math.sin(an) * r]); } quads.push({ z: zs[ci], a: as[ci] * (1 - dry[ci] * .9), col, pid, ink: !!L.keep, q }); };
       cap(0); cap(n - 1);
       for (let i = 0; i < n - 1; i++) {
         if (as[i] < .005 || as[i + 1] < .005) continue; const a = (as[i] + as[i + 1]) / 2;
         const z = (zs[i] + zs[i + 1]) / 2, d = (dry[i] + dry[i + 1]) / 2, body = a * (1 - d * .9);
-        if (body > .005) { const b0 = as[i] * (1 - dry[i] * .9), b1 = as[i + 1] * (1 - dry[i + 1] * .9), kk = L.keep && (b0 < .9 || b1 < .9) ? Math.min(6, Math.max(1, Math.ceil(Math.abs(b1 - b0) / .02))) : 1; if (kk === 1) quad(i, 0, i + 1, 0, ws[i] / 2, ws[i + 1] / 2, body, z); else { const p0 = pts[i], p1 = pts[i + 1], n0 = N2[i], n1 = N2[i + 1], hw0 = ws[i] / 2, hw1 = ws[i + 1] / 2, L0 = [p0[0] - n0[0] * hw0, p0[1] - n0[1] * hw0], R0 = [p0[0] + n0[0] * hw0, p0[1] + n0[1] * hw0], L1 = [p1[0] - n1[0] * hw1, p1[1] - n1[1] * hw1], R1 = [p1[0] + n1[0] * hw1, p1[1] + n1[1] * hw1], lp = (A, B, u) => [A[0] + (B[0] - A[0]) * u, A[1] + (B[1] - A[1]) * u]; for (let s3 = 0; s3 < kk; s3++) { const u0 = s3 / kk, u1 = (s3 + 1) / kk; quads.push({ z, a: b0 + (b1 - b0) * (u0 + u1) / 2, col, rgb: L.col, brgb: L.col, base: 0, pid, sub: 0, mul: false, ink: !!L.keep, q: [lp(L0, L1, u0), lp(L0, L1, u1), lp(R0, R1, u1), lp(R0, R1, u0)] }); } } }
+        if (body > .005) { const b0 = as[i] * (1 - dry[i] * .9), b1 = as[i + 1] * (1 - dry[i + 1] * .9), kk = L.keep && (b0 < .9 || b1 < .9) ? Math.min(6, Math.max(1, Math.ceil(Math.abs(b1 - b0) / .02))) : 1; if (kk === 1) quad(i, 0, i + 1, 0, ws[i] / 2, ws[i + 1] / 2, body, z); else { const p0 = pts[i], p1 = pts[i + 1], n0 = N2[i], n1 = N2[i + 1], hw0 = ws[i] / 2, hw1 = ws[i + 1] / 2, L0 = [p0[0] - n0[0] * hw0, p0[1] - n0[1] * hw0], R0 = [p0[0] + n0[0] * hw0, p0[1] + n0[1] * hw0], L1 = [p1[0] - n1[0] * hw1, p1[1] - n1[1] * hw1], R1 = [p1[0] + n1[0] * hw1, p1[1] + n1[1] * hw1], lp = (A, B, u) => [A[0] + (B[0] - A[0]) * u, A[1] + (B[1] - A[1]) * u]; for (let s3 = 0; s3 < kk; s3++) { const u0 = s3 / kk, u1 = (s3 + 1) / kk; quads.push({ z, a: b0 + (b1 - b0) * (u0 + u1) / 2, col, pid, ink: !!L.keep, q: [lp(L0, L1, u0), lp(L0, L1, u1), lp(R0, R1, u1), lp(R0, R1, u0)] }); } } }
       }
     }
 
@@ -849,7 +789,7 @@ class Component extends DCLogic {
       // once a surface line has lifted off its right end towards its dot, the surface carries on out past the right edge, as on the Freediving page
       if (X.k <= 2 && X.f1 != null) { if (X.tB == null && hh >= sl[X.f1] + 40) X.tB = G;
         if (X.tB != null) { const e0 = all[X.f1], xr = e0[0] + (W + 20 - e0[0]) * smooth(clamp((G - X.tB) / .5, 0, 1)), ep = [e0];
-          for (let x = Math.ceil((e0[0] + 1) / 9) * 9; x < xr; x += 9) ep.push([x, SY + this.waveY(x - LX, X.k, 0)]); if (xr > e0[0] + 1) ep.push([xr, SY + this.waveY(xr - LX, X.k, 0)]);
+          for (let x = Math.ceil((e0[0] + 1) / 9) * 9; x < xr; x += 9) ep.push([x, SY + waveY(x - LX, X.k, 0)]); if (xr > e0[0] + 1) ep.push([xr, SY + waveY(xr - LX, X.k, 0)]);
           // width keeps the line's own rhythm, measured along the stroke, so the join doesn't show
           let se = sl[X.f1]; for (let i = 0; i < ep.length - 1; i++) { const q0 = ep[i], q1 = ep[i + 1], dd = Math.hypot(q1[0] - q0[0], q1[1] - q0[1]) || 1, nx = -(q1[1] - q0[1]) / dd, ny = (q1[0] - q0[0]) / dd, tipR = Math.sqrt(clamp((xr - q1[0]) / 26, .04, 1)), hw0 = X.tw * (.84 + .16 * Math.sin(se * .045)) / 2, hw1 = X.tw * (.84 + .16 * Math.sin((se += dd) * .045)) / 2 * (xr >= W + 19 ? 1 : tipR);
             quads.push({ z: -1.95 + (X.ink ? .02 : 0), a: X.ta, col, rgb: X.col, pid, sub: 0, mul: !X.ink, q: [[q0[0] - nx * hw0, q0[1] - ny * hw0], [q1[0] - nx * hw1, q1[1] - ny * hw1], [q1[0] + nx * hw1, q1[1] + ny * hw1], [q0[0] + nx * hw0, q0[1] + ny * hw0]] }); } } }
@@ -930,7 +870,7 @@ class Component extends DCLogic {
     // the buoy and flag fill with colour from where their lines arrive, outline drawing in with it, matching the Freediving buoy exactly
     if (G != null && !this.dest && this.exits) { const BS = clamp(W / 900, .75, 1), Xb = this.exits.find(x => x.k === 3), Xf = this.exits.find(x => x.k === 4);
       const kB = Xb && Xb.tA != null ? smooth(clamp((G - Xb.tA) / .6, 0, 1)) : 0, kF = Xf && Xf.tA != null ? smooth(clamp((G - Xf.tA) / .5, 0, 1)) : 0, kP = Math.max(kF, Xb && Xb.tA != null ? smooth(clamp((G - Xb.tA - .35) / .5, 0, 1)) : 0);
-      if (kB > 0 || kF > 0) { ctx.save(); ctx.translate(LX, SY + this.waveY(0, 0, 0) - 2); ctx.scale(BS, BS); ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.globalAlpha = 1;
+      if (kB > 0 || kF > 0) { ctx.save(); ctx.translate(LX, SY + waveY(0, 0, 0) - 2); ctx.scale(BS, BS); ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.globalAlpha = 1;
         if (kP > 0) { ctx.strokeStyle = '#141414'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(0, -12); ctx.lineTo(0, -12 - 34 * kP); ctx.stroke(); }
         if (kF > 0) { ctx.save(); ctx.beginPath(); ctx.arc(1, -39, 27 * kF, 0, 6.2832); ctx.clip(); ctx.fillStyle = 'rgb(232,34,44)'; ctx.fillRect(0, -46, 22, 14);
           ctx.strokeStyle = '#f6efe0'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(1.8, -44.2); ctx.lineTo(20.2, -33.8); ctx.stroke(); ctx.restore();
@@ -946,7 +886,7 @@ class Component extends DCLogic {
     if (G != null && this.navFrom) ['sound', 'library', 'c4', 'c5', 'c6', 'freediving', 'ink'].forEach((k, i) => { const f = this.navFrom[k]; if (!f) return; const toSnd = /\/sound\//.test(this.dest || ''), P0 = f.p, kk = easeIO(clamp((G - .15 - i * .07) / 1.4, 0, 1));
       // to Sound each dot waits where it is while the strokes fade (Sound then drops it onto its beat pad); anywhere else it rises to the menu at the top
       if (toSnd) { ctx.globalAlpha = 1; ctx.fillStyle = `rgb(${f.col[0]},${f.col[1]},${f.col[2]})`; ctx.beginPath(); ctx.arc(P0[0], P0[1], /^c\d/.test(k) ? 5.5 : 8, 0, 6.2832); ctx.fill(); return; }
-      const P1 = toSnd ? sndDrop(k, W, H) : navAt(W, k), C1 = toSnd ? [P0[0], P0[1] + (P1[1] - P0[1]) * .45] : [P0[0], P0[1] - 90], C2 = toSnd ? [P1[0], P1[1] - 90] : [P1[0], P1[1] + 70], bz = u => { const a = (1 - u) ** 3, b = 3 * (1 - u) ** 2 * u, c = 3 * (1 - u) * u * u, d = u ** 3; return [a * P0[0] + b * C1[0] + c * C2[0] + d * P1[0], a * P0[1] + b * C1[1] + c * C2[1] + d * P1[1]]; };
+      const P1 = toSnd ? sndDrop(k, W, H) : navAt(W, k), C1 = toSnd ? [P0[0], P0[1] + (P1[1] - P0[1]) * .45] : [P0[0], P0[1] - 90], C2 = toSnd ? [P1[0], P1[1] - 90] : [P1[0], P1[1] + 70], bz = u => cubicAt(P0, C1, C2, P1, u);
       const col = `rgb(${f.col[0]},${f.col[1]},${f.col[2]})`, tail = Math.max(0, kk - .35); ctx.strokeStyle = col; ctx.lineCap = 'round';
       for (let q = 0; q < 24; q++) { const u0 = tail + (kk - tail) * q / 24, u1 = tail + (kk - tail) * (q + 1) / 24, a0 = bz(u0), a1 = bz(u1); ctx.globalAlpha = .85 * (q / 24) * Math.sin(Math.PI * Math.min(1, kk * 1.15)); ctx.lineWidth = 1.5 + 3.5 * q / 24; ctx.beginPath(); ctx.moveTo(a0[0], a0[1]); ctx.lineTo(a1[0], a1[1]); ctx.stroke(); }
       const p = bz(kk); ctx.globalAlpha = 1; ctx.fillStyle = col; ctx.beginPath(); ctx.arc(p[0], p[1], 7 + (/^c\d/.test(k) ? -1.5 : 1) * kk, 0, 6.2832); ctx.fill(); });
@@ -964,7 +904,7 @@ class Component extends DCLogic {
   // the black dot. With a mouse, hovering fades the coloured lines and a click shuffles. On a touch screen (no hover) it takes two taps: the
   // first fades the coloured lines, the second shuffles, and the new symbol comes in with every line showing; a tap anywhere else undoes the first
   inkTap = e => {
-    const touch = typeof matchMedia !== 'undefined' && matchMedia('(hover: none)').matches;
+    const touch = isTouch();
     if (!touch) { this.shuffle(); return; }
     const disarm = () => { this.inkArmed = false; this.hovI = 0; if (this.offInk) { document.removeEventListener('pointerdown', this.offInk, true); this.offInk = null; } };
     if (!this.inkArmed) { this.inkArmed = true; this.hovI = 1;

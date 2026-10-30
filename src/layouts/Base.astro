@@ -1,4 +1,5 @@
 ---
+import { BASE } from '../lib/base.js';
 interface Props { title: string; noindex?: boolean }
 const { title, noindex } = Astro.props;
 ---
@@ -9,7 +10,10 @@ const { title, noindex } = Astro.props;
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     {noindex && <meta name="robots" content="noindex" />}
-    <link rel="icon" href={`${import.meta.env.BASE_URL.replace(/\/?$/, '/')}favicon.svg`} type="image/svg+xml" />
+    <link rel="icon" href={`${BASE}favicon.svg`} type="image/svg+xml" />
+    <!-- every page's fonts come from Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <slot name="head" />
     <script is:inline>
       // The pages animate their way out before navigating. When Back restores one from the back-forward cache

@@ -2,29 +2,22 @@
 // The logic class is the design's own code; View is its template as JSX.
 import React from 'react';
 import { DCLogic, page, sty, BASE, assetUrl } from '../lib/dc.js';
-import { squid, squidCells, SQUID_W, SQUID_H, SQUID_IDLES, SQUID_REACTS, SQUID_MOVES, SQUID_SLOW, SQUID_FAST } from '../lib/squid.js';
+import { squid, squidCells, SQUID_W, SQUID_H, SQUID_REACTS, SQUID_MOVES, SQUID_SLOW, SQUID_FAST } from '../lib/squid.js';
 import { deckGeo, deckGeoV, deckScale, isPhone, DECK_KEYS, padOf } from '../lib/deck.js';
+import { handNavFrom, takeNavFrom, leaveTo } from '../lib/nav.js';
 import SOUND from '../data/sound.json';
 const KINDS_OK = ['field', 'voice', 'music'];
 
-const PAGE = 'sound';
-const COL = [232, 34, 44];
 const HOME = BASE + '?from=dive';
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const smooth = x => x * x * (3 - 2 * x);
 const easeIO = k => .5 - .5 * Math.cos(Math.PI * k);
 const rng = s => () => { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 const TAU = Math.PI * 2;
-// each kind of piece has its own colour, from the site's palette; tint is the pale version the haze style glows in
-const KINDS = { field: { label: 'Field', cs: 'rgb(22,168,82)', tint: 'rgb(170,232,196)' }, music: { label: 'Music', cs: 'rgb(232,34,44)', tint: 'rgb(255,172,168)' }, voice: { label: 'Voice', cs: 'rgb(138,64,214)', tint: 'rgb(212,186,248)' } };
-// two art directions. many: the wave is built of hundreds of small coloured pieces, like cut paper set in layers of glass.
-// haze: a cold misty ground with grain and drifting light, and the wave as thin glowing lines
-const THEMES = {
-  many: { bg: '#0e1117', ink: '#f3efe6', muted: '#a9a49a', disp: "'Newsreader', Georgia, serif", dispStyle: 'italic', dispW: 300, dispCase: 'none', dispLs: '-0.025em', body: "'Newsreader', Georgia, serif", neutral: '#e9e3d6', grain: .16, dispSize: 'min(clamp(56px, 9vw, 112px), 14vh)', labBg: 'transparent', labPad: '0', labRad: '0', labSh: 'none', listBg: 'transparent', listPad: '0', listRad: '0', trSize: 'clamp(18px, 2.8vh, 22px)', trCase: 'none', trLs: 'normal', chipPad: '6px 0' },
-  haze: { bg: '#2a3036', ink: '#f4f6f7', muted: '#c9d1d7', disp: "'Six Caps', 'Hanken Grotesk', sans-serif", dispStyle: 'normal', dispW: 400, dispCase: 'uppercase', dispLs: '0.01em', body: "'Hanken Grotesk', system-ui, sans-serif", neutral: '#eef3f6', grain: .34, dispSize: 'min(clamp(56px, 9vw, 112px), 14vh)', labBg: 'transparent', labPad: '0', labRad: '0', labSh: 'none', listBg: 'transparent', listPad: '0', listRad: '0', trSize: 'clamp(18px, 2.8vh, 22px)', trCase: 'none', trLs: 'normal', chipPad: '6px 0' },
-  // stark: pale grey ground, black lines, white label strips with black type
-  stark: { bg: '#dfdfdc', ink: '#0c0c0c', muted: '#45474a', disp: "'Michroma', 'Hanken Grotesk', sans-serif", dispStyle: 'normal', dispW: 400, dispCase: 'uppercase', dispLs: '0.02em', body: "'JetBrains Mono', monospace", neutral: '#0c0c0c', grain: .12, dispSize: 'min(clamp(36px, 5.6vw, 72px), 9vh)', labBg: '#f7f7f5', labPad: '.3em .5em .24em', labRad: '.14em', labSh: '0 1px 2px rgba(0,0,0,.14)', listBg: '#f7f7f5', listPad: '2px 14px', listRad: '4px', trSize: '13px', trCase: 'uppercase', trLs: '.04em', chipPad: '5px 9px' }
-};
+// each kind of piece has its own colour, from the site's palette
+const KINDS = { field: { cs: 'rgb(22,168,82)' }, music: { cs: 'rgb(232,34,44)' }, voice: { cs: 'rgb(138,64,214)' } };
+// the look: pale grey ground, black lines, white label strips with black type
+const THEME = { bg: '#dfdfdc', ink: '#0c0c0c', muted: '#45474a', disp: "'Michroma', 'Hanken Grotesk', sans-serif", dispStyle: 'normal', dispW: 400, dispCase: 'uppercase', dispLs: '0.02em', body: "'JetBrains Mono', monospace", neutral: '#0c0c0c', grain: .12, dispSize: 'min(clamp(36px, 5.6vw, 72px), 9vh)', labBg: '#f7f7f5', labPad: '.3em .5em .24em', labRad: '.14em', labSh: '0 1px 2px rgba(0,0,0,.14)', listBg: '#f7f7f5', listPad: '2px 14px', listRad: '4px', trSize: '13px', trCase: 'uppercase', trLs: '.04em', chipPad: '5px 9px' };
 // the cut-paper colours mixed in among a piece's own colour
 const PAL = ['rgb(232,34,44)', 'rgb(255,196,0)', 'rgb(24,88,224)', 'rgb(255,118,18)', 'rgb(22,168,82)', 'rgb(138,64,214)', 'rgb(244,138,172)', 'rgb(233,227,214)', 'rgb(110,200,230)'];
 // the paper inks the deck's lit edge picks from (all the wave's colours but the cream)
@@ -51,7 +44,6 @@ const SILENT_WAV = 'data:audio/wav;base64,UklGRuwAAABXQVZFZm10IBAAAAABAAEARKwAAI
 // when pad i is fully formed. The controller's fold-out is timed from these too
 const DOT_OPEN = { t0: 1.45, step: .06, dur: .35 }, padReady = i => DOT_OPEN.t0 + i * DOT_OPEN.step + DOT_OPEN.dur;
 const pad2 = n => String(n).padStart(2, '0');
-const fmtDate = iso => { const d = new Date(iso + 'T12:00:00'); return isNaN(d) ? iso : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); };
 const fmtDur = s => Math.floor(s / 60) + ':' + pad2(Math.floor(s % 60));
 const hash = s => { let h = 2166136261; for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619); return h >>> 0; };
 // a piece's loudness over its length, 0..1 at N_ENV points: swells for field recordings, sections and beats for music, phrases and pauses for voice
@@ -69,16 +61,15 @@ function envFromBuf(buf) { const d = buf.getChannelData(0), e = new Float32Array
   for (let i = 0; i < N_ENV; i++) e[i] = .04 + .9 * e[i] / mx; return e; }
 const envAt = (e, u) => { const x = clamp(u, 0, 1) * (e.length - 1), i = Math.floor(x), f = x - i; return e[i] * (1 - f) + e[Math.min(e.length - 1, i + 1)] * f; };
 // an album's pieces end to end, for the resting wave, and which piece sits at each point of it
-const mixOf = tracks => { const tot = tracks.reduce((s, t) => s + t.dur, 0), e = new Float32Array(N_ENV); for (let i = 0; i < N_ENV; i++) { let u = i / (N_ENV - 1) * tot, k = 0; while (k < tracks.length - 1 && u > tracks[k].dur) { u -= tracks[k].dur; k++; } e[i] = envAt(tracks[k].env, u / tracks[k].dur); } return e; };
 const kindAt = (tracks, u) => { const tot = tracks.reduce((s, t) => s + t.dur, 0); let v = u * tot, k = 0; while (k < tracks.length - 1 && v > tracks[k].dur) { v -= tracks[k].dur; k++; } return tracks[k].kind; };
 const SCALE = [0, 2, 4, 7, 9, 12, 14, 16];
 const VOWELS = [[730, 1090], [270, 2290], [300, 870], [530, 1840], [660, 1720], [440, 1020]];
-// pieces per half-column in the many style
+// pieces per half-column of the wave
 const FK = 20;
 
 class Component extends DCLogic {
-  state = { navHov: null, album: 0, hover: null, playing: null, paused: false, W: 1200, H: 800 };
-  canvasRef = React.createRef(); contentRef = React.createRef(); rootRef = React.createRef(); flapA = React.createRef(); flapB = React.createRef(); wheelRef = React.createRef();
+  state = { album: 0, playing: null, paused: false, W: 1200, H: 800 };
+  canvasRef = React.createRef(); rootRef = React.createRef(); flapA = React.createRef(); flapB = React.createRef(); wheelRef = React.createRef();
   wvOf() { return innerWidth; }
   seek(u) { const c = this.cur; if (!c) return; const off = clamp(u, 0, 1) * c.tr.dur; if (c.paused) { c.off = off; this.forceUpdate(); } else this.play(c.tr, off); }
   // arriving from another page, once the dots have become faders the page tunes in like a radio finding its station:
@@ -111,7 +102,7 @@ class Component extends DCLogic {
   // real dial: the pointer leans toward the hand, then snaps to the next number with a click), click a number to turn straight to it, or
   // scroll over it. Set to 5 2 3 8 6 9 they open something (still to come: see onCombo)
   knobV = [0, 0, 0, 0, 0, 0];
-  setKnob(i, v) { v = ((v % 10) + 10) % 10; const old = this.knobV[i]; if (old === v) return; this.knobV[i] = v; this.knobAt = this.knobAt || []; this.knobAt[i] = this.t;
+  setKnob(i, v) { v = ((v % 10) + 10) % 10; const old = this.knobV[i]; if (old === v) return; this.knobV[i] = v;
     this.knobKick = this.knobKick || []; this.knobKick[i] = { t: this.t, d: v > old ? 1 : -1 }; this.knobClick(); try { if (navigator.vibrate && matchMedia('(pointer: coarse)').matches) navigator.vibrate(4); } catch (e) {}
     if (this.knobV.join('') === '523869') this.onCombo(); }
   // the combination is set. What it opens is still to be decided; for now every number stays lit while it is set, so you can tell
@@ -119,7 +110,7 @@ class Component extends DCLogic {
   // each hit on the spare pad: a kick drum, a sine that drops from a punchy click to a low thump, through the deck's volume
   // (straight into the volume, not the analyser, so it doesn't move the piece's wave or the squid's tempo; timed on its own clock, which the page's
   // never resets)
-  spareHit = () => { this.spareAt = performance.now() / 1000; this.spareN = (this.spareN || 0) + 1;
+  spareHit = () => { this.spareAt = performance.now() / 1000;
     try { this.ensureAC(); const ac = this.ac, now = ac.currentTime, o = ac.createOscillator(), g = ac.createGain(), c = ac.createOscillator(), cg = ac.createGain();
       o.type = 'sine'; o.frequency.setValueAtTime(160, now); o.frequency.exponentialRampToValueAtTime(48, now + .12); o.frequency.exponentialRampToValueAtTime(38, now + .45);
       g.gain.setValueAtTime(0, now); g.gain.linearRampToValueAtTime(.9, now + .004); g.gain.exponentialRampToValueAtTime(.001, now + .5); o.connect(g); g.connect(this.vol); o.start(now); o.stop(now + .52);
@@ -178,7 +169,6 @@ class Component extends DCLogic {
     this.kBpm += (tgt - this.kBpm) * Math.min(1, dt * .8); return this.kBpm; }
   playBtn = () => { if (this.cur) this.toggle(); else this.play(this.albums[this.state.album].tracks[0]); };
   // cue: back to the start of the piece (a paused piece stays paused there)
-  cueBtn = () => { const c = this.cur; if (!c) return; if (c.paused) { c.off = 0; this.forceUpdate(); } else this.play(c.tr, 0); };
   // faders can be pushed up and down; Sound's is the volume
   // the volume fader beside the screen
   volDown = e => { if (e.button) return; e.preventDefault(); const set = y => { const G = deckGeo(innerWidth, innerHeight); this.volHold = clamp(y - (this.deckSY || 0), G.lo, G.hi); };
@@ -190,16 +180,14 @@ class Component extends DCLogic {
   // the squid's pixel size on the screen: as big as the strip allows
   sqPx(G) { return G.phone || G.scr[2] < 320 ? 2.5 : 3; }
   rowsOf(G) { const [sx, sy, sw, sh] = G.scr, ex = this.stripEx(G), n = this.albums[this.state.album].tracks.length, top = sy + 66 + ex, rh = clamp((sh - 70 - ex) / Math.max(1, n), 15, 44); return Array.from({ length: n }, (_, k) => [sx + 4, top + k * rh, sw - 8, rh]); }
-  t = 0; live = 0; mx = 0; pf = 0; labs = {}; S = [0, 1, 2, 3, 4, 5, 6, 7].map(() => ({ on: 0, k: 0, yp: 300, y0: 300, tp: -9 }));
-  albums = ALBUMS.map((a, ai) => { const tracks = a.tracks.map((tr, ti) => ({ ...tr, id: ai + '-' + ti, ai, ti, env: envOf(tr) })); return { ...a, tracks, mix: mixOf(tracks) }; });
-  strip = false;
-  get look() { const s = this.props.style ?? 'stark'; return THEMES[s] ? s : 'stark'; }
+  t = 0; live = 0; mx = 0; S = Array.from({ length: 8 }, () => ({ k: 0 }));
+  albums = ALBUMS.map((a, ai) => { const tracks = a.tracks.map((tr, ti) => ({ ...tr, id: ai + '-' + ti, ai, ti, env: envOf(tr) })); return { ...a, tracks }; });
   componentDidMount() {
     // arriving from Home or Freediving: their menu dots are handed over and fly in to become this page's faders
-    if (/from=page/.test(location.search)) try { const nf = JSON.parse(sessionStorage.getItem('nav-from') || 'null'); if (nf) this.arr = { nf }; sessionStorage.removeItem('nav-from'); } catch (e) {}
+    if (/from=page/.test(location.search)) { const nf = takeNavFrom(); if (nf) this.arr = { nf }; }
     const r = rng(7), gc = document.createElement('canvas'); gc.width = gc.height = 220;
     { const x = gc.getContext('2d'), im = x.createImageData(220, 220); for (let i = 0; i < im.data.length; i += 4) { const v = 128 + (r() - .5) * 150; im.data[i] = im.data[i + 1] = im.data[i + 2] = v; im.data[i + 3] = 255; } x.putImageData(im, 0, 0); }
-    this.grainC = gc; this.lc = document.createElement('canvas');
+    this.grainC = gc;
     this.setState({ W: innerWidth, H: innerHeight });
     this.onResize = () => this.setState({ W: innerWidth, H: innerHeight });
     // one album per scroll gesture: a gesture is armed after a short pause in wheel events and fires once it has moved far enough
@@ -214,11 +202,15 @@ class Component extends DCLogic {
     const onExit = e => e.target && e.target.closest && e.target.closest('[data-full-exit]');
     // near the playhead (within 9px): grab it and drag; a playing piece jumps along every few frames, like dragging tape
     this.nearHead = x => { const c = this.cur; return !!c && x != null && Math.abs(x - this.posOf() / c.tr.dur * this.wvOf()) < 9; };
+    // a drag moves the playhead to x on a waveform W wide: a playing piece jumps along every few frames (seeking with the scrub set aside, so
+    // the seek lands), and letting go seeks to where it ended
+    this.scrubTo = (x, W) => { this.scrub.x = x; const now = performance.now(), c = this.cur;
+      if (c && !c.paused && now - (this.scrub.at || 0) > 70) { this.scrub.at = now; const sc = this.scrub; this.scrub = null; this.seek(sc.x / W); this.scrub = sc; } };
+    this.scrubEnd = W => { const u = this.scrub.x / W; this.scrub = null; this.scrubAt = performance.now(); this.seek(u); };
     this.onFDown = e => { if (!this.focus || this.fK < .5 || e.button || onExit(e) || !this.nearHead(e.clientX)) return; e.preventDefault(); this.scrub = { x: e.clientX };
-      const mv = ev => { this.scrub.x = clamp(ev.clientX, 0, this.wvOf()); this.fmx = ev.clientX; this.fMove = performance.now(); const now = performance.now(), c = this.cur;
-        if (c && !c.paused && now - (this.scrub.at || 0) > 70) { this.scrub.at = now; const sc = this.scrub; this.scrub = null; this.seek(sc.x / this.wvOf()); this.scrub = sc; } };
-      const up = () => { removeEventListener('pointermove', mv); removeEventListener('pointerup', up); const u = this.scrub.x / this.wvOf(); this.scrub = null; this.scrubAt = performance.now(); this.seek(u); };
-      addEventListener('pointermove', mv); addEventListener('pointerup', up); };
+      const mv = ev => { this.fmx = ev.clientX; this.fMove = performance.now(); this.scrubTo(clamp(ev.clientX, 0, this.wvOf()), this.wvOf()); };
+      const up = () => { removeEventListener('pointermove', mv); removeEventListener('pointerup', up); removeEventListener('pointercancel', up); this.scrubEnd(this.wvOf()); };
+      addEventListener('pointermove', mv); addEventListener('pointerup', up); addEventListener('pointercancel', up); };
     // on a phone (which has no play button) a tap anywhere above the deck plays and pauses, or starts the album's first piece; taps on controls,
     // links, the menu and the deck, or just after a drag, are left alone
     const phoneTarget = e => { if (this.focus || !isPhone(innerWidth, innerHeight) || e.clientY >= deckGeo(innerWidth, innerHeight).y0 + (this.deckSY || 0)) return false;
@@ -230,10 +222,9 @@ class Component extends DCLogic {
       const x0 = e.clientX, y0 = e.clientY, W0 = this.wvOf(), u0 = clamp(this.posOf() / this.cur.tr.dur, 0, 1); let drag = false;
       const mv = ev => { const dx = ev.clientX - x0, dy = ev.clientY - y0;
         if (!drag) { if (Math.abs(dx) < 10 || Math.abs(dx) < Math.abs(dy)) return; drag = true; this.ty = null; this.scrub = { x: u0 * W0 }; }
-        this.scrub.x = clamp(u0 + dx / W0, 0, 1) * W0; const now = performance.now(), c = this.cur;
-        if (c && !c.paused && now - (this.scrub.at || 0) > 70) { this.scrub.at = now; const sc = this.scrub; this.scrub = null; this.seek(sc.x / W0); this.scrub = sc; } };
+        this.scrubTo(clamp(u0 + dx / W0, 0, 1) * W0, W0); };
       const up = () => { removeEventListener('pointermove', mv); removeEventListener('pointerup', up); removeEventListener('pointercancel', up);
-        if (!drag || !this.scrub) return; const u = this.scrub.x / W0; this.scrub = null; this.scrubAt = performance.now(); this.seek(u); };
+        if (drag && this.scrub) this.scrubEnd(W0); };
       addEventListener('pointermove', mv); addEventListener('pointerup', up); addEventListener('pointercancel', up); };
     this.onFClick = e => { if (!this.focus || performance.now() - (this.fAt || 0) < 400 || onExit(e) || performance.now() - (this.scrubAt || 0) < 350 || this.nearHead(e.clientX)) return; if (this.cur) this.toggle(); };
     this.onTS = e => { this.ty = e.touches[0].clientY; }; this.onTE = e => { if (this.ty == null) return; const dy = this.ty - e.changedTouches[0].clientY; this.ty = null; if (Math.abs(dy) > 50) this.step(dy > 0 ? 1 : -1); };
@@ -241,15 +232,13 @@ class Component extends DCLogic {
     addEventListener('resize', this.onResize); addEventListener('wheel', this.onWheel, { passive: true }); addEventListener('keydown', this.onKey); document.addEventListener('fullscreenchange', this.onFsc); addEventListener('pointermove', this.onFMove); addEventListener('click', this.onFClick); addEventListener('click', this.onWClick); addEventListener('pointerdown', this.onFDown); addEventListener('pointerdown', this.onPDown); addEventListener('touchstart', this.onTS, { passive: true }); addEventListener('touchend', this.onTE); addEventListener('pointermove', this.onPM);
     // pieces with a file: decode it for its real waveform and length
     this.albums.forEach(a => a.tracks.forEach(tr => { if (!tr.src) return; const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext; if (!OAC) return;
-      fetch(tr.src).then(res => res.arrayBuffer()).then(b => new OAC(1, 1, 44100).decodeAudioData(b)).then(buf => { tr.buf = buf; tr.dur = buf.duration; tr.env = envFromBuf(buf); a.mix = mixOf(a.tracks); this.forceUpdate(); }).catch(() => {}); }));
+      fetch(tr.src).then(res => res.arrayBuffer()).then(b => new OAC(1, 1, 44100).decodeAudioData(b)).then(buf => { tr.buf = buf; tr.dur = buf.duration; tr.env = envFromBuf(buf); this.forceUpdate(); }).catch(() => {}); }));
     if (import.meta.env.DEV) window.__sound = this; // a handle for checking the page in development; not in the built site
     this.raf = requestAnimationFrame(this.tick);
   }
   componentWillUnmount() { this.mediaOff(); cancelAnimationFrame(this.raf); removeEventListener('resize', this.onResize); removeEventListener('wheel', this.onWheel); removeEventListener('keydown', this.onKey); document.removeEventListener('fullscreenchange', this.onFsc); removeEventListener('pointermove', this.onFMove); removeEventListener('click', this.onFClick); removeEventListener('click', this.onWClick); removeEventListener('pointerdown', this.onFDown); removeEventListener('pointerdown', this.onPDown); removeEventListener('touchstart', this.onTS); removeEventListener('touchend', this.onTE); removeEventListener('pointermove', this.onPM); this.stopNodes(); try { this.ac && this.ac.close(); } catch (e) {} }
-  componentDidUpdate(prev) { if (prev.style !== this.props.style) { this.t = 0; this.disp = null; this.listBottom = 0; } }
   step(d) { this.goAlbum(this.state.album + d)(); }
-  goAlbum = a => () => { a = clamp(a, 0, this.albums.length - 1); if (a === this.state.album) return; this.albDir = a > this.state.album ? 1 : -1; if (this.strip && this.cur) this.stop(); this.flipPrev = this.state.album; this.flipT0 = this.t; this.setState({ album: a, hover: null }); };
-  trById(id) { const [a, b] = id.split('-').map(Number); return this.albums[a].tracks[b]; }
+  goAlbum = a => () => { a = clamp(a, 0, this.albums.length - 1); if (a === this.state.album) return; this.albDir = a > this.state.album ? 1 : -1; this.flipPrev = this.state.album; this.flipT0 = this.t; this.setState({ album: a }); };
   // ---- sound
   // iPhones mute Web Audio while the ring / silent switch is on (but not media playback), so while a piece plays the page says it is playing
   // media: Safari 17+ takes navigator.audioSession, older ones switch over while an <audio> element plays alongside (a silent loop). Only for
@@ -297,7 +286,6 @@ class Component extends DCLogic {
     let lv = e; if (N.file || N.f || N.lead || N.saw) { this.an.getFloatTimeDomainData(this.anBuf); let s = 0; for (let i = 0; i < this.anBuf.length; i++) s += this.anBuf[i] * this.anBuf[i]; lv = clamp(Math.sqrt(s / this.anBuf.length) * 6, 0, 1); }
     this.live += (lv - this.live) * (1 - Math.exp(-(this.dtF || 1 / 60) * 21.4)); }   // by the clock (.3 a frame at 60fps)
   // ---- nav (same as the other pages)
-  dotOf(k) { const d = document.querySelector('[data-navk="' + k + '"] [data-navdot]'); if (!d) return null; const r = d.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }
   // kind: 'home' (faders turn back into dots and the panel slides away, Home picks the dots up), 'dive' (the same, and Freediving picks them up:
   // they draw its water's surface lines, then go up into its menu), 'library' (the same, and the Library's books open out of them), 'other'
   // (plain fade)
@@ -310,7 +298,7 @@ class Component extends DCLogic {
     const dt = Math.min(.05, (now - (this.last || now)) / 1000); this.last = now; this.t += dt; this.dtF = dt;
     if (this.arr && (this.t > 4.5 || this.out)) this.arr = null;
     if (this.out) { this.out.t += dt; const lim = this.out.k !== 'other' ? 1.25 : .55;
-      if (this.out.t > lim && !this.left) { this.left = true; if (this.out.k !== 'other') try { const o = { ...(this.dotPos || {}) }; o.ink = o.home; sessionStorage.setItem('nav-from', JSON.stringify(o)); } catch (x) {} (window.__leave || (h => { location.href = h; }))(this.out.href); } }
+      if (this.out.t > lim && !this.left) { this.left = true; if (this.out.k !== 'other') handNavFrom({ ...(this.dotPos || {}) }); leaveTo(this.out.href); } }
     this.mx += ((this.mxT || 0) - this.mx) * Math.min(1, dt * 3);
     // the volume fader sets the master gain; squared, so the fader moves through loudness the way the ear hears it (half way down is half as loud)
     if (this.vol) this.vol.gain.setTargetAtTime(Math.pow(this.volume ?? 1, 2), this.ac.currentTime, .05);
@@ -392,12 +380,11 @@ class Component extends DCLogic {
     // on a narrow screen the deck is drawn at its own size and scaled down to fit (see deckScale); W, H and G here are in its own units
     const ds = deckScale(Ws, Hs), W = Ws / ds, H = Hs / ds, dcs = this.dotsCtx; if (ds < 1) { ctx.save(); ctx.scale(ds, ds); if (dcs) { dcs.save(); dcs.scale(ds, ds); } }
     const AC = this.accent(), NEON_C = AC.acc, NEON_M = AC.acc; this.acc = AC;
-    const look = this.look, cy = look === 'stark' && (this.props.cyber ?? true), G = deckGeoV(W, H), PM = '#8a8f94', mono = "'JetBrains Mono', monospace", mich = 'Michroma, sans-serif',
+    const cy = this.props.cyber ?? true, G = deckGeoV(W, H), PM = '#8a8f94', mono = "'JetBrains Mono', monospace", mich = 'Michroma, sans-serif',
       cols = ['#f2f2f0', 'rgb(24,88,224)', 'rgb(232,34,44)', 'rgb(255,196,0)', 'rgb(255,118,18)', 'rgb(22,168,82)', 'rgb(138,64,214)'], names = ['Home', 'Freediving', 'Sound', 'Library'],
       LAB = ['#f2f2f0', 'rgb(120,166,255)', 'rgb(255,112,108)', 'rgb(255,206,60)'];
     // asm: how built the deck is (its controls); slide: how far it has dropped away below the screen
     const A = this.arr, O = this.out && this.out.k !== 'other' ? this.out : null; let asm = 1, slide = 0;
-    if (A) { asm = 1; slide = 0; }
     if (O) { asm = 1 - smooth(clamp(O.t / .45, 0, 1)); slide = easeIO(clamp((O.t - .3) / .8, 0, 1)); }
     this.fK = (this.fK || 0) + ((this.focus ? 1 : 0) - (this.fK || 0)) * Math.min(1, dt * 2.2); const fz = easeIO(clamp(this.fK, 0, 1));
     { const R = this.rootRef.current, ex = R && R.querySelector('[data-full-exit]'), awake = this.focus && (this.scrub || performance.now() - (this.fMove || 0) < 2200);
@@ -487,9 +474,9 @@ class Component extends DCLogic {
       if (!this.knobA) this.knobA = this.knobV.map(() => 0);
       G.knobs.forEach(([kx, ky, kr], i) => { const v = this.knobV[i], rw = this.knobRaw && this.knobRaw[i], tgt = -150 + v * 300 / 9 + (rw != null ? (rw - (-150 + v * 300 / 9)) * .3 : 0); this.knobA[i] += (tgt - this.knobA[i]) * Math.min(1, dt * (this.arr ? 5 : 34));
         const kk = this.knobKick && this.knobKick[i], kA = this.knobA[i] + (kk ? kk.d * 6 * Math.exp(-(t - kk.t) * 24) * Math.cos((t - kk.t) * 60) : 0);
-        const hv = this.knobHov === i || this.knobHeld === i, fzk0 = clamp(kr * .48, 5.5, 8), nr = kr + fzk0 * .7 + 1.8, nh = this.knobNum && this.knobNum.i === i ? this.knobNum.q : -1;
+        const hv = this.knobHov === i || this.knobHeld === i, fzk = clamp(kr * .48, 5.5, 8), nr = kr + fzk * .7 + 1.8, nh = this.knobNum && this.knobNum.i === i ? this.knobNum.q : -1;
         ctx.globalAlpha = 1 - fo; ctx.fillStyle = '#060708'; ctx.beginPath(); ctx.arc(kx, ky + 1.5, kr + 3, 0, TAU); ctx.fill();
-        const fzk = fzk0; ctx.font = '500 ' + fzk.toFixed(1) + 'px ' + mono; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+        ctx.font = '500 ' + fzk.toFixed(1) + 'px ' + mono; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
         for (let q = 0; q <= 9; q++) { const mq = ctx.measureText(String(q)), dx = (mq.actualBoundingBoxLeft - mq.actualBoundingBoxRight) / 2, dy = (mq.actualBoundingBoxAscent - mq.actualBoundingBoxDescent) / 2; const a = (-150 + q * 300 / 9) * Math.PI / 180, on = q === v, lit = on || comboK > 0, nx = kx + Math.sin(a) * nr, ny = ky - Math.cos(a) * nr;
           // the number under the pointer gets a small ring, so it reads as something to press
           if (q === nh) { ctx.globalAlpha = 1 - fo; ctx.fillStyle = AC.a(.16); ctx.strokeStyle = NEON_C; ctx.lineWidth = 1; glow(NEON_C, 6); ctx.beginPath(); ctx.arc(nx, ny, fzk * .62, 0, TAU); ctx.fill(); ctx.stroke(); noGlow(); }
@@ -598,9 +585,7 @@ class Component extends DCLogic {
   // ---- layout
   // the wave lies flat across the middle of the page and opens up and down while a piece plays
   geom(W, H) { const t0 = deckGeo(W, H).y0 - 8, fz = easeIO(clamp(this.fK || 0, 0, 1)), top = t0 + (H - t0) * fz, m = clamp(W * .05, 26, 56), amp = Math.min(top * .32, 260); return { m, amp, yB: Math.round(top / 2) }; }
-  segsOf(ai, W, m) { const tr = this.albums[ai].tracks, gap = W < 700 ? 16 : 28, avail = W - m - 140 - gap * (tr.length - 1), wt = tr.map(t => Math.pow(t.dur, .6)), sw = wt.reduce((a, b) => a + b, 0); let x = m;
-    return tr.map((t, k) => { const w = avail * wt[k] / sw, s = { tr: t, x0: x, x1: x + w }; x += w + gap; return s; }); }
-  // the many style's pieces: for every column, FK slots above the baseline and FK below, each its own shape, size, tilt, colour and depth
+  // the wave's pieces: for every column, FK slots above the baseline and FK below, each its own shape, size, tilt, colour and depth
   frags(n) { if (this.F && this.F.n === n) return this.F; const T = n * FK * 2, r = rng(99), F = { n, dx: new Float32Array(T), sz: new Float32Array(T), rot: new Float32Array(T), sh: new Uint8Array(T), pal: new Uint8Array(T), ck: new Float32Array(T), z: new Uint8Array(T), dy: new Float32Array(T) };
     for (let f = 0; f < T; f++) { F.dx[f] = (r() - .5) * 7; F.sz[f] = 2.5 + r() * 5.5; F.rot[f] = r() * TAU; F.sh[f] = Math.floor(r() * 5); F.pal[f] = Math.floor(r() * PAL.length); F.ck[f] = r(); F.z[f] = Math.floor(r() * 3); F.dy[f] = (r() - .5) * 3; }
     return (this.F = F); }
@@ -612,27 +597,22 @@ class Component extends DCLogic {
     else { ctx.beginPath(); ctx.arc(0, 0, sz * .42, 0, TAU); ctx.lineWidth = 1.1; ctx.stroke(); } }
   draw(dt) {
     const cv = this.canvasRef.current; if (!cv) return;
-    const W = innerWidth, H = innerHeight, dpr = Math.min(2, devicePixelRatio || 1), look = this.look, TH = THEMES[look];
+    const W = innerWidth, H = innerHeight, dpr = Math.min(2, devicePixelRatio || 1), TH = THEME;
     if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); this.grainP = null; }
     const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1; ctx.filter = 'none';
-    const t = this.t, fo = this.out ? smooth(clamp(this.out.t / .45, 0, 1)) : 0, { m, amp, yB } = this.geom(W, H), Wv = W, cyber = look === 'stark' && (this.props.cyber ?? true);
-    const al = this.albums[this.state.album], c = this.cur, pos = this.posOf(), segs = this.strip ? this.segsOf(this.state.album, W, m) : null, hov = this.state.hover, hovTr = hov ? this.trById(hov) : null;
+    const t = this.t, fo = this.out ? smooth(clamp(this.out.t / .45, 0, 1)) : 0, { m, amp, yB } = this.geom(W, H), Wv = W, cyber = this.props.cyber ?? true;
+    const al = this.albums[this.state.album], c = this.cur, pos = this.posOf();
     let playX = null;
-    if (c) { const u = pos / c.tr.dur; if (!this.strip) playX = u * Wv; else { const sg = segs.find(q => q.tr.id === c.tr.id); if (sg) playX = sg.x0 + u * (sg.x1 - sg.x0); } }
-    const live = c && !c.paused ? this.live : 0, D = this.dotOf(PAGE) || [W - 160, 28];
+    if (c) playX = pos / c.tr.dur * Wv;
+    const live = c && !c.paused ? this.live : 0;
     // ground
-    if (look === 'haze') {
-      const gr = ctx.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#1f252b'); gr.addColorStop(.55, '#3a434b'); gr.addColorStop(1, '#5f6a73'); ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H);
-      ctx.globalCompositeOperation = 'screen';
-      [[.2, .32, .42, '226,204,192', .2], [.8, .2, .34, '196,212,228', .18], [.55, .82, .5, '214,222,232', .16]].forEach(([bx, by, br, rgb, a], k) => { const x = (bx + .05 * Math.sin(t * .07 + k * 2)) * W, y = (by + .04 * Math.cos(t * .05 + k)) * H, rr = br * Math.max(W, H), g = ctx.createRadialGradient(x, y, 0, x, y, rr); g.addColorStop(0, 'rgba(' + rgb + ',' + a + ')'); g.addColorStop(1, 'rgba(' + rgb + ',0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); });
-      ctx.globalCompositeOperation = 'source-over';
-    } else if (look === 'stark') {
+    {
       const gr = ctx.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#eaeae7'); gr.addColorStop(1, '#d0d1ce'); ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H);
       const vg = ctx.createRadialGradient(W * .42, H * .45, Math.min(W, H) * .2, W * .42, H * .45, Math.max(W, H) * .8); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.12)'); ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
       if (!this.grainP) this.grainP = ctx.createPattern(this.grainC, 'repeat'); ctx.globalCompositeOperation = 'overlay'; ctx.globalAlpha = TH.grain; ctx.fillStyle = this.grainP; ctx.fillRect(0, 0, W, H); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
-    } else { ctx.fillStyle = TH.bg; ctx.fillRect(0, 0, W, H); }
+    }
     // stark: each album's photo, full height, multiplied into the grey so its white ground disappears and only the darks show; crossfades between albums
-    if (look === 'stark') { const ph = this.photos || (this.photos = {}), pr = Math.min(dpr, 1.5), tn = this.tuneAt(t), pa = (this.props.photo ?? .9) * (this.arr ? (tn ? tn.sig : t < 1.6 ? 0 : 1) : smooth(clamp((t - .2) / 1.2, 0, 1))) * (1 - fo) * (1 - easeIO(clamp(this.fK || 0, 0, 1)));
+    { const ph = this.photos || (this.photos = {}), pr = Math.min(dpr, 1.5), tn = this.tuneAt(t), pa = (this.props.photo ?? .9) * (this.arr ? (tn ? tn.sig : t < 1.6 ? 0 : 1) : smooth(clamp((t - .2) / 1.2, 0, 1))) * (1 - fo) * (1 - easeIO(clamp(this.fK || 0, 0, 1)));
       this.albums.forEach((a, ai) => { if (!a.img) return; let P = ph[a.img]; if (!P) { P = ph[a.img] = { im: new Image(), k: 0 }; P.im.src = a.img; }
         const ok = P.im.complete && P.im.naturalWidth > 0; P.k += ((ai === this.state.album && ok ? 1 : 0) - P.k) * Math.min(1, dt * 2.4); if (P.k < .004 || !ok) return;
         // full height, pushed right against the panel; imgY lifts it so the subject sits in the open top right, above the track list
@@ -656,118 +636,62 @@ class Component extends DCLogic {
       // fine scanlines over the ground and photo
       if (cyber) { if (!this.scanP) { const sc = document.createElement('canvas'); sc.width = 1; sc.height = 3; const sx = sc.getContext('2d'); sx.fillStyle = 'rgba(0,0,0,.05)'; sx.fillRect(0, 0, 1, 1); this.scanP = ctx.createPattern(sc, 'repeat'); } ctx.globalAlpha = 1 - fo; ctx.fillStyle = this.scanP; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; } }
     // a soft light of the playing piece's colour round the playhead
-    if (playX != null && look !== 'stark') { const rr = amp * 1.6, g = ctx.createRadialGradient(playX, yB, 0, playX, yB, rr), k = KINDS[c.tr.kind], col = (look === 'haze' ? k.tint : k.cs).slice(4, -1); g.addColorStop(0, 'rgba(' + col + ',' + (.1 + .16 * live) * (1 - fo) + ')'); g.addColorStop(1, 'rgba(' + col + ',0)'); ctx.globalCompositeOperation = 'screen'; ctx.fillStyle = g; ctx.fillRect(playX - rr, yB - rr, rr * 2, rr * 2); ctx.globalCompositeOperation = 'source-over'; }
-    // arrival. many: the red dot breaks into pieces that fly down and build the wave, left to right. haze: the red dot blooms into a soft light
-    // that sinks to the baseline and cools, and the lines form out of it from the middle outwards
-    const arrD = this.arr ? .9 : 0, introDone = t > 3.4 + arrD, eqRise = x => { const h = (((Math.floor(x / 10) + 7) * 2654435761) >>> 0) % 1000 / 1000, k = clamp((t - 1.75 - h * .45) / .32, 0, 1); return k <= 0 ? 0 : k >= 1 ? 1 : 1 + 2.2 * (k - 1) ** 3 + 1.2 * (k - 1) ** 2; }, introG = this.arr ? (x => introDone ? 1 : eqRise(x)) : look === 'many' ? (x => introDone ? 1 : smooth(clamp((t - arrD - (1.0 + .9 * x / W)) / .45, 0, 1))) : (x => introDone ? 1 : smooth(clamp((t - arrD - .3 - 1.1 * Math.abs(x / W - .5)) / .8, 0, 1)));
+    // arrival: the wave opens out from the middle; handed over from another page, its columns spring up one by one
+    const arrD = this.arr ? .9 : 0, introDone = t > 3.4 + arrD, eqRise = x => { const h = (((Math.floor(x / 10) + 7) * 2654435761) >>> 0) % 1000 / 1000, k = clamp((t - 1.75 - h * .45) / .32, 0, 1); return k <= 0 ? 0 : k >= 1 ? 1 : 1 + 2.2 * (k - 1) ** 3 + 1.2 * (k - 1) ** 2; }, introG = this.arr ? (x => introDone ? 1 : eqRise(x)) : (x => introDone ? 1 : smooth(clamp((t - arrD - .3 - 1.1 * Math.abs(x / W - .5)) / .8, 0, 1)));
     // targets for each column: height, strength and which kind of piece it belongs to
-    const pieces = look === 'many' || (look === 'stark' && (this.props.wave ?? 'pieces') === 'pieces'), g = pieces ? (W < 600 ? 8 : 10) : (W < 600 ? 3 : 4), n = Math.ceil(W / g);
+    const g = W < 600 ? 8 : 10, n = Math.ceil(W / g);
     if (!this.disp || this.disp.length !== n) { this.disp = new Float32Array(n); this.alp = new Float32Array(n); this.colK = new Array(n).fill(null); }
     const kE = 1 - Math.exp(-dt * 6);
     for (let i = 0; i < n; i++) { const x = i * g + g / 2; let env = 0, kk = null, a = .3;
-      // resting: flat; hovering a piece lifts it a little; playing (or paused): the piece's full wave, and nothing else
-      if (!this.strip) { if (c) { env = envAt(c.tr.env, Math.min(1, x / Wv)); kk = c.tr.kind; a = x <= playX ? 1 : .22; } else if (hovTr) { env = envAt(hovTr.env, x / Wv) * .14; kk = hovTr.kind; a = .62; } else kk = kindAt(al.tracks, Math.min(1, x / Wv)); }
-      else { const sg = segs.find(q => x >= q.x0 && x <= q.x1); if (sg) { const id = sg.tr.id, e0 = envAt(sg.tr.env, (x - sg.x0) / (sg.x1 - sg.x0)); kk = sg.tr.kind; if (c && c.tr.id === id) { env = e0; a = x <= playX ? 1 : .22; } else if (c) a = 0; else if (hov === id) { env = e0 * .14; a = .66; } else a = .36; } else if (c) a = 0; }
+      // resting: flat; playing (or paused): the piece's full wave, and nothing else
+      if (c) { env = envAt(c.tr.env, Math.min(1, x / Wv)); kk = c.tr.kind; a = x <= playX ? 1 : .22; } else kk = kindAt(al.tracks, Math.min(1, x / Wv));
       // changes sweep in from the left
       const k = Math.min(1, kE * (.6 + .8 * (1 - i / n)));
       this.disp[i] += (env - this.disp[i]) * k; this.alp[i] += (a - this.alp[i]) * k; if (kk) this.colK[i] = kk; }
-    if (pieces) {
-      const F = this.frags(n), step = amp / FK, par = this.mx * 5, jit = look === 'stark' ? .45 : 1;
+    {
+      const F = this.frags(n), step = amp / FK, par = this.mx * 5, jit = .45;
       // the played part of the wave dances with the music: each column follows its own band of the spectrum, strongest just behind the playhead
       const spK = 1 - Math.exp(-(this.dtF || 1 / 60) * 35.9);   // the dancing columns' easing, by the clock (.45 a frame at 60fps)
       let spec = null; if (playX != null && live && this.an) { if (!this.fBuf) this.fBuf = new Uint8Array(this.an.frequencyBinCount); this.an.getByteFrequencyData(this.fBuf); spec = this.fBuf; }
       if (!this.sp || this.sp.length !== n) this.sp = new Float32Array(n);
-      // scrub aids. settle: while the playhead is dragged the pieces gather into neat lines (all of them, or only round the pointer for lens);
-      // ghost: faint lines always under the pieces; contour: a fine outline round the wave
-      const sm = this.props.settle ?? 'lens', ghost = this.props.ghost ?? false, contour = this.props.contour ?? false;
+      // scrub aids. settle: while the playhead is dragged the pieces gather into neat lines (all of them, or only round the pointer for lens)
+            const sm = this.props.settle ?? 'lens';
       // (scrubbing now happens on the deck: a drag on the jog or round its rim lines the pieces up round the playhead)
       const scr = this.scrub || ((this.jogScr || this.rimDrag) && playX != null ? { x: playX } : null);
       this.stl = (this.stl || 0) + ((scr && sm !== 'off' ? 1 : 0) - (this.stl || 0)) * Math.min(1, dt * 9); if (scr) this.lensX = scr.x;
-      if (!this.hhA || this.hhA.length !== n) this.hhA = new Float32Array(n); this.hhA.fill(-1);
       for (let i = 0; i < n; i++) { const x = i * g + g / 2, ig = introG(x); if (ig <= 0) continue;
         const b = spec && x <= playX ? spec[2 + (i * 37) % 140] / 255 * Math.exp(-(playX - x) / (W * .3)) : 0; this.sp[i] += (b - this.sp[i]) * spK;
         const hh = this.disp[i] * amp * (.92 + .08 * Math.sin(t * 1.3 + i * .37)) * ig * (1 + 1.2 * this.sp[i]), kc = this.colK[i] ? KINDS[this.colK[i]].cs : TH.neutral, e = playX != null && live ? live * Math.exp(-(((x - playX) / 52) ** 2)) : 0;
-        const sk = sm === 'lens' ? this.stl * Math.exp(-(((x - (this.lensX ?? -1e4)) / 110) ** 2)) : this.stl; this.hhA[i] = hh;
-        if (ghost || sk > .01) { ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.fillStyle = kc; ctx.globalAlpha = this.alp[i] * (1 - fo) * Math.max(ghost ? .22 : 0, sk); const lw = 1 + sk; ctx.fillRect(x - lw / 2, yB - Math.max(.6, hh), lw, Math.max(1.2, hh * 2)); }
+        const sk = sm === 'lens' ? this.stl * Math.exp(-(((x - (this.lensX ?? -1e4)) / 110) ** 2)) : this.stl;
+        if (sk > .01) { ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.fillStyle = kc; ctx.globalAlpha = this.alp[i] * (1 - fo) * sk; const lw = 1 + sk; ctx.fillRect(x - lw / 2, yB - Math.max(.6, hh), lw, Math.max(1.2, hh * 2)); }
         for (let h = 0; h < 2; h++) for (let j = 0; j < FK; j++) { const off = (j + .5) * step; if (off > hh + step * .5) break;
           const f = (i * FK + j) * 2 + h, sd = h ? 1 : -1, z = F.z[f], lastF = j ? clamp((hh - off) / step + .5, 0, 1) : 1;
           let px = x + F.dx[f] * jit + par * (z - 1), py = yB + sd * (off + F.dy[f]), rot = F.rot[f] + Math.sin(t * .5 + f) * .08;
           if (e) { py += sd * e * (6 + off * .4); rot += e * 2.4 * (f % 2 ? 1 : -1); px += e * F.dx[f] * 2; }
           if (sk > .01) { px += (x - px) * sk; py += (yB + sd * off - py) * sk; rot *= 1 - sk; }
-          ctx.globalAlpha = this.alp[i] * (.5 + .25 * z) * lastF * (1 - fo) * (1 - .85 * sk); const col = F.ck[f] < .62 ? kc : look === 'stark' && F.pal[f] === 7 ? TH.ink : PAL[F.pal[f]]; ctx.fillStyle = col; ctx.strokeStyle = col;
+          ctx.globalAlpha = this.alp[i] * (.5 + .25 * z) * lastF * (1 - fo) * (1 - .85 * sk); const col = F.ck[f] < .62 ? kc : F.pal[f] === 7 ? TH.ink : PAL[F.pal[f]]; ctx.fillStyle = col; ctx.strokeStyle = col;
           this.drawFrag(ctx, dpr, F.sh[f], px, py, rot, F.sz[f] * (.7 + .2 * z)); } }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      if (contour) { ctx.globalAlpha = .85 * (1 - fo); ctx.strokeStyle = TH.ink; ctx.lineWidth = 1; ctx.lineJoin = 'round';
-        for (const sd of [-1, 1]) { ctx.beginPath(); let on = false; for (let i = 0; i < n; i++) { const hv = this.hhA[i]; if (hv < 0) { on = false; continue; } const x = i * g + g / 2, y = yB + sd * Math.max(.5, hv); if (on) ctx.lineTo(x, y); else { ctx.moveTo(x, y); on = true; } } ctx.stroke(); } }
-      // the red dot's pieces in flight
-      if (!introDone && look === 'many') { const rr = rng(5); ctx.fillStyle = 'rgb(' + COL.join(',') + ')'; ctx.strokeStyle = ctx.fillStyle;
-        for (let k = 0; k < 130; k++) { const tx = (k + .5) / 130 * W, r1 = rr(), r2 = rr(), r3 = rr(), t0 = .25 + .9 * tx / W * .8 + r1 * .18, u = clamp((t - t0) / (.75 + r2 * .2), 0, 1); if (u <= 0 || u >= 1) continue;
-          const ee = easeIO(u), C1 = [D[0] - 80 - r2 * 260, D[1] + 60 + r3 * 220], E = [tx, yB + (r3 - .5) * 6], q = 1 - ee, px = q * q * D[0] + 2 * q * ee * C1[0] + ee * ee * E[0], py = q * q * D[1] + 2 * q * ee * C1[1] + ee * ee * E[1];
-          ctx.globalAlpha = (1 - smooth(clamp((u - .82) / .18, 0, 1))) * (1 - fo); this.drawFrag(ctx, dpr, Math.floor(r1 * 5), px, py, r2 * TAU + u * 6, 3 + r3 * 5); }
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
-    } else {
-      // haze: the lines are drawn to their own layer, then laid over the ground twice, blurred for the glow and sharp on top
-      const lc = this.lc; if (lc.width !== cv.width || lc.height !== cv.height) { lc.width = cv.width; lc.height = cv.height; }
-      const lx = lc.getContext('2d'); lx.setTransform(1, 0, 0, 1, 0, 0); lx.clearRect(0, 0, lc.width, lc.height); lx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      for (let i = 0; i < n; i++) { const x = i * g + g / 2, ig = introG(x); if (ig <= 0) continue;
-        let hh = this.disp[i] * amp * (.9 + .1 * Math.sin(t * 1.7 + i * .23)) * ig;
-        if (playX != null && live) { const d = (x - playX) / 46; hh *= 1 + .7 * live * Math.exp(-d * d) * (.75 + .25 * Math.sin(t * 23 + i)); }
-        hh = Math.max(.6, hh); lx.globalAlpha = this.alp[i]; lx.fillStyle = this.colK[i] ? KINDS[this.colK[i]][look === 'stark' ? 'cs' : 'tint'] : TH.neutral; lx.fillRect(x - .5, yB - hh, 1, hh * 2); }
-      if (playX != null) { lx.globalAlpha = .95; lx.fillStyle = this.rimCol(playX) || (cyber ? NEON_M : look === 'stark' ? TH.ink : '#ffffff'); lx.fillRect(Math.round(playX) - .5, 0, 1, H); }
-      ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalCompositeOperation = look === 'stark' ? 'multiply' : 'screen';
-      if ('filter' in ctx) { ctx.filter = 'blur(' + Math.round((look === 'stark' ? 4 : 7) * dpr) + 'px)'; ctx.globalAlpha = (look === 'stark' ? .3 : .85) * (1 - fo); ctx.drawImage(lc, 0, 0); ctx.filter = 'none'; }
-      ctx.globalAlpha = 1 - fo; ctx.drawImage(lc, 0, 0); ctx.globalCompositeOperation = 'source-over'; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
-    // playhead (many draws it here; haze has it in the glowing layer) and the time beside it
-    if (playX != null) { if (pieces) { ctx.globalAlpha = .9 * (1 - fo); const rc = this.rimCol(playX); if (cyber || rc) { ctx.fillStyle = rc || NEON_M; ctx.shadowColor = rc || NEON_M; ctx.shadowBlur = 12; ctx.fillRect(Math.round(playX) - .75, 0, 1.5, H); ctx.shadowBlur = 0; ctx.shadowColor = 'transparent'; } else { ctx.fillStyle = TH.ink; ctx.fillRect(Math.round(playX) - .5, 0, 1, H); } }
-    }
-    // scrub marker: a line where the pointer would jump to, with that time under it
-    // while a piece plays, everything but its wave fades out
-    this.pf += (((c && !c.paused) ? 1 : 0) - this.pf) * Math.min(1, dt * 2.5); 
+    // the playhead
+    if (playX != null) { ctx.globalAlpha = .9 * (1 - fo); const rc = this.rimCol(); if (cyber || rc) { ctx.fillStyle = rc || NEON_M; ctx.shadowColor = rc || NEON_M; ctx.shadowBlur = 12; ctx.fillRect(Math.round(playX) - .75, 0, 1.5, H); ctx.shadowBlur = 0; ctx.shadowColor = 'transparent'; } else { ctx.fillStyle = TH.ink; ctx.fillRect(Math.round(playX) - .5, 0, 1, H); } }
     // handing over to / from Home and Freediving: their paper ground comes in under the panel
     const pap = this.arr ? 1 - smooth(clamp((t - .2) / 1, 0, 1)) : this.out && this.out.k !== 'other' ? smooth(clamp((this.out.t - .25) / .7, 0, 1)) : 0;
     if (pap > 0) { ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = pap; ctx.fillStyle = '#f5f3ee'; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
     this.deckOut(ctx, W, H, t, dt, TH, live, this.out && this.out.k !== 'other' ? 0 : fo);
-    const ta = (this.arr ? (t >= 1.7 ? 1 : 0) : smooth(clamp((t - 1.4) / .8, 0, 1))) * (1 - fo), el = this.contentRef.current;
-    if (el) { el.style.opacity = (ta * (1 - this.pf)).toFixed(3); el.style.pointerEvents = this.pf > .5 ? 'none' : ''; el.style.transform = 'translateY(' + ((1 - ta) * (this.arr ? 0 : 8)).toFixed(1) + 'px)'; this.typeIn(t); }
     ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
   }
-  // arriving: the album's labels and tracks type in, a character at a time, like a mixer readout; the album rail flickers on with the signal
-  typeIn(t) { if (this.typed) return; const sec = this.contentRef.current && this.contentRef.current.querySelectorAll('section')[this.state.album], rail = this.wheelRef.current; if (!sec) return;
-    const els = [];
-    if (this.arr) { const h2 = sec.querySelector('h2'), meta = h2 && h2.parentElement.querySelector('p'); if (meta) els.push([meta, .15]); if (h2) els.push([h2, .35]); sec.querySelectorAll('ol > li').forEach((li, i) => els.push([li, .6 + i * .12])); }
-    const u = t - 1.7, done = !this.arr || u > 2.2;
-    els.forEach(([e, d]) => { const n = Math.max(4, (e.textContent || '').trim().length), k = clamp((u - d) / clamp(n * .028, .25, .7), 0, 1), kq = Math.floor(k * n) / n; e.style.clipPath = done || k >= 1 ? '' : 'inset(0 ' + ((1 - kq) * 100).toFixed(2) + '% 0 0)'; });
-    if (rail) { const tn = this.tuneAt(t); rail.style.opacity = done || !tn ? '' : (tn.sig > .35 && Math.random() > .15 * (1 - tn.sig) ? 1 : .15).toString(); }
-    if (done) { this.typed = true; if (rail) rail.style.opacity = ''; } }
   renderVals() {
-    const { W, H, album, playing, paused } = this.state, G = this.geom(W, H), n = this.albums.length;
-    const trV = tr => { const k = KINDS[tr.kind], cur = playing === tr.id; return { mark: cur ? (paused ? '❙❙' : '▶') : pad2(tr.ti + 1), title: tr.title, kind: k.label, col: this.look === 'stark' ? THEMES.stark.ink : k.cs, date: fmtDate(tr.date), dur: fmtDur(tr.dur), state: cur ? (paused ? 'Paused' : 'Playing') : 'Play',
-      play: () => this.click(tr), on: () => { if (this.state.hover !== tr.id) this.setState({ hover: tr.id }); }, off: () => { if (this.state.hover === tr.id) this.setState({ hover: null }); } }; };
-    const albums = this.albums.map((a, ai) => { const tot = a.tracks.reduce((s, t) => s + t.dur, 0); return { title: a.title, meta: pad2(ai + 1) + ' / ' + pad2(n) + ' · ' + a.tracks.length + ' pieces · ' + fmtDur(tot), tracks: a.tracks.map(trV),
-      hasNext: ai < n - 1, next: ai < n - 1 ? '↓ ' + this.albums[ai + 1].title : '', goNext: this.goAlbum(ai + 1) }; });
-    const segs = this.strip ? this.segsOf(album, W, G.m).map(sg => ({ ...trV(sg.tr), left: Math.round(sg.x0), width: Math.round(sg.x1 - sg.x0), top: Math.round(G.yB - 96), height: 122 })) : [];
+    const { album, playing, paused } = this.state;
     return {
-      th: (() => { const T = THEMES[this.look], cy = this.look === 'stark' && (this.props.cyber ?? true); return { ...T, titleSh: cy ? '2px 0 0 rgba(255,43,214,.85), -2px 0 0 rgba(0,229,255,.85)' : 'none', cardInk: cy ? 'var(--acc, ' + NEON_C + ')' : '#f2f2f0', cardSh: cy ? '0 0 8px var(--accG2, rgba(0,229,255,.75)), 1px 0 0 var(--acc, ' + NEON_M + ')' : 'none' }; })(),
+      th: (() => { const cy = this.props.cyber ?? true; return { ...THEME, cardInk: cy ? 'var(--acc, ' + NEON_C + ')' : '#f2f2f0', cardSh: cy ? '0 0 8px var(--accG2, rgba(0,229,255,.75)), 1px 0 0 var(--acc, ' + NEON_M + ')' : 'none' }; })(),
       // what scrolling up / down leads to: the album above at the top edge, the one below at the bottom edge
       flapA: this.flapA, flapB: this.flapB, flipTo: pad2(album + 1), flipFrom: pad2((this.flipPrev ?? album) + 1),
       wheelRef: this.wheelRef, wheelItems: this.albums.map((a, ai) => ({ i: ai, num: pad2(ai + 1), title: a.title, go: this.goAlbum(ai) })),
-      upList: this.albums.slice(0, album).map((a, ai) => ({ num: pad2(ai + 1), title: a.title, go: this.goAlbum(ai) })),
-      downList: this.albums.slice(album + 1).map((a, k) => ({ num: pad2(album + k + 2), title: a.title, go: this.goAlbum(album + k + 1) })),
-      upNum: album > 0 ? pad2(album) : '', upTitle: album > 0 ? this.albums[album - 1].title : '',
-      downNum: album < n - 1 ? pad2(album + 2) : '', downTitle: album < n - 1 ? this.albums[album + 1].title : '',
-      // the space the deck takes at the bottom; albums are this much shorter than the screen
-      ch: 'calc(100vh - ' + (H - deckGeo(W, H).y0 + 8) + 'px)',
-      isList: !this.strip, isStrip: this.strip, albums, cur: albums[album], segs,
-      albumY: 'translateY(calc(' + (-album) + ' * (100vh - ' + (H - deckGeo(W, H).y0 + 8) + 'px)))', titleY: 'translateY(' + (-album * 1.02) + 'em)',
-      prevName: album > 0 ? '↑ ' + this.albums[album - 1].title : '', prevOp: album > 0 ? 1 : 0, prevPe: album > 0 ? 'auto' : 'none',
-      nextName: album < n - 1 ? '↓ ' + this.albums[album + 1].title : '', nextOp: album < n - 1 ? 1 : 0, nextPe: album < n - 1 ? 'auto' : 'none',
-      goPrev: this.goAlbum(album - 1), goNext: this.goAlbum(album + 1),
-      canvasRef: this.canvasRef, contentRef: this.contentRef, goHome: this.goHome,
-      navOff: () => this.setState({ navHov: null }),
+      canvasRef: this.canvasRef,
       rootRef: this.rootRef,
       // the deck's controls
-      deck: { jogDown: this.jogDown, jogMove: this.jogHover, jogOn: () => { this.jogHov = 1; }, jogOff: () => { this.jogHov = 0; this.rimHov = false; }, play: this.playBtn, cue: this.cueBtn, playLabel: playing && !paused ? 'Pause' : 'Play',
+      deck: { jogDown: this.jogDown, jogMove: this.jogHover, jogOn: () => { this.jogHov = 1; }, jogOff: () => { this.jogHov = 0; this.rimHov = false; }, play: this.playBtn, playLabel: playing && !paused ? 'Pause' : 'Play',
         btnOn: k => () => { this.btnHov = k; }, btnOff: () => { this.btnHov = null; }, full: this.goFull, leaveFull: this.leaveFull, fullDn: () => { this.fullDown = true; }, fullUp: () => { this.fullDown = false; }, fullOut: () => { this.btnHov = null; this.fullDown = false; },
         cpOn: i => () => this.padOn(4 + i), cpOff: i => () => this.padOff(4 + i), spare: this.spareHit, vol: this.volDown, knob: [0, 1, 2, 3, 4, 5].map(i => ({ down: this.knobDown(i), wheel: this.knobWheel(i), on: () => { this.knobHov = i; }, off: () => { if (this.knobHov === i) this.knobHov = null; this.knobNum = null; }, move: this.knobMove(i) })),
         rows: [0, 1, 2, 3, 4, 5].map(k => ({ go: () => { const tr = this.albums[this.state.album].tracks[k]; if (tr) this.click(tr); }, on: () => { this.rowHov = k; }, off: () => { if (this.rowHov === k) this.rowHov = null; } })) },
@@ -780,11 +704,10 @@ function View(v) {
   return (
     <>
     {"\n    "}
-    <div ref={v.rootRef} style={sty(`--ch:${v.ch ?? '100vh'};position:fixed;inset:0;overflow:hidden;color:${v.th?.ink ?? ''};background:${v.th?.bg ?? ''};font-family:${v.th?.body ?? ''};-webkit-font-smoothing:antialiased`)}>
+    <div ref={v.rootRef} style={sty(`position:fixed;inset:0;overflow:hidden;color:${v.th?.ink ?? ''};background:${v.th?.bg ?? ''};font-family:${v.th?.body ?? ''};-webkit-font-smoothing:antialiased`)}>
       {"\n      \n  \n      "}
       <canvas ref={v.canvasRef} style={sty("position:absolute;inset:0;width:100%;height:100%;pointer-events:none")} />
       {"\n      \n  \n      \n      "}
-      <div ref={v.contentRef} style={sty("display:none")} />
       {"\n      \n      \n      \n  \n      "}
       <div role="navigation" aria-label="Pages" style={sty("position:absolute;inset:0;z-index:5;pointer-events:none")}>
         <a href={BASE + "?from=dive"} onClick={v.pad?.home?.go} aria-label="Home" data-navk="home" onMouseEnter={v.pad?.home?.on} onMouseLeave={v.pad?.home?.off} onFocus={v.pad?.home?.on} onBlur={v.pad?.home?.off} style={sty("position:absolute;left:-200px;top:0;display:block;border-radius:5px;pointer-events:auto;cursor:pointer")}>
@@ -862,4 +785,4 @@ function View(v) {
   );
 }
 
-export default page(Component, View, {"style":"stark","cyber":true,"photo":0.9,"deck":true,"strings":"fader","wave":"pieces","settle":"lens","contour":false,"ghost":false,"synth":true});
+export default page(Component, View, {"cyber":true,"photo":0.9,"deck":true,"strings":"fader","settle":"lens","synth":true});
