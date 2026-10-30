@@ -5,7 +5,7 @@ import { DCLogic, page, sty, BASE } from '../lib/dc.js';
 import { deckGeo, padOf } from '../lib/deck.js';
 import { navAt, NAV_Y, handNavFrom, leaveTo } from '../lib/nav.js';
 import { ropeX, waveY, surfaceY, cubicAt } from '../lib/rope.js';
-import { PACE } from '../lib/pace.js';
+import { LEAVE_PACE } from '../lib/pace.js';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const smooth = x => x * x * (3 - 2 * x);
@@ -670,10 +670,10 @@ class Component extends DCLogic {
   tick = now => {
     cancelAnimationFrame(this.raf); this.raf = requestAnimationFrame(this.tick);
     const dt = Math.min(.05, (now - (this.last || now)) / 1000); this.last = now;
-    this.T += dt * PACE; this.hovT += (this.hov - this.hovT) * (1 - Math.exp(-dt * 8)); for (const k of ['sound', 'library']) this.hovPgT[k] = (this.hovPgT[k] || 0) + ((this.hovPg[k] || 0) - (this.hovPgT[k] || 0)) * (1 - Math.exp(-dt * 8));
+    this.T += dt; this.hovT += (this.hov - this.hovT) * (1 - Math.exp(-dt * 8)); for (const k of ['sound', 'library']) this.hovPgT[k] = (this.hovPgT[k] || 0) + ((this.hovPg[k] || 0) - (this.hovPgT[k] || 0)) * (1 - Math.exp(-dt * 8));
     this.fadeTick(dt); this.dtF = Math.max(0, dt);
     // leaving: the last frame is kept (window.__leave) and shown by the next page while it loads, so there's no blank moment in between
-    if (this.go != null) { this.go += dt * PACE; if (this.go > (this.dest ? (/\/sound\//.test(this.dest) ? 1.3 : 2.05) : 4.05) && !this.left) { this.left = true; // Sound picks the menu dots up where they are and drops them onto its beat pads
+    if (this.go != null) { this.go += dt * LEAVE_PACE; if (this.go > (this.dest ? (/\/sound\//.test(this.dest) ? 1.3 : 2.05) : 4.05) && !this.left) { this.left = true; // Sound picks the menu dots up where they are and drops them onto its beat pads
       if (/\/sound\//.test(this.dest || '')) { const o = {}; DOT_KEYS.forEach(k => { const f = this.navFrom && this.navFrom[k]; o[k] = f ? f.p : sndDrop(k, innerWidth, innerHeight); }); handNavFrom(o); }
       leaveTo(this.dest || BASE + 'freediving/?from=home'); } }
     // once the symbol has settled (drawn, its transition over, nothing hovered, fading or with labels moving) the picture doesn't change, so it

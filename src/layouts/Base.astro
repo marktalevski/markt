@@ -25,7 +25,7 @@ const { title, noindex } = Astro.props;
       window.__leave = href => {
         try { const W = innerWidth, H = innerHeight, c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d');
           x.fillStyle = getComputedStyle(document.body).backgroundColor || '#f5f3ee'; x.fillRect(0, 0, W, H);
-          document.querySelectorAll('canvas').forEach(cv => { const r = cv.getBoundingClientRect(), st = getComputedStyle(cv); if (!r.width || !r.height || st.display === 'none' || st.visibility === 'hidden') return;
+          document.querySelectorAll('canvas:not([data-nocover])').forEach(cv => { const r = cv.getBoundingClientRect(), st = getComputedStyle(cv); if (!r.width || !r.height || st.display === 'none' || st.visibility === 'hidden') return;
             x.globalAlpha = +st.opacity; if (x.globalAlpha > 0) try { x.drawImage(cv, r.left, r.top, r.width, r.height); } catch (e) {} });
           x.globalAlpha = 1; document.querySelectorAll('[data-navdot]').forEach(d => { const r = d.getBoundingClientRect(), st = getComputedStyle(d); if (r.width < 3 || +st.opacity === 0 || st.visibility === 'hidden') return;
             x.fillStyle = st.backgroundColor; x.beginPath(); x.arc(r.left + r.width / 2, r.top + r.height / 2, r.width / 2, 0, 6.2832); x.fill(); });
@@ -68,6 +68,33 @@ const { title, noindex } = Astro.props;
           // a frame after the page's own first frame, so that frame is on screen before the cover lifts off it
           window.__ready = () => requestAnimationFrame(() => requestAnimationFrame(off));
           setTimeout(off, 4000);
+        }
+      } catch (e) {}
+    </script>
+    <script is:inline>
+      // A frame meter, for checking on a real phone or computer that the animations keep up: open any page with ?fps at the end of its address
+      // (it then stays on from page to page; ?fps=0 turns it off). Bottom left: each bar is one frame, its height how long it took; red ones
+      // took more than 1.5 frames (a stutter you could see). The line under it: the screen's rate, stutters on this page (counted once the
+      // page has been up a second, after its arrival has settled behind the cover), and the slowest of the frames shown
+      try {
+        const q = new URLSearchParams(location.search).get('fps');
+        if (q !== null) sessionStorage.setItem('fps-meter', q === '0' ? '' : '1');
+        if (sessionStorage.getItem('fps-meter')) {
+          const W = 196, H = 52, N = 120, dpr = Math.min(2, devicePixelRatio || 1), c = document.createElement('canvas'), x = c.getContext('2d');
+          c.width = W * dpr; c.height = H * dpr; c.setAttribute('data-nocover', ''); c.setAttribute('aria-hidden', 'true');
+          c.style.cssText = 'position:fixed;left:8px;bottom:8px;width:' + W + 'px;height:' + H + 'px;z-index:2147483600;pointer-events:none;border-radius:6px';
+          document.body.appendChild(c); x.scale(dpr, dpr);
+          const ts = [], t0 = performance.now(); let last = 0, drops = 0;
+          const loop = now => { requestAnimationFrame(loop);
+            if (last) { ts.push(now - last); if (ts.length > N) ts.shift(); } last = now;
+            const s = ts.slice().sort((a, b) => a - b), base = s[s.length >> 1] || 1000 / 60, d = ts[ts.length - 1] || 0, slow = base * 1.5;
+            if (ts.length > 10 && now - t0 > 1000 && d > slow) drops++;
+            x.clearRect(0, 0, W, H); x.fillStyle = 'rgba(12,12,12,.78)'; x.fillRect(0, 0, W, H);
+            const top = 6, bh = 28, sc = bh / (base * 3); x.fillStyle = 'rgba(255,255,255,.25)'; x.fillRect(6, top + bh - slow * sc, W - 12, 1);
+            ts.forEach((v, i) => { x.fillStyle = v > slow ? '#ff5a4f' : '#5fd38a'; const h = Math.min(bh, v * sc); x.fillRect(6 + i * (W - 12) / N, top + bh - h, Math.max(1, (W - 12) / N - .3), h); });
+            x.fillStyle = '#f2f2f0'; x.font = '10px ui-monospace, Menlo, monospace'; x.textBaseline = 'alphabetic';
+            x.fillText(Math.round(1000 / base) + ' Hz  ' + drops + ' stutters  max ' + Math.round(s[s.length - 1] || 0) + ' ms', 6, H - 7); };
+          requestAnimationFrame(loop);
         }
       } catch (e) {}
     </script>

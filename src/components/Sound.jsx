@@ -5,7 +5,7 @@ import { DCLogic, page, sty, BASE, assetUrl } from '../lib/dc.js';
 import { squid, squidCells, SQUID_W, SQUID_H, SQUID_REACTS, SQUID_MOVES, SQUID_SLOW, SQUID_FAST } from '../lib/squid.js';
 import { deckGeo, deckGeoV, deckScale, isPhone, DECK_KEYS, padOf } from '../lib/deck.js';
 import { handNavFrom, takeNavFrom, leaveTo } from '../lib/nav.js';
-import { PACE } from '../lib/pace.js';
+import { LEAVE_PACE } from '../lib/pace.js';
 import SOUND from '../data/sound.json';
 const KINDS_OK = ['field', 'voice', 'music'];
 
@@ -303,9 +303,9 @@ class Component extends DCLogic {
   GO = { freediving: this.leave(BASE + 'freediving/?from=sound', 'dive'), sound: this.stay, library: this.leave(BASE + 'library/', 'library') };
   tick = now => {
     this.raf = requestAnimationFrame(this.tick);
-    const dt = Math.min(.05, (now - (this.last || now)) / 1000); this.last = now; this.t += dt * (this.t < 4.5 ? PACE : 1); this.dtF = dt;   // (the arrival, the first 4.5 s of t, runs at PACE)
+    const dt = Math.min(.05, (now - (this.last || now)) / 1000); this.last = now; this.t += dt; this.dtF = dt;
     if (this.arr && (this.t > 4.5 || this.out)) this.arr = null;
-    if (this.out) { this.out.t += dt * PACE; const lim = this.out.k !== 'other' ? 1.25 : .55;
+    if (this.out) { this.out.t += dt * LEAVE_PACE; const lim = this.out.k !== 'other' ? 1.25 : .55;
       if (this.out.t > lim && !this.left) { this.left = true; if (this.out.k !== 'other') handNavFrom({ ...(this.dotPos || {}) }); leaveTo(this.out.href); } }
     this.mx += ((this.mxT || 0) - this.mx) * Math.min(1, dt * 3);
     // the volume fader sets the master gain; squared, so the fader moves through loudness the way the ear hears it (half way down is half as loud)

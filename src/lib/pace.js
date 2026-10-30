@@ -1,3 +1,4 @@
-// how fast the pages' intros and the transitions between them run, against the pace they were designed at: 1 is that pace, 1.4 takes each
-// about 30% less time. Only the transitions follow it, not the motion that keeps going on a page (the water, the squid, the wave)
-export const PACE = 1.4;
+// how fast a page plays its way out when you go somewhere else (the dots flying up into the menu, the colours draining, the books folding),
+// against the pace it was designed at: 1.4 takes about 30% less time, since a click to go somewhere shouldn't feel like waiting. Everything
+// you watch on a page (Home's lines drawing, the water rising, the books opening) keeps its own, slower pace
+export const LEAVE_PACE = 1.4;
