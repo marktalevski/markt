@@ -646,9 +646,9 @@ class Component extends DCLogic {
   }
   // 0..1 through the dot's pulse as the last absorbed letter arrives
   labelPulse(pg) { const s = this.labs && this.labs[pg]; if (!s || s.pk == null) return 0; const u = clamp((s.pk - (LABEL.time - LABEL.letter * .35)) / LABEL.pulse, 0, 1); return Math.sin(Math.PI * u); }
-  // touch screens have no hover: the first tap shows the label, the second goes there
+  // touch screens have no hover: the first tap shows the label (only that one: another page's shown label goes), the second goes there
   tapReveal(pg) { if (!isTouch()) return false; const s = this.labs && this.labs[pg]; if (s && s.on) return false;
-    if (pg === 'freediving') this.hov = 1; else this.hovPg[pg] = 1;
+    this.hov = pg === 'freediving' ? 1 : 0; this.hovPg.sound = pg === 'sound' ? 1 : 0; this.hovPg.library = pg === 'library' ? 1 : 0;
     if (!this.offTap) { this.offTap = e => { if (e.target.closest && e.target.closest('button[aria-label]')) return; this.hov = 0; this.hovPg.sound = this.hovPg.library = 0; }; document.addEventListener('pointerdown', this.offTap); }
     return true; }
   // x: 0 at the start of the visible stroke, 1 at its tail

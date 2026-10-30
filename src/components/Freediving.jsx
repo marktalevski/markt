@@ -189,8 +189,10 @@ class Component extends DCLogic {
   // stays free; asking again closes it, and scrolling away from it closes it too
   go(i) { this.target = i; this.setState({ exp: this.state.exp === i ? null : i }); }
   waveRef = React.createRef();
-  goHome = e => { e.preventDefault(); if (this.leaveT != null) return; const o = navDots(); handNavFrom(o); const far = this.p > -.9; this.goSurface(); this.navPos = o; setTimeout(() => { this.leaveT = 0; }, far ? 1300 : 0); };
-  goPage = k => e => { if (e) e.preventDefault(); if (this.leaveT != null || this.pgLeave) return; this.pgLeave = { href: k === 'sound' ? BASE + 'sound/?from=page' : BASE + 'library/', t: 0, k, nav: { c4: navDot('c4'), sound: navDot('sound') } }; };
+  // (a leave, once asked for, is the only one: going Home waits up to 1.3 s for the page to rise to the surface first, so homeAsked, not
+  // leaveT, is what keeps a second click, or a click on another page, from starting another)
+  goHome = e => { e.preventDefault(); if (this.homeAsked || this.pgLeave) return; this.homeAsked = true; const o = navDots(); handNavFrom(o); const far = this.p > -.9; this.goSurface(); this.navPos = o; setTimeout(() => { this.leaveT = 0; }, far ? 1300 : 0); };
+  goPage = k => e => { if (e) e.preventDefault(); if (this.homeAsked || this.pgLeave) return; this.pgLeave = { href: k === 'sound' ? BASE + 'sound/?from=page' : BASE + 'library/', t: 0, k, nav: { c4: navDot('c4'), sound: navDot('sound') } }; };
   goSurface = () => { this.target = -1; this.setState({ exp: null }); };
 
   tick = now => {
@@ -523,7 +525,8 @@ class Component extends DCLogic {
     if (intro) {
       const d = smooth(clamp((T - this.tideEnd) / 1.0, 0, 1)), drop = this.fromHome ? 1 : smooth(clamp((T - this.dropT) / .4, 0, 1));
       if (d > 0) { const end = LS + (H + 20 - LS) * d, pts = []; for (let y = LS; y <= end; y += 15) pts.push([o.x + Math.sin((y - o.y) * .02) * .7, y]); pts.push([o.x + Math.sin((end - o.y) * .02) * .7, end]); this.brush(ctx, pts, ROPE_W + 1.8, .85, LS - o.y, false, d < 1, ROPE_EDGE); this.brush(ctx, pts, ROPE_W - .2, 1, LS - o.y, false, d < 1, ROPE_SAND); }
-      if (this.leaveT == null) { this.buoyDrain = 1 - this.paintFill(T, 'c4'); this.flagDrain = 1 - this.paintFill(T, 'sound'); }
+      // (the larger of the two: leaving for Sound or the Library mid-way drains whatever colour the paint has put in so far)
+      if (this.leaveT == null) { this.buoyDrain = Math.max(this.buoyDrain, 1 - this.paintFill(T, 'c4')); this.flagDrain = Math.max(this.flagDrain, 1 - this.paintFill(T, 'sound')); }
       if (drop > 0) { this.buoyPos = [o.x, BY - (1 - drop) * 60, BS * drop]; this.drawBuoy(ctx, o.x, BY - (1 - drop) * 60, BS * drop, t); }
       if (this.leaveT == null) this.paintDots(ctx, T, [o.x, BY, BS]);
     } else {

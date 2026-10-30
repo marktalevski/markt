@@ -231,15 +231,21 @@ class Component extends DCLogic {
     this.onTS = e => { this.ty = e.touches[0].clientY; }; this.onTE = e => { if (this.ty == null) return; const dy = this.ty - e.changedTouches[0].clientY; this.ty = null; if (Math.abs(dy) > 50) this.step(dy > 0 ? 1 : -1); };
     this.onPM = e => { this.mxT = e.clientX / innerWidth * 2 - 1; };
     addEventListener('resize', this.onResize); addEventListener('wheel', this.onWheel, { passive: true }); addEventListener('keydown', this.onKey); document.addEventListener('fullscreenchange', this.onFsc); addEventListener('pointermove', this.onFMove); addEventListener('click', this.onFClick); addEventListener('click', this.onWClick); addEventListener('pointerdown', this.onFDown); addEventListener('pointerdown', this.onPDown); addEventListener('touchstart', this.onTS, { passive: true }); addEventListener('touchend', this.onTE); addEventListener('pointermove', this.onPM);
-    // pieces with a file: decode it for its real waveform and length
-    this.albums.forEach(a => a.tracks.forEach(tr => { if (!tr.src) return; const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext; if (!OAC) return;
-      fetch(tr.src).then(res => res.arrayBuffer()).then(b => new OAC(1, 1, 44100).decodeAudioData(b)).then(buf => { tr.buf = buf; tr.dur = buf.duration; tr.env = envFromBuf(buf); this.forceUpdate(); }).catch(() => {}); }));
+    this.decodeAlbum(this.state.album);
     if (import.meta.env.DEV) window.__sound = this; // a handle for checking the page in development; not in the built site
     this.raf = requestAnimationFrame(this.tick);
   }
   componentWillUnmount() { this.mediaOff(); cancelAnimationFrame(this.raf); removeEventListener('resize', this.onResize); removeEventListener('wheel', this.onWheel); removeEventListener('keydown', this.onKey); document.removeEventListener('fullscreenchange', this.onFsc); removeEventListener('pointermove', this.onFMove); removeEventListener('click', this.onFClick); removeEventListener('click', this.onWClick); removeEventListener('pointerdown', this.onFDown); removeEventListener('pointerdown', this.onPDown); removeEventListener('touchstart', this.onTS); removeEventListener('touchend', this.onTE); removeEventListener('pointermove', this.onPM); this.stopNodes(); try { this.ac && this.ac.close(); } catch (e) {} }
+  // pieces with a file are fetched and decoded for their real waveform and length when their album is first shown (or a piece is played),
+  // not all at once on arrival. A piece already playing on its stand-in sound when its file arrives switches over to it where it was
+  decode(tr) { if (!tr.src || tr.decoding) return; const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext; if (!OAC) return; tr.decoding = true;
+    fetch(tr.src).then(res => { if (!res.ok) throw new Error(res.status); return res.arrayBuffer(); }).then(b => new OAC(1, 1, 44100).decodeAudioData(b)).then(buf => {
+      const c = this.cur, was = c && c.tr === tr && !c.paused && !c.N.file ? this.posOf() : null;
+      tr.buf = buf; tr.dur = buf.duration; tr.env = envFromBuf(buf);
+      if (was != null) this.play(tr, Math.min(was, tr.dur)); else this.forceUpdate(); }).catch(() => { tr.decoding = false; }); }
+  decodeAlbum(ai) { const a = this.albums[ai]; if (a) a.tracks.forEach(tr => this.decode(tr)); }
   step(d) { this.goAlbum(this.state.album + d)(); }
-  goAlbum = a => () => { a = clamp(a, 0, this.albums.length - 1); if (a === this.state.album) return; this.albDir = a > this.state.album ? 1 : -1; this.flipPrev = this.state.album; this.flipT0 = this.t; this.setState({ album: a }); };
+  goAlbum = a => () => { a = clamp(a, 0, this.albums.length - 1); if (a === this.state.album) return; this.albDir = a > this.state.album ? 1 : -1; this.flipPrev = this.state.album; this.flipT0 = this.t; this.decodeAlbum(a); this.setState({ album: a }); };
   // ---- sound
   // iPhones mute Web Audio while the ring / silent switch is on (but not media playback), so while a piece plays the page says it is playing
   // media: Safari 17+ takes navigator.audioSession, older ones switch over while an <audio> element plays alongside (a silent loop). Only for
@@ -257,7 +263,7 @@ class Component extends DCLogic {
   }
   ensureAC() { if (!this.ac) { const AC = window.AudioContext || window.webkitAudioContext; this.ac = new AC(); this.an = this.ac.createAnalyser(); this.an.fftSize = 512; this.vol = this.ac.createGain(); this.an.connect(this.vol); this.vol.connect(this.ac.destination); this.anBuf = new Float32Array(512); } if (this.ac.state === 'suspended') this.ac.resume(); }
   play(tr, off = 0) {
-    this.stopNodes(); this.ensureAC(); this.mediaOn(); const ac = this.ac, now = ac.currentTime, out = ac.createGain(); out.gain.value = 0; out.connect(this.an);
+    this.decode(tr); this.stopNodes(); this.ensureAC(); this.mediaOn(); const ac = this.ac, now = ac.currentTime, out = ac.createGain(); out.gain.value = 0; out.connect(this.an);
     const N = { out, list: [] }, on = this.props.synth ?? true;
     if (tr.buf) { const s = ac.createBufferSource(); s.buffer = tr.buf; s.connect(out); out.gain.value = 1; s.start(now, off); N.list.push(s); N.file = 1; }
     else if (on && tr.kind === 'field') { const nb = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate), d = nb.getChannelData(0); let b = 0; for (let i = 0; i < d.length; i++) { b = .97 * b + .03 * (Math.random() * 2 - 1); d[i] = b * 4 + (Math.random() * 2 - 1) * .12; }

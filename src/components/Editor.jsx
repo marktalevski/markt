@@ -2,7 +2,7 @@
 // The logic class is the design's own code; View is its template as JSX.
 import React from 'react';
 import { DCLogic, page, sty, BASE, assetUrl } from '../lib/dc.js';
-import { load, loadDraft, save, newId } from '../lib/site-data.js';
+import { fetchSite, loadDraft, save, newId } from '../lib/site-data.js';
 
 // the tabs: the dive log's entries, Sound's albums and the Library's books
 const ARROWS = { down: 'Freediving', up: 'Sound', right: 'Library' };
@@ -36,7 +36,8 @@ const durOf = file => new Promise(res => { const a = new Audio(), url = URL.crea
 // Sound's albums as saved in the project (src/data/sound.json)
 // what site.json holds: the profile, Freediving's entries (its 'down' line only) and the Library's books
 const siteOf = d => ({ profile: d.profile, entries: (d.entries || []).filter(e => e.line === 'down'), books: d.books || [] });
-const loadAlbums = () => fetch(BASE + '__editor/sound/', { cache: 'no-cache' }).then(r => r.json()).then(d => Array.isArray(d.albums) ? d.albums : []).catch(() => []);
+// Sound's albums from the editor helper, or null if they couldn't be read (never an empty list in its place, which saving would write back)
+const loadAlbums = () => fetch(BASE + '__editor/sound/', { cache: 'no-cache' }).then(r => r.ok ? r.json() : null).then(d => d && Array.isArray(d.albums) ? d.albums : null).catch(() => null);
 const fmtDur = s => s ? Math.floor(s / 60) + ':' + String(Math.round(s % 60)).padStart(2, '0') : '';
 // a photo field: a preview, Upload (into dir) and Remove; the photo is stored by its path
 class PhotoPick extends React.Component {
@@ -181,13 +182,15 @@ class Component extends DCLogic {
   state = { data: null, line: 'down', selId: null, selBook: null, selAlbum: null, note: '' };
 
   componentDidMount() {
-    const pub = load(); Promise.all([loadDraft(pub), pub, loadAlbums()]).then(([data, pub, siteAlbums]) => {
+    const pub = fetchSite(); Promise.all([loadDraft(pub), pub, loadAlbums()]).then(([data, pub, siteAlbums]) => {
+      // the site's content couldn't be read: nothing is shown, and Save to site stays off, so an empty list is never written over it
+      if (!data || (!Array.isArray(data.albums) && !siteAlbums)) { this.setState({ loadFailed: true, note: 'Could not read the site\'s content (public/data/site.json or src/data/sound.json). Fix it, then reload this page.' }); return; }
       // a working copy from before Sound's albums were editable gets the site's albums
       if (!Array.isArray(data.albums)) data.albums = siteAlbums;
       // a working copy whose books or albums differ from the site's: either edited here, or older than the site (and saving it would undo
       // the newer ones), so say so
       const diff = [pub && Array.isArray(pub.books) && pub.books.length && JSON.stringify(pub.books) !== JSON.stringify(data.books) ? 'books' : '',
-        JSON.stringify(siteAlbums) !== JSON.stringify(data.albums) ? 'albums' : ''].filter(Boolean).join(' and ');
+        siteAlbums && JSON.stringify(siteAlbums) !== JSON.stringify(data.albums) ? 'albums' : ''].filter(Boolean).join(' and ');
       this.setState({ data, note: diff ? `The ${diff} here differ from the site's. If you did not change them here, use Reset to published first.` : '' }); });
   }
 
@@ -219,6 +222,7 @@ class Component extends DCLogic {
   };
   // writes the site's files in the project (site.json and sound.json) through the editor helper; pushing then publishes them
   saveSite = () => {
+    if (this.state.loadFailed || !this.state.data) { this.setState({ note: 'Nothing was saved: the site\'s content could not be read when this page opened. Reload it first.' }); return; }
     const d = this.state.data, site = siteOf(d);
     fetch(BASE + '__editor/save/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ site, sound: { albums: d.albums || [] } }) })
       .then(r => r.json().then(j => { if (!r.ok) throw new Error(j.error || 'Save failed'); this.setState({ note: 'Saved to the site\'s files. Push them to publish.' }); }))
@@ -238,7 +242,7 @@ class Component extends DCLogic {
       catch (e) { this.setState({ note: 'That file is not a valid export.' }); }
     });
   };
-  resetSample = () => { if (confirm('Throw away your changes and go back to the published entries?')) Promise.all([load(), loadAlbums()]).then(([d, albums]) => this.commit({ ...d, albums }, { selId: null, selBook: null, selAlbum: null, note: '' })); };
+  resetSample = () => { if (confirm('Throw away your changes and go back to the published entries?')) Promise.all([fetchSite(), loadAlbums()]).then(([d, albums]) => { if (!d || !albums) { this.setState({ note: 'Could not read the published content, so nothing was reset.' }); return; } this.commit({ ...d, albums }, { selId: null, selBook: null, selAlbum: null, note: '' }); }); };
 
   renderVals() {
     const d = this.state.data, line = this.state.line;
