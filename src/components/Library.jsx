@@ -6,6 +6,7 @@ import React from 'react';
 import { DCLogic, page, sty, BASE, assetUrl } from '../lib/dc.js';
 import { loadBooks } from '../lib/library-data.js';
 import { cubicAt } from '../lib/rope.js';
+import { PACE } from '../lib/pace.js';
 import { navAt, navDots, handNavFrom, takeNavFrom, leaveTo } from '../lib/nav.js';
 
 const PAGE = 'library';
@@ -31,6 +32,8 @@ const easeIn = u => u * u * (1.6 - .6 * u), easeOut = u => 1 - easeIn(1 - u);
 const paras = s => (s || '').split(/\n\s*\n/).map(x => x.trim()).filter(Boolean);
 const SERIF = "'Newsreader', Georgia, serif", SANS = "'Geist', sans-serif", MONOF = "'Geist Mono', monospace";
 const NAV = [['home', 'Home'], ['freediving', 'Freediving'], ['sound', 'Sound'], ['library', 'Library']];
+// every animation here runs at the site's transition pace (delays included)
+const play = (el, kf, o) => { const a = el.animate(kf, o); a.playbackRate = PACE; return a; };
 const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 class Component extends DCLogic {
@@ -60,7 +63,7 @@ class Component extends DCLogic {
   }
   arrive() {
     if (reducedMotion()) return;
-    const anims = this.arrAnims = [], A = (el, kf, o) => { const a = el.animate(kf, o); anims.push(a); return a; };
+    const anims = this.arrAnims = [], A = (el, kf, o) => { const a = play(el, kf, o); anims.push(a); return a; };
     const W = innerWidth, nf = this.nf || {}, from = k => nf[k] || nf[k === 'home' ? 'ink' : k] || navAt(W, k), t0 = 120, step = 90, fly = 540, open = 300;
     // where the mug rests, measured before the books start (the top book's opening scale would carry it along)
     const mugEl = document.querySelector('[data-mug]'), mugL = mugEl ? mugEl.getBoundingClientRect().left : 0;
@@ -83,9 +86,9 @@ class Component extends DCLogic {
   // a new book: the text lifts away, the column goes back to the top, and the new book's text rises in
   pick(slug) {
     if (slug === this.state.sel || this.switching || this.out) return; this.switching = true;
-    const body = this.bodyRef.current; if (body && body.animate) body.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-12px)' }], { duration: 220, easing: 'ease-in', fill: 'forwards' });
+    const body = this.bodyRef.current; if (body && body.animate) play(body, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-12px)' }], { duration: 220, easing: 'ease-in', fill: 'forwards' });
     this.pickT = setTimeout(() => { if (this.out) return; this.setState({ sel: slug }); const sc = this.scrollRef.current; if (sc) sc.scrollTop = 0;
-      requestAnimationFrame(() => { if (this.out) { this.switching = false; return; } const bd = this.bodyRef.current; if (bd && bd.animate) { bd.getAnimations().forEach(x => x.cancel()); bd.animate([{ opacity: 0, transform: 'translateY(16px)' }, { opacity: 1, transform: 'none' }], { duration: 420, easing: 'cubic-bezier(.2,.8,.2,1)' }); } this.switching = false; }); }, 230);
+      requestAnimationFrame(() => { if (this.out) { this.switching = false; return; } const bd = this.bodyRef.current; if (bd && bd.animate) { bd.getAnimations().forEach(x => x.cancel()); play(bd, [{ opacity: 0, transform: 'translateY(16px)' }, { opacity: 1, transform: 'none' }], { duration: 420, easing: 'cubic-bezier(.2,.8,.2,1)' }); } this.switching = false; }); }, 230 / PACE);
   }
   // where each heading sits down the text, as a ring on the line
   measure() {
@@ -133,15 +136,15 @@ class Component extends DCLogic {
       // rise into the menu (or, to Freediving, stay where their books were); the next page picks them up there. It goes once the last dot
       // has arrived
       const W = innerWidth, fold = 210, fly = 480, step = 70, flights = [];
-      [this.bodyRef.current, document.querySelector('[data-rail]')].forEach(el => el && el.animate([{ opacity: getComputedStyle(el).opacity }, { opacity: 0 }], { duration: 220, fill: 'forwards' }));   // from as they are (the line is hidden with no book open)
-      const mug = document.querySelector('[data-mug]'); if (mug) { const r = mug.getBoundingClientRect(); mug.animate([{ translate: '0 0' }, { translate: `${innerWidth - r.left + 60}px 0` }], { duration: 420, easing: 'cubic-bezier(.55,0,.75,.4)', fill: 'forwards' }); }
+      [this.bodyRef.current, document.querySelector('[data-rail]')].forEach(el => el && play(el, [{ opacity: getComputedStyle(el).opacity }, { opacity: 0 }], { duration: 220, fill: 'forwards' }));   // from as they are (the line is hidden with no book open)
+      const mug = document.querySelector('[data-mug]'); if (mug) { const r = mug.getBoundingClientRect(); play(mug, [{ translate: '0 0' }, { translate: `${innerWidth - r.left + 60}px 0` }], { duration: 420, easing: 'cubic-bezier(.55,0,.75,.4)', fill: 'forwards' }); }
       this.spines().forEach(({ el, k, L, rad, dot, asDot }, i) => { const N = navAt(W, k), d = 160 + i * step;
-        el.animate([{ scale: '1 1', opacity: 1 }, { scale: asDot, opacity: 0 }], { duration: fold, delay: d, fill: 'forwards', easing: 'ease-in' });
+        play(el, [{ scale: '1 1', opacity: 1 }, { scale: asDot, opacity: 0 }], { duration: fold, delay: d, fill: 'forwards', easing: 'ease-in' });
         if (!dot) return;
         dot.getAnimations().forEach(a => a.cancel());   // its arrival (which ends stretched out and hidden) is over
-        const show = dot.animate([{ opacity: 0 }, { opacity: 1 }], { duration: fold * .5, delay: d + fold * .5, fill: 'both' });
+        const show = play(dot, [{ opacity: 0 }, { opacity: 1 }], { duration: fold * .5, delay: d + fold * .5, fill: 'both' });
         if (atBooks) { dot.style.translate = `${L[0] - rad}px ${L[1] - rad}px`; dot.style.backgroundColor = DOT_COL[k]; flights.push(show); return; }
-        flights.push(dot.animate(flight(L, [L[0], L[1] - 140], [N[0] - 30, N[1] + 70], N, rad, easeOut, [getComputedStyle(el).backgroundColor, DOT_COL[k]]), { duration: fly, delay: d + fold * .5, fill: 'both' })); });
+        flights.push(play(dot, flight(L, [L[0], L[1] - 140], [N[0] - 30, N[1] + 70], N, rad, easeOut, [getComputedStyle(el).backgroundColor, DOT_COL[k]]), { duration: fly, delay: d + fold * .5, fill: 'both' })); });
       // with no books to fold, it still waits for the text to fade
       let gone = false; const once = () => { if (!gone) { gone = true; go(); } };
       Promise.all(flights.map(a => a.finished)).then(() => setTimeout(once, flights.length ? 60 : 280), once); };

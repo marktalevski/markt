@@ -5,6 +5,7 @@ import { DCLogic, page, sty, BASE } from '../lib/dc.js';
 import { deckGeo, padOf } from '../lib/deck.js';
 import { navAt, NAV_Y, handNavFrom, leaveTo } from '../lib/nav.js';
 import { ropeX, waveY, surfaceY, cubicAt } from '../lib/rope.js';
+import { PACE } from '../lib/pace.js';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const smooth = x => x * x * (3 - 2 * x);
@@ -460,15 +461,21 @@ class Component extends DCLogic {
     const bez = (out, A, B, C, D, n) => { for (let i = 1; i <= n; i++) out.push(cubicAt(A, B, C, D, i / n)); };
     const WIN = {}; { const okI = SP.map(q => { if ((q[2] ?? 1) < .5) return 0; const k = sec(q), r = Math.hypot(q[0] - cx, q[1] - cy); return r >= .8 * secMax(k) ? 1 : 0; });
       const pre = [0]; okI.forEach((v, i) => pre.push(pre[i] + v)); const hidP = [0]; SP.forEach((q, i) => hidP.push(hidP[i] + ((q[2] ?? 1) < .2 ? 1 : 0))); const hidN = (a, b) => hidP[b + 1] - hidP[a]; const frac = (a, b) => (pre[b + 1] - pre[a]) / Math.max(1, b - a + 1);
-      const cen = (a, b) => { const m = SP[Math.floor((a + b) / 2)], e2 = SP[b]; return [(m[0] * 2 + e2[0]) / 3, (m[1] * 2 + e2[1]) / 3]; }, taken = [], takenS = [], samp = (a, b) => { const o = []; for (let i = a; i <= b; i += 4) o.push(SP[i]); return o; }, mdOf = (a, b) => { if (!takenS.length) return R; const S = samp(a, b); let t = 0; for (const p of S) { let m = 1e9; for (const q of takenS) { const d = (p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2; if (d < m) m = d; } t += Math.sqrt(m); } return t / S.length; };
+      const cen = (a, b) => { const m = SP[Math.floor((a + b) / 2)], e2 = SP[b]; return [(m[0] * 2 + e2[0]) / 3, (m[1] * 2 + e2[1]) / 3]; }, taken = [], takenS = [], samp = (a, b) => { const o = []; for (let i = a; i <= b; i += 4) o.push(SP[i]); return o; }, mdOf = (a, b) => { if (!takenS.length) return R; let t = 0, n = 0; for (let i = a; i <= b; i += 4) { t += nearT(i); n++; } return t / n; };
+      // the search below asks the same few things about each point thousands of times, so each is worked out once: how far it is from the
+      // nearest stretch already taken (until another is taken), how sharply the stroke turns there, and whether it is near a page's label
+      let nearTN = -1; const nearTC = new Float64Array(NS), nearT = i => { if (nearTN !== takenS.length) { nearTN = takenS.length; nearTC.fill(-1); }
+        if (nearTC[i] < 0) { const p = SP[i]; let m = 1e9; for (const q of takenS) { const d = (p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2; if (d < m) m = d; } nearTC[i] = Math.sqrt(m); } return nearTC[i]; };
+      const turnC = new Float64Array(NS).fill(-1), turnAt = i => { if (turnC[i] < 0) { const p0 = SP[i - 4], p1 = SP[i], p2 = SP[i + 4], a1 = Math.atan2(p1[1] - p0[1], p1[0] - p0[0]), a2 = Math.atan2(p2[1] - p1[1], p2[0] - p1[0]); let d = Math.abs(a2 - a1); if (d > Math.PI) d = 2 * Math.PI - d; turnC[i] = d; } return turnC[i]; };
+      const nearEnd = SP.map(p => ends.slice(0, 3).some(S => Math.abs(p[0] - S[0]) < 150 && Math.abs(p[1] - S[1]) < 60));
       const spanOf = L => Math.min(NS - 1, Math.max(this.shapeName === 'hangul' ? 30 : 50, Math.floor((L.page ? .22 : this.shapeName === 'hangul' ? .12 : .3) * NS)));
       LINES.forEach((L, li) => { if (!L.page) return; const sp = spanOf(L), stI = stIs[L.page], A = [Math.max(0, stI - sp), stI], B = [stI, Math.min(NS - 1, stI + sp)];
         for (let i = A[1]; i >= A[0]; i--) if ((SP[i][2] ?? 1) < .2) { A[0] = Math.min(A[1], i + 1); break; } for (let i = B[0]; i <= B[1]; i++) if ((SP[i][2] ?? 1) < .2) { B[1] = Math.max(B[0], i - 1); break; }
         const useB = (A[1] - A[0] < 20) || (B[1] - B[0] >= 20 && frac(B[0], B[1]) > frac(A[0], A[1]) + .1); const w = useB ? B : A; WIN[li] = [w[0], w[1], useB]; taken.push(cen(w[0], w[1])); takenS.push(...samp(w[0], w[1])); });
       let runMax = 0, run = 0; SP.forEach(q => { if ((q[2] ?? 1) >= .2) { run++; runMax = Math.max(runMax, run); } else run = 0; });
       LINES.forEach((L, li) => { if (L.keep || L.page) return; const sp = Math.max(30, Math.min(spanOf(L), Math.floor(runMax * .34))), spx0 = sp; let best = null;
-        for (const spx of [sp, Math.round(sp * .75), Math.max(24, Math.round(sp * .55))]) for (let st = 0; st + spx < NS; st += 6) { const sp = spx; if (hidN(st, st + sp) > 1) { continue; } { let sharp = false; for (let i = st + 4; i <= st + sp - 4 && !sharp; i += 3) { const p0 = SP[i - 4], p1 = SP[i], p2 = SP[i + 4], a1 = Math.atan2(p1[1] - p0[1], p1[0] - p0[0]), a2 = Math.atan2(p2[1] - p1[1], p2[0] - p1[0]); let d = Math.abs(a2 - a1); if (d > Math.PI) d = 2 * Math.PI - d; if (d > 1.9) sharp = true; } if (sharp) { continue; } }
-          const outE = (eb, ea) => { const tx = eb[0] - ea[0], ty = eb[1] - ea[1], tl = Math.hypot(tx, ty) || 1, ox = eb[0] - cx, oy = eb[1] - cy, ol = Math.hypot(ox, oy) || 1; return (tx * ox + ty * oy) / (tl * ol) >= -.35; }, okFw = outE(SP[st + sp], SP[st + sp - 5]), okRv = outE(SP[st], SP[st + 5]); if (!okFw && !okRv) { continue; } const rv = !okFw; const c = cen(st, st + sp), md = mdOf(st, st + sp), nearSt = (() => { for (let i = st; i <= st + sp; i += 4) for (let si = 0; si < 3; si++) { const S = ends[si]; if (Math.abs(SP[i][0] - S[0]) < 150 && Math.abs(SP[i][1] - S[1]) < 60) return 1; } return 0; })(), fr = frac(st, st + sp), sc = (fr < .55 ? -3 : 0) + fr + 2.6 * Math.min(1, md / (R * .7)) - (md < R * .3 ? 1.6 : 0) - 1.2 * nearSt + .35 * sp / spx0; if (!best || sc > best[0]) best = [sc, st, st + sp, c, rv]; }
+        for (const spx of [sp, Math.round(sp * .75), Math.max(24, Math.round(sp * .55))]) for (let st = 0; st + spx < NS; st += 6) { const sp = spx; if (hidN(st, st + sp) > 1) { continue; } { let sharp = false; for (let i = st + 4; i <= st + sp - 4 && !sharp; i += 3) if (turnAt(i) > 1.9) sharp = true; if (sharp) { continue; } }
+          const outE = (eb, ea) => { const tx = eb[0] - ea[0], ty = eb[1] - ea[1], tl = Math.hypot(tx, ty) || 1, ox = eb[0] - cx, oy = eb[1] - cy, ol = Math.hypot(ox, oy) || 1; return (tx * ox + ty * oy) / (tl * ol) >= -.35; }, okFw = outE(SP[st + sp], SP[st + sp - 5]), okRv = outE(SP[st], SP[st + 5]); if (!okFw && !okRv) { continue; } const rv = !okFw; const c = cen(st, st + sp), md = mdOf(st, st + sp), nearSt = (() => { for (let i = st; i <= st + sp; i += 4) if (nearEnd[i]) return 1; return 0; })(), fr = frac(st, st + sp), sc = (fr < .55 ? -3 : 0) + fr + 2.6 * Math.min(1, md / (R * .7)) - (md < R * .3 ? 1.6 : 0) - 1.2 * nearSt + .35 * sp / spx0; if (!best || sc > best[0]) best = [sc, st, st + sp, c, rv]; }
         if (!best) { const sp2 = Math.max(24, Math.floor(sp * .5)); for (let st = 0; st + sp2 < NS; st += 4) { if (hidN(st, st + sp2) > 0) continue; const c = cen(st, st + sp2), md = mdOf(st, st + sp2), sc = frac(st, st + sp2) + 1.4 * Math.min(1, md / (R * .7)); if (!best || sc > best[0]) best = [sc, st, st + sp2, c]; } }
         if (best) { WIN[li] = [best[1], best[2], !!best[4]]; taken.push(best[3]); takenS.push(...samp(best[1], best[2])); } }); }
     this.paths = LINES.map((L, li) => {
@@ -663,10 +670,10 @@ class Component extends DCLogic {
   tick = now => {
     cancelAnimationFrame(this.raf); this.raf = requestAnimationFrame(this.tick);
     const dt = Math.min(.05, (now - (this.last || now)) / 1000); this.last = now;
-    this.T += dt; this.hovT += (this.hov - this.hovT) * (1 - Math.exp(-dt * 8)); for (const k of ['sound', 'library']) this.hovPgT[k] = (this.hovPgT[k] || 0) + ((this.hovPg[k] || 0) - (this.hovPgT[k] || 0)) * (1 - Math.exp(-dt * 8));
+    this.T += dt * PACE; this.hovT += (this.hov - this.hovT) * (1 - Math.exp(-dt * 8)); for (const k of ['sound', 'library']) this.hovPgT[k] = (this.hovPgT[k] || 0) + ((this.hovPg[k] || 0) - (this.hovPgT[k] || 0)) * (1 - Math.exp(-dt * 8));
     this.fadeTick(dt); this.dtF = Math.max(0, dt);
     // leaving: the last frame is kept (window.__leave) and shown by the next page while it loads, so there's no blank moment in between
-    if (this.go != null) { this.go += dt; if (this.go > (this.dest ? (/\/sound\//.test(this.dest) ? 1.3 : 2.05) : 4.05) && !this.left) { this.left = true; // Sound picks the menu dots up where they are and drops them onto its beat pads
+    if (this.go != null) { this.go += dt * PACE; if (this.go > (this.dest ? (/\/sound\//.test(this.dest) ? 1.3 : 2.05) : 4.05) && !this.left) { this.left = true; // Sound picks the menu dots up where they are and drops them onto its beat pads
       if (/\/sound\//.test(this.dest || '')) { const o = {}; DOT_KEYS.forEach(k => { const f = this.navFrom && this.navFrom[k]; o[k] = f ? f.p : sndDrop(k, innerWidth, innerHeight); }); handNavFrom(o); }
       leaveTo(this.dest || BASE + 'freediving/?from=home'); } }
     // once the symbol has settled (drawn, its transition over, nothing hovered, fading or with labels moving) the picture doesn't change, so it

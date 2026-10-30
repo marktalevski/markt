@@ -5,6 +5,7 @@ import { DCLogic, page, sty, BASE, assetUrl } from '../lib/dc.js';
 import { ropeX, waveY, surfaceY, cubicAt } from '../lib/rope.js';
 import { navDot, navDotEl, navDots, handNavFrom, takeNavFrom, leaveTo } from '../lib/nav.js';
 import { drawSquid } from '../lib/squid-draw.js';
+import { PACE } from '../lib/pace.js';
 
 // the rope down from the buoy, wide enough for its twist to show
 const ROPE_W = 3.6;
@@ -191,7 +192,7 @@ class Component extends DCLogic {
   waveRef = React.createRef();
   // (a leave, once asked for, is the only one: going Home waits up to 1.3 s for the page to rise to the surface first, so homeAsked, not
   // leaveT, is what keeps a second click, or a click on another page, from starting another)
-  goHome = e => { e.preventDefault(); if (this.homeAsked || this.pgLeave) return; this.homeAsked = true; const o = navDots(); handNavFrom(o); const far = this.p > -.9; this.goSurface(); this.navPos = o; setTimeout(() => { this.leaveT = 0; }, far ? 1300 : 0); };
+  goHome = e => { e.preventDefault(); if (this.homeAsked || this.pgLeave) return; this.homeAsked = true; const o = navDots(); handNavFrom(o); const far = this.p > -.9; this.goSurface(); this.navPos = o; setTimeout(() => { this.leaveT = 0; }, far ? 1300 / PACE : 0); };
   goPage = k => e => { if (e) e.preventDefault(); if (this.homeAsked || this.pgLeave) return; this.pgLeave = { href: k === 'sound' ? BASE + 'sound/?from=page' : BASE + 'library/', t: 0, k, nav: { c4: navDot('c4'), sound: navDot('sound') } }; };
   goSurface = () => { this.target = -1; this.setState({ exp: null }); };
 
@@ -204,14 +205,14 @@ class Component extends DCLogic {
  }
     if (this.tideIntro && this.leaveT == null) { const kk = clamp((this.introT - this.tide0) / 1.5, 0, 1), e2 = kk * kk * kk * (kk * (kk * 6 - 15) + 10), dy = innerHeight * 1.05 * (1 - e2), sw = Math.sin(this.introT * 2.4) * 6 * (1 - e2);
       this.tideY = this.state.introDone ? 0 : dy + sw; if (this.canvasRef.current) this.canvasRef.current.style.transform = 'none'; [this.chromeRef].forEach(r => { const el = r.current; if (el) el.style.transform = this.tideY ? 'translateY(' + this.tideY.toFixed(1) + 'px)' : 'none'; }); }
-    if (this.leaveT != null) { this.leaveT += dt;
+    if (this.leaveT != null) { this.leaveT += dt * PACE;
       // once the colour is in, each label is drawn up into its dot: rising, narrowing, softening
       document.querySelectorAll('nav[aria-label="Pages"] > [data-navk]').forEach((el, i) => { const lab = el.querySelector(':scope > span:last-child'), dot = el.querySelector('[data-navdot]'); if (!lab) return;
         const k = clamp((this.leaveT - SWIRL_DUR * .85 - i * .1) / .75, 0, 1), e = k * k * (3 - 2 * k); lab.style.transformOrigin = '50% 0'; lab.style.transform = 'translateY(' + (-30 * e).toFixed(1) + 'px) scaleY(' + (1 - .85 * e).toFixed(3) + ') scaleX(' + (1 - .5 * e).toFixed(3) + ')'; lab.style.opacity = (1 - e).toFixed(3); lab.style.filter = e > .02 ? 'blur(' + (2.5 * e).toFixed(2) + 'px)' : '';
         if (dot && k > 0) { const u = clamp((k - .55) / .45, 0, 1); dot.style.transform = 'scale(' + (1 + .18 * Math.sin(Math.PI * u)).toFixed(3) + ')'; } });
       if (this.leaveT > SWIRL_DUR * .85 + 1.25 && !this.left) { this.left = true; leaveTo(BASE + '?from=dive'); } }
     if ((this.fromHome || this.fromSound) && !this.navLabDone) { const k = this.state.introDone ? 1 : smooth(clamp((this.introT - (this.fromSound ? 3 : 1.3)) / .9, 0, 1)); if (this.fromSound && k >= 1) document.querySelectorAll('[data-navdot]').forEach(d => { d.style.opacity = '1'; }); document.querySelectorAll('nav[aria-label="Pages"] > [data-navk] > span:last-child').forEach(el => { el.style.opacity = k.toFixed(3); }); if (k >= 1) this.navLabDone = true; }
-    if (!this.state.introDone) { this.introT += dt; if (this.introT >= this.introEnd) this.setState({ introDone: true }); }
+    if (!this.state.introDone) { this.introT += dt * PACE; if (this.introT >= this.introEnd) this.setState({ introDone: true }); }
     // the intro skipped (or left) before the orange and red dots finished colouring the buoy and flag: their menu dots come back regardless
     if (!this.paintDone && (this.state.introDone || this.leaveT != null || this.pgLeave)) { this.paintDone = true; this.painted = { c4: true, sound: true };
       ['c4', 'sound'].forEach(k => { const d = navDotEl(k); if (d) d.style.opacity = '1'; }); }
@@ -225,7 +226,7 @@ class Component extends DCLogic {
     this.layout(dt);
     // leaving for Sound or the Library: the cards fade at once; the buoy's and flag's colours drain back into the orange and red dots (see
     // draw, PG_DRAIN), and only then does the water fade and the page go
-    if (this.pgLeave) { const L = this.pgLeave; L.t += dt; const kc = smooth(clamp(L.t / .45, 0, 1)), k = smooth(clamp((L.t - PG_DRAIN) / .45, 0, 1));
+    if (this.pgLeave) { const L = this.pgLeave; L.t += dt * PACE; const kc = smooth(clamp(L.t / .45, 0, 1)), k = smooth(clamp((L.t - PG_DRAIN) / .45, 0, 1));
       [this.canvasRef, this.waveRef].forEach(r => { if (r.current) r.current.style.opacity = (1 - k).toFixed(3); }); [this.worldRef, this.chromeRef].forEach(r => { if (r.current) r.current.style.opacity = ((+r.current.style.opacity || 0) * (1 - kc)).toFixed(3); });
       const d = navDotEl(L.k); if (d) d.style.transform = 'scale(' + (1 + .6 * Math.sin(Math.PI * clamp(L.t / .55, 0, 1))).toFixed(3) + ')';
       // for Sound: the menu's names fade and only the dots stay; Sound takes them over from exactly where they sit
@@ -557,7 +558,7 @@ class Component extends DCLogic {
                 const pts = ap.slice(Math.floor(u0 * 48), Math.ceil(hk * 48) + 1); if (pts.length >= 2) this.brushFly(ctx, pts, 3.2, .95, this.redToPink(ctx, A, B2), 1.2, hk < 1); } }
             if (this.sqRot == null) this.sqRot = Math.PI; if (this.sqTo == null) this.sqTo = Math.PI; if (this.octV > 40) this.sqTo = Math.PI; else if (this.octV < -40) this.sqTo = 0; this.sqRot += (this.sqTo - this.sqRot) * (1 - Math.exp(-dtT * 6));
             // arrival: swims in pale from the bottom right, loops, a line from the red Sound dot pours in its pink (it smiles ^^), then it swims over to the line
-            if (this.sqI == null && vis && (this.props.motion ?? true)) this.sqI = 0; if (this.sqI != null) this.sqI += dtT;
+            if (this.sqI == null && vis && (this.props.motion ?? true)) this.sqI = 0; if (this.sqI != null) this.sqI += dtT * PACE;
             const I = this.sqI ?? 99, SW = 1.7, RD0 = SW + .05, RD1 = RD0 + 1.3, LP0 = RD1 + .15, LP1 = LP0 + 2.1, GO0 = LP1, GO1 = GO0 + 1.5, ez = ioCubic, wrapA = a => Math.atan2(Math.sin(a), Math.cos(a)), dirA = (dx, dy) => Math.atan2(dx, -dy), lerpA = (a, b, u) => a + wrapA(b - a) * u;
             const M = [W * .5 + 30, Math.max(H * .5 - 30, (this.anchor || 190) + 60)], bz3 = cubicAt;
             let dx = ox, dy = oy, dr = this.sqRot, dv = clamp(this.octV / 500, -1, 1), fill = fillK, happy = I > RD0 + 1.0 && I < GO1 + 1.2 ? 1 : 0;
