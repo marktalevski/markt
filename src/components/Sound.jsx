@@ -191,7 +191,8 @@ class Component extends DCLogic {
     this.setState({ W: innerWidth, H: innerHeight });
     this.onResize = () => this.setState({ W: innerWidth, H: innerHeight });
     // one album per scroll gesture: a gesture is armed after a short pause in wheel events and fires once it has moved far enough
-    this.onWheel = e => { if (e.target && e.target.closest && e.target.closest('[data-knob]')) return; const now = performance.now(); if (now - (this.lastWheel || 0) > 180) { this.acc = 0; this.armed = true; } this.lastWheel = now; this.acc += e.deltaY; if (this.armed && Math.abs(this.acc) > 30 && now - (this.lastStep || 0) > 650) { this.armed = false; this.lastStep = now; this.step(this.acc > 0 ? 1 : -1); } };
+    // (wheelAcc, not acc: drawDeck keeps the deck's accent colours in this.acc every frame)
+    this.onWheel = e => { if (e.target && e.target.closest && e.target.closest('[data-knob]')) return; const now = performance.now(); if (now - (this.lastWheel || 0) > 180) { this.wheelAcc = 0; this.armed = true; } this.lastWheel = now; this.wheelAcc += e.deltaY; if (this.armed && Math.abs(this.wheelAcc) > 30 && now - (this.lastStep || 0) > 650) { this.armed = false; this.lastStep = now; this.step(this.wheelAcc > 0 ? 1 : -1); } };
     this.onKey = e => { const tg = e.target && e.target.tagName || ''; if (/INPUT|TEXTAREA|SELECT/.test(tg)) return; const k = e.key;
       if (k === 'ArrowDown' || k === 'PageDown') { e.preventDefault(); this.step(1); } else if (k === 'ArrowUp' || k === 'PageUp') { e.preventDefault(); this.step(-1); }
       else if (k === ' ' && this.cur && !/BUTTON|^A$/.test(tg)) { e.preventDefault(); this.toggle(); } else if (k === 'Escape') { if (this.focus) this.leaveFull(); else this.stop(); }
