@@ -4,11 +4,12 @@
 // This file is the page's state and what a visitor can do to it. The painting is in scene.js (the page), wave.js, photos.js and
 // deck/ (the controller); the controller's hit areas are in controls.js, the album clock in clock.js, the sound in player.js.
 import { BASE } from '../lib/base.js';
+import { leaveTo, pageReady } from '../lib/cover.js';
 import { deckGeo, isPhone } from '../lib/deck-layout.js';
 import { followDrag } from '../lib/dom.js';
 import { startLoop } from '../lib/loop.js';
 import { clamp } from '../lib/math.js';
-import { handNavFrom, leaveTo, pageReady, takeNavFrom } from '../lib/nav.js';
+import { handNavFrom, takeNavFrom } from '../lib/nav.js';
 import { LEAVE_PACE } from '../lib/pace.js';
 import { albums } from './albums.js';
 import { placeClock, showAlbumNumber, stepFlip } from './clock.js';

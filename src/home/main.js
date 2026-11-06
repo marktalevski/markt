@@ -4,8 +4,9 @@
 // This file is the page's state and what a visitor can do. The symbols are in symbols/, where their lines run in layout.js, the
 // lines as paint in strokes.js and paint.js, the frame in scene.js, and the ways out in leave.js.
 import { BASE } from '../lib/base.js';
+import { leaveTo, pageReady } from '../lib/cover.js';
 import { startLoop } from '../lib/loop.js';
-import { handNavFrom, leaveTo, pageReady, takeNavFrom } from '../lib/nav.js';
+import { handNavFrom, takeNavFrom } from '../lib/nav.js';
 import { LEAVE_PACE } from '../lib/pace.js';
 import { paperGrain } from '../lib/paper.js';
 import { FADE, fadeTick } from './fade.js';
@@ -19,9 +20,6 @@ import { SHAPES } from './symbols/index.js';
 const isTouch = () => matchMedia('(hover: none)').matches;
 
 class Home {
-  /** Every symbol's name (the dev symbol picker lists them). */
-  static SHAPES = SHAPES;
-
   constructor(root) {
     // ---- the page's elements
     this.canvas = root.querySelector('.home__canvas');
@@ -35,7 +33,7 @@ class Home {
       last = sessionStorage.getItem('home-shape');
     } catch (e) {}
     this.picked = pickShape(last); // the one for this visit (never the one shown last)
-    this.asked = null; // the one a shuffle (or the dev picker) asked for instead
+    this.asked = null; // the one a shuffle (or the symbol picker) asked for instead
     this.shapeName = null; // the one laid out (see layout.js, which sets geo, stations, paths and the rest)
     this.geo = this.paths = null;
     this.previous = null; // after a shuffle: the last symbol's lines, which the new one's grow out of
@@ -74,7 +72,11 @@ class Home {
     this.ready = false; // the first frame has been drawn
 
     this.listen();
-    if (import.meta.env.DEV) window.__home = this; // (for the local symbol picker only)
+    if (import.meta.env.DEV) {
+      window.__home = this; // (a handle for checking the page in development)
+      // the symbol picker: a tool for designing the symbols, on your own computer only
+      import('../dev/symbol-picker.js').then(({ symbolPicker }) => symbolPicker(this));
+    }
     startLoop(dt => this.frame(dt));
   }
 
@@ -206,7 +208,7 @@ class Home {
   }
 
   /**
-   * Paints another symbol: the lines of this one flow on into the next. With no name it picks one (the black dot); the dev symbol
+   * Paints another symbol: the lines of this one flow on into the next. With no name it picks one (the black dot); the symbol
    * picker passes a name. Says whether it could (not while a symbol is still being drawn).
    */
   shuffle(name) {

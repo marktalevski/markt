@@ -2,12 +2,13 @@
 // and scrolling takes you down it: the water darkens, an orange line follows you to the nearest entry, and a squid keeps you company.
 //
 // This file is the page's state and its frame-by-frame logic; the painting is in scene.js and the placing of the entries in layout.js.
-import { entries as published } from '../../public/data/site.json';
+import { entries as published } from '../data/site.json';
 import { BASE } from '../lib/base.js';
+import { leaveTo, pageReady } from '../lib/cover.js';
 import { startLoop } from '../lib/loop.js';
 import { clamp, rng, smooth, smoother } from '../lib/math.js';
 import { bindMenu } from '../lib/menu.js';
-import { handNavFrom, leaveTo, navDot, navDotEl, navDots, pageReady, takeNavFrom } from '../lib/nav.js';
+import { handNavFrom, navDot, navDotEl, navDots, takeNavFrom } from '../lib/nav.js';
 import { LEAVE_PACE } from '../lib/pace.js';
 import { paperGrain } from '../lib/paper.js';
 import { buildEntries, closeCard, diveLog, openCard } from './entries.js';

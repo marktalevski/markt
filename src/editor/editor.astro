@@ -1,15 +1,13 @@
 ---
+// The editor's page. It is private: astro.config.mjs adds it under `npm run dev` only, so it is never part of the published site.
 import Base from '../layouts/Base.astro';
-import Editor from '../components/Editor.jsx';
+import Editor from './Editor.jsx';
+import './editor.css';
 ---
+
 <Base title="Editor · Mark T" noindex>
   <Fragment slot="head">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;1,6..72,300&amp;family=JetBrains+Mono:wght@400;500&amp;family=Familjen+Grotesk:wght@400;500;600&amp;display=swap" />
-    <style is:inline>
-      body{margin:0;background:#f2f0e9;color:#10232c}
-      a{color:#1f6f86}a:hover{color:#10232c}
-      input,textarea,select,button{font:inherit;color:inherit}
-    </style>
   </Fragment>
   <Editor client:only="react" />
 </Base>

@@ -1,0 +1,403 @@
+/* The editor: a bar across the top, the profile under it, then the list of things on the left and the one being edited on the right. */
+body {
+  margin: 0;
+  background: #f2f0e9;
+  color: #10232c;
+}
+a {
+  color: #1f6f86;
+}
+a:hover {
+  color: #10232c;
+}
+input,
+textarea,
+select,
+button {
+  font: inherit;
+  color: inherit;
+}
+input[type='file'] {
+  display: none;
+}
+
+.editor {
+  min-height: 100vh;
+  font-family: 'Familjen Grotesk', system-ui, sans-serif;
+  font-size: 15px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- small things used everywhere */
+.label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #4a5b61;
+}
+.label--section {
+  padding-top: 8px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.input {
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid rgba(16, 35, 44, 0.2);
+  border-radius: 6px;
+  background: #fff;
+}
+.input--title {
+  font-size: 17px;
+}
+.input--date {
+  padding: 0 10px;
+}
+.input--profile {
+  height: 38px;
+}
+.input--grow {
+  flex: 1 1 260px;
+}
+.text {
+  padding: 12px;
+  border: 1px solid rgba(16, 35, 44, 0.2);
+  border-radius: 6px;
+  background: #fff;
+  line-height: 1.6;
+  resize: vertical;
+  font-family: 'Newsreader', Georgia, serif;
+  font-size: 17px;
+}
+.button {
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid rgba(16, 35, 44, 0.25);
+  background: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+}
+/* (a file input's label, which looks like a button) */
+.button--file {
+  display: flex;
+  align-items: center;
+}
+.button--quiet {
+  border: 0;
+  background: none;
+  color: #5b6b70;
+}
+.button--danger {
+  color: #8a3a1c;
+  border-color: #b5502c;
+}
+.button--tall {
+  height: 40px;
+  padding: 0 14px;
+}
+.button--tall.button--quiet {
+  padding: 0 12px;
+  border-radius: 0;
+}
+.button--delete {
+  height: 38px;
+  padding: 0 14px;
+  background: none;
+}
+.buttons {
+  display: flex;
+  gap: 8px;
+}
+.add {
+  height: 40px;
+  border: 1px dashed rgba(16, 35, 44, 0.35);
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+}
+.add--wide {
+  width: 100%;
+}
+.error {
+  color: #8a3a1c;
+}
+.error--small {
+  font-size: 13px;
+}
+.saved {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: #4a5b61;
+}
+.saved--foot {
+  padding-top: 6px;
+}
+
+/* ---- the bar */
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 28px;
+  border-bottom: 1px solid rgba(16, 35, 44, 0.14);
+}
+.bar__title {
+  font-family: 'Newsreader', Georgia, serif;
+  font-style: italic;
+  font-weight: 300;
+  font-size: 26px;
+  line-height: 1;
+}
+.bar__site {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+}
+.bar__gap {
+  flex: 1;
+}
+.bar__note {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: #8a3a1c;
+}
+.bar__button {
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid rgba(16, 35, 44, 0.25);
+  background: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.bar__button--main {
+  padding: 0 16px;
+  border: 0;
+  background: #10232c;
+  color: #f2f0e9;
+}
+.bar__button--file {
+  display: flex;
+  align-items: center;
+}
+.bar__button--quiet {
+  border: 0;
+  background: none;
+  color: #5b6b70;
+  border-radius: 0;
+}
+
+/* ---- the profile */
+.profile {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 16px 28px;
+  border-bottom: 1px solid rgba(16, 35, 44, 0.14);
+  background: #ebe8df;
+}
+.profile__name {
+  flex: 1 1 220px;
+  max-width: 360px;
+}
+.profile__intro {
+  flex: 2 1 320px;
+  max-width: 620px;
+}
+
+/* ---- the list on the left */
+.work {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+  min-height: 0;
+}
+.side {
+  border-right: 1px solid rgba(16, 35, 44, 0.14);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 14px 14px 10px;
+}
+.tab {
+  height: 40px;
+  border: 1px solid rgba(16, 35, 44, 0.2);
+  border-radius: 6px;
+  cursor: pointer;
+  background: #fff;
+  color: #10232c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.tab.is-on {
+  background: #10232c;
+  color: #f2f0e9;
+}
+.tab__name {
+  font-size: 16px;
+}
+.tab__count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+}
+.side__add {
+  padding: 0 14px 10px;
+}
+.list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 8px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.list__row {
+  text-align: left;
+  border: 0;
+  border-radius: 6px;
+  padding: 10px 12px;
+  cursor: pointer;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.list__row.is-on {
+  background: #dfe9e8;
+}
+.list__meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: #4a5b61;
+}
+.list__title {
+  font-size: 15px;
+  line-height: 1.3;
+}
+
+/* ---- the one being edited */
+.main {
+  padding: 24px 32px 60px;
+  overflow-y: auto;
+}
+.main__empty {
+  color: #4a5b61;
+  padding-top: 40px;
+}
+.form {
+  max-width: 720px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.halves {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+}
+.entry-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 170px;
+  gap: 14px;
+}
+.foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding-top: 6px;
+}
+.foot--wrap {
+  flex-wrap: wrap;
+}
+.checks {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.check {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* a photo: its preview, and Upload / Remove under it */
+.photo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.photo__preview {
+  width: 240px;
+  max-width: 100%;
+  aspect-ratio: 4 / 3;
+  background-position: center;
+  background-size: cover;
+  border-radius: 6px;
+}
+.photo__preview--wide {
+  width: 320px;
+  aspect-ratio: 16 / 10;
+}
+.photo__actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* a piece's sound file: its name and length, Upload, a player, Remove */
+.sound-file {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.sound-file__name {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: #10232c;
+}
+.sound-file audio {
+  height: 32px;
+}
+
+/* cards: a list of things that can be moved, removed and added to */
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid rgba(16, 35, 44, 0.14);
+  border-radius: 8px;
+  background: #f7f5ef;
+}
+.card__actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}

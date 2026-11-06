@@ -4,12 +4,13 @@
 //
 // Each book is one of the menu's dots: arriving, the dots fly down and open out into the books; leaving, the books fold back into
 // their dots, which rise to the menu (or wait where the books were, for Freediving to pick up).
-import { books as published } from '../../public/data/site.json';
+import { books as published } from '../data/site.json';
 import { BASE } from '../lib/base.js';
+import { leaveTo, pageReady } from '../lib/cover.js';
 import { h } from '../lib/dom.js';
 import { clamp } from '../lib/math.js';
 import { bindMenu } from '../lib/menu.js';
-import { DOT_CSS, dotRadius, handNavFrom, leaveTo, navAt, navDots, pageReady, takeNavFrom } from '../lib/nav.js';
+import { DOT_CSS, dotRadius, handNavFrom, navAt, navDots, takeNavFrom } from '../lib/nav.js';
 import { LEAVE_PACE } from '../lib/pace.js';
 import { BOOK_DOT, COVER } from './books.js';
 import { easeIn, easeOut, flight, play, reducedMotion } from './flights.js';

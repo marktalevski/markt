@@ -1,21 +1,24 @@
 import { defineConfig } from 'astro/config';
-import react from '@astrojs/react';
-import { fileURLToPath } from 'node:url';
 import { editorApi } from './src/dev/editor-api.mjs';
 
-// The editor and the Home symbol picker are private tools: they exist only under `npm run dev` and are never part of the published site.
-// The editor's helper (src/dev/editor-api.mjs) saves its uploads and published data straight into the project.
-let paths = null;
-const editorLocalOnly = {
-  name: 'editor-local-only',
+/**
+ * The editor is a private tool: it exists only under `npm run dev` and is never part of the published site. This adds its page
+ * (/editor/), React (the editor is the one thing written in it, so the site itself is built without it) and the editor's helper on
+ * the dev server, which saves what the editor uploads and publishes straight into the project.
+ */
+const editor = {
+  name: 'editor',
   hooks: {
-    'astro:config:setup': ({ command, config, injectRoute, injectScript }) => {
+    'astro:config:setup': async ({ command, injectRoute, updateConfig }) => {
       if (command !== 'dev') return;
-      paths = { root: fileURLToPath(config.root), publicDir: fileURLToPath(config.publicDir) };
+      const { default: react } = await import('@astrojs/react');
+      updateConfig({ integrations: [react()] });
       injectRoute({ pattern: '/editor', entrypoint: './src/editor/editor.astro' });
-      injectScript('page', `import '/src/dev/symbol-picker.js';`);
     },
-    'astro:server:setup': ({ server }) => { if (paths) server.middlewares.use(editorApi(paths)); },
+    // (this one runs only when the dev server starts)
+    'astro:server:setup': ({ server }) => {
+      server.middlewares.use(editorApi());
+    },
   },
 };
 
@@ -24,7 +27,7 @@ export default defineConfig({
   site: 'https://marktalevski.github.io',
   base: '/markt',
   trailingSlash: 'always',
-  integrations: [react(), editorLocalOnly],
+  integrations: [editor],
   // CSS is shipped as written: minifiers round colours' transparency (rgba(…, .06) becomes #…0f), which shifts painted textures by a shade
   vite: { build: { cssMinify: false } },
 });

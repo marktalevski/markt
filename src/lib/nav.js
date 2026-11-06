@@ -78,9 +78,3 @@ export const takeNavFrom = () => {
     return null;
   }
 };
-
-/** Goes to the next page through Base.astro's __leave, which keeps this page's last picture up until the next one has drawn. */
-export const leaveTo = href => (window.__leave || (h => (location.href = h)))(href);
-
-/** Tells Base.astro this page has drawn its first frame, so the last page's picture can lift off it. */
-export const pageReady = () => window.__ready && window.__ready();

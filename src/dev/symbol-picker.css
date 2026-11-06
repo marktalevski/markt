@@ -1,0 +1,56 @@
+/* The symbol picker (a tool for designing Home's symbols, on your own computer only: see symbol-picker.js). */
+.symbol-picker {
+  position: fixed;
+  left: 10px;
+  top: 10px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  max-height: calc(100vh - 20px);
+  font:
+    12px/1 system-ui,
+    sans-serif;
+}
+.symbol-picker button {
+  font: inherit;
+  color: #141414;
+  cursor: pointer;
+}
+.symbol-picker__tab,
+.symbol-picker__list {
+  background: rgba(245, 243, 238, 0.85);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.12);
+}
+.symbol-picker__tab {
+  border: 0;
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+.symbol-picker__list {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 6px;
+  border-radius: 10px;
+  backdrop-filter: blur(4px);
+}
+.symbol-picker__list[hidden] {
+  display: none;
+}
+.symbol-picker__name {
+  border: 1px solid #14141433;
+  border-radius: 6px;
+  padding: 3px 8px;
+  text-align: left;
+  background: transparent;
+}
+/* the symbol that is showing */
+.symbol-picker .symbol-picker__name[aria-pressed='true'] {
+  background: #141414;
+  color: #f5f3ee;
+}

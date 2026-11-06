@@ -1,8 +1,16 @@
 ---
+// The shell every page sits in: the document's head, and the few small scripts that have to run before a page is first painted (so
+// they are written into the page itself, not loaded with the page's own code).
 import { BASE } from '../lib/base.js';
-interface Props { title: string; noindex?: boolean }
+import fpsMeter from '../lib/fps-meter.js?url&no-inline'; // (the file's address in the site)
+
+interface Props {
+  title: string;
+  noindex?: boolean;
+}
 const { title, noindex } = Astro.props;
 ---
+
 <!doctype html>
 <html lang="en">
   <head>
@@ -16,74 +24,67 @@ const { title, noindex } = Astro.props;
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <slot name="head" />
     <script is:inline>
-      // The pages animate their way out before navigating. When Back restores one from the back-forward cache
-      // it would resume with that exit already finished (a blank page), so start it fresh instead.
-      addEventListener('pageshow', e => { if (e.persisted) location.reload(); });
-      // Every page is a canvas that draws nothing until its script has started, so between two pages there would be a blank moment. So a
-      // page leaves through __leave: it keeps a picture of its last frame (its canvases, and its menu dots), and the next page shows that
-      // picture straight away, until it has drawn its own first frames (see the script at the top of the body)
-      window.__leave = href => {
-        try { const W = innerWidth, H = innerHeight, c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d');
-          x.fillStyle = getComputedStyle(document.body).backgroundColor || '#f5f3ee'; x.fillRect(0, 0, W, H);
-          document.querySelectorAll('canvas:not([data-nocover])').forEach(cv => { const r = cv.getBoundingClientRect(), st = getComputedStyle(cv); if (!r.width || !r.height || st.display === 'none' || st.visibility === 'hidden') return;
-            x.globalAlpha = +st.opacity; if (x.globalAlpha > 0) try { x.drawImage(cv, r.left, r.top, r.width, r.height); } catch (e) {} });
-          x.globalAlpha = 1; document.querySelectorAll('[data-navdot]').forEach(d => { const r = d.getBoundingClientRect(), st = getComputedStyle(d); if (r.width < 3 || +st.opacity === 0 || st.visibility === 'hidden') return;
-            x.fillStyle = st.backgroundColor; x.beginPath(); x.arc(r.left + r.width / 2, r.top + r.height / 2, r.width / 2, 0, 6.2832); x.fill(); });
-          sessionStorage.setItem('page-cover', JSON.stringify({ t: Date.now(), src: c.toDataURL('image/jpeg', .9) }));
-        } catch (e) {}
-        location.href = href;
-      };
-      // Labels are set in Papyrus where it's installed (macOS, iOS, Windows with Office). Elsewhere they go back
-      // to the original Newsreader styles, not a plain substitute.
+      // The pages animate their way out before navigating. When Back restores one from the back-forward cache it would resume with
+      // that exit already finished (a blank page), so it starts fresh instead.
+      addEventListener('pageshow', e => {
+        if (e.persisted) location.reload();
+      });
+
+      // Labels are set in Papyrus where it is installed (macOS, iOS, Windows with Office). Elsewhere they go back to the original
+      // Newsreader styles (.no-papyrus), not to a plain substitute. (A font that isn't there measures the same as its fallback.)
       try {
-        const x = document.createElement('canvas').getContext('2d'), w = f => { x.font = '40px ' + f; return x.measureText('Freediving Journal').width; };
-        if (w('Papyrus, monospace') === w('monospace') && w('Papyrus, serif') === w('serif')) document.documentElement.classList.add('no-papyrus');
+        const pen = document.createElement('canvas').getContext('2d');
+        const width = font => {
+          pen.font = '40px ' + font;
+          return pen.measureText('Freediving Journal').width;
+        };
+        if (width('Papyrus, monospace') === width('monospace') && width('Papyrus, serif') === width('serif'))
+          document.documentElement.classList.add('no-papyrus');
       } catch (e) {}
     </script>
   </head>
   <body>
     <script is:inline>
-      // arriving from another page: its last frame, over everything, until this page says it has drawn its own first frame (window.__ready,
-      // which each page calls once it has), or at the latest after a few seconds. The picture is decoded before the first paint, so it is
-      // there from the very first frame
+      // Arriving from another page of the site: that page's last frame goes over everything (lib/cover.js keeps the picture), until
+      // this page says it has drawn its own first frame (pageReady() there, which calls window.__ready) or, at the latest, four
+      // seconds on. The script is here, ahead of everything else in the body, so that the picture is decoded before the first paint
+      // and is there from the very first frame.
       window.__ready = () => {};
       try {
-        const j = JSON.parse(sessionStorage.getItem('page-cover') || 'null'); sessionStorage.removeItem('page-cover');
-        if (j && Date.now() - j.t < 10000) {
-          const i = new Image(); i.id = 'page-cover'; i.alt = ''; i.decoding = 'sync'; i.src = j.src; i.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:2147483000;pointer-events:none;transition:opacity .15s';
-          document.body.appendChild(i); document.documentElement.classList.add('covered');   // (pages can style themselves for arriving under the picture)
-          let gone = false; const off = () => { if (gone) return; gone = true; i.style.opacity = '0'; setTimeout(() => i.remove(), 200); };
+        const cover = JSON.parse(sessionStorage.getItem('page-cover') || 'null');
+        sessionStorage.removeItem('page-cover');
+        if (cover && Date.now() - cover.t < 10000) {
+          const img = new Image();
+          img.id = 'page-cover';
+          img.alt = '';
+          img.decoding = 'sync';
+          img.src = cover.src;
+          img.style.cssText =
+            'position:fixed;inset:0;width:100%;height:100%;z-index:2147483000;pointer-events:none;transition:opacity .15s';
+          document.body.appendChild(img);
+          // (pages can style themselves for arriving under the picture)
+          document.documentElement.classList.add('covered');
+
+          let lifted = false;
+          const lift = () => {
+            if (lifted) return;
+            lifted = true;
+            img.style.opacity = '0';
+            setTimeout(() => img.remove(), 200);
+          };
           // a frame after the page's own first frame, so that frame is on screen before the cover lifts off it
-          window.__ready = () => requestAnimationFrame(() => requestAnimationFrame(off));
-          setTimeout(off, 4000);
+          window.__ready = () => requestAnimationFrame(() => requestAnimationFrame(lift));
+          setTimeout(lift, 4000);
         }
       } catch (e) {}
     </script>
-    <script is:inline>
-      // A frame meter, for checking on a real phone or computer that the animations keep up: open any page with ?fps at the end of its address
-      // (it then stays on from page to page; ?fps=0 turns it off). Bottom left: each bar is one frame, its height how long it took; red ones
-      // took more than 1.5 frames (a stutter you could see). The line under it: the screen's rate, stutters on this page (counted once the
-      // page has been up a second, after its arrival has settled behind the cover), and the slowest of the frames shown
+    <script is:inline define:vars={{ fpsMeter }}>
+      // The frame meter (lib/fps-meter.js): ?fps at the end of any page's address turns it on, and it stays on from page to page
+      // until ?fps=0 turns it off. Its code is only fetched while it is on.
       try {
-        const q = new URLSearchParams(location.search).get('fps');
-        if (q !== null) sessionStorage.setItem('fps-meter', q === '0' ? '' : '1');
-        if (sessionStorage.getItem('fps-meter')) {
-          const W = 196, H = 52, N = 120, dpr = Math.min(2, devicePixelRatio || 1), c = document.createElement('canvas'), x = c.getContext('2d');
-          c.width = W * dpr; c.height = H * dpr; c.setAttribute('data-nocover', ''); c.setAttribute('aria-hidden', 'true');
-          c.style.cssText = 'position:fixed;left:8px;bottom:8px;width:' + W + 'px;height:' + H + 'px;z-index:2147483600;pointer-events:none;border-radius:6px';
-          document.body.appendChild(c); x.scale(dpr, dpr);
-          const ts = [], t0 = performance.now(); let last = 0, drops = 0;
-          const loop = now => { requestAnimationFrame(loop);
-            if (last) { ts.push(now - last); if (ts.length > N) ts.shift(); } last = now;
-            const s = ts.slice().sort((a, b) => a - b), base = s[s.length >> 1] || 1000 / 60, d = ts[ts.length - 1] || 0, slow = base * 1.5;
-            if (ts.length > 10 && now - t0 > 1000 && d > slow) drops++;
-            x.clearRect(0, 0, W, H); x.fillStyle = 'rgba(12,12,12,.78)'; x.fillRect(0, 0, W, H);
-            const top = 6, bh = 28, sc = bh / (base * 3); x.fillStyle = 'rgba(255,255,255,.25)'; x.fillRect(6, top + bh - slow * sc, W - 12, 1);
-            ts.forEach((v, i) => { x.fillStyle = v > slow ? '#ff5a4f' : '#5fd38a'; const h = Math.min(bh, v * sc); x.fillRect(6 + i * (W - 12) / N, top + bh - h, Math.max(1, (W - 12) / N - .3), h); });
-            x.fillStyle = '#f2f2f0'; x.font = '10px ui-monospace, Menlo, monospace'; x.textBaseline = 'alphabetic';
-            x.fillText(Math.round(1000 / base) + ' Hz  ' + drops + ' stutters  max ' + Math.round(s[s.length - 1] || 0) + ' ms', 6, H - 7); };
-          requestAnimationFrame(loop);
-        }
+        const asked = new URLSearchParams(location.search).get('fps');
+        if (asked !== null) sessionStorage.setItem('fps-meter', asked === '0' ? '' : '1');
+        if (sessionStorage.getItem('fps-meter')) import(fpsMeter).then(meter => meter.startFpsMeter());
       } catch (e) {}
     </script>
     <slot />

@@ -5,19 +5,20 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
-    "preview": "astro preview"
+    "preview": "astro preview",
+    "lint": "eslint . && prettier --check .",
+    "format": "prettier --write ."
   },
   "dependencies": {
-    "@astrojs/react": "^7.0.1",
-    "astro": "^7.3.8",
-    "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "astro": "^7.3.8"
   },
   "devDependencies": {
+    "@astrojs/react": "^7.0.1",
     "@eslint/js": "^10.0.1",
     "eslint": "^10.14.0",
     "globals": "^17.14.0",
-    "parse5": "^8.0.1",
-    "prettier": "^3.9.10"
+    "prettier": "^3.9.10",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
   }
 }
