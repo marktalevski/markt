@@ -4,11 +4,58 @@
 // each line: an opacity mask is built with max-blending (overlaps keep the strongest value, and slight overlaps hide the joins), then
 // page = page * (1 - mask) + colour * mask, which is exact translucency with no levels and no seams. The colour is not flat: see
 // streaks.
+//
+// A canvas has no blend that does that sum in one go, but on a negative of the page two of its blends do it between them: 'screen'
+// with the mask leaves the negative of page * (1 - mask), and 'difference' then takes colour * mask off that. So the lines go onto a
+// negative, which is turned back into the page once they are all on.
 import { clamp, smooth } from '../lib/math.js';
 
+/** The paper (#f5f3ee), as a negative. */
+const PAPER_NEGATIVE = '#0a0c11';
+
 const colRGB = {};
+/** A colour's red, green and blue, from its 'rgb(r,g,b)'. */
+function rgbOf(col) {
+  let base = colRGB[col];
+  if (!base) {
+    const m = col.match(/\d+/g);
+    base = colRGB[col] = m ? m.slice(0, 3).map(Number) : [0, 0, 0];
+  }
+  return base;
+}
+
+// the one light, from the upper left
+const LIGHT_X = -0.6,
+  LIGHT_Y = -0.8;
+// the brush-mixed stripes: where each runs across the stroke (0..1), how wide, lighter or darker, and how strongly
+const STRIPES = [
+  { at: 0.18, width: 0.2, light: true, strength: 0.32, inkStrength: 0.2 },
+  { at: 0.5, width: 0.14, light: false, strength: 0.24, inkStrength: 0.35 },
+  { at: 0.68, width: 0.16, light: true, strength: 0.22, inkStrength: 0.14 },
+];
+const PAPER_GAP = 'rgb(245,243,238)';
+// the texture's fills. Each kind is one fill, and they go down in the order they first turn up along the stroke: a ridge on either
+// edge at each of four strengths (0-7), the three stripes (8-10), and the dry gaps at three strengths (11-13)
+const RIDGE = 0,
+  STRIPE = 8,
+  GAP = 11,
+  KINDS = 14;
+
+/** Adds to a path the strip of quad q between two fractions of the way across it: f0a to f1a at its start, f0b to f1b at its end. */
+function strip(path, q, f0a, f1a, f0b, f1b) {
+  const a = q[0],
+    b = q[1],
+    c = q[2],
+    d = q[3];
+  path.moveTo(a[0] + (d[0] - a[0]) * f0a, a[1] + (d[1] - a[1]) * f0a);
+  path.lineTo(b[0] + (c[0] - b[0]) * f0b, b[1] + (c[1] - b[1]) * f0b);
+  path.lineTo(b[0] + (c[0] - b[0]) * f1b, b[1] + (c[1] - b[1]) * f1b);
+  path.lineTo(a[0] + (d[0] - a[0]) * f1a, a[1] + (d[1] - a[1]) * f1a);
+  path.closePath();
+}
+
 /**
- * The texture of a real brush stroke, painted over a line's flat colour (cx3: where; qs: the line's quads; col: its colour; ink: the
+ * The texture of a real brush stroke, painted over a line's flat colour (ctx: where; qs: the line's quads; col: its colour; ink: the
  * black line). Four things real strokes do:
  * 1. ridges catch the light: one light from the upper left, so the edge facing it gets a pale highlight and the opposite edge a soft
  *    shadow, swapping as the stroke turns
@@ -17,101 +64,81 @@ const colRGB = {};
  * 3. the brush is fullest where it lands: the first stretch is richer and the ridges heavier
  * 4. it runs out: towards the tail bristles lose contact and paper shows through in fine gaps (dry brush)
  */
-function streaks(cx3, qs, col, ink) {
-  let base = colRGB[col];
-  if (!base) {
-    const m = col.match(/\d+/g);
-    base = colRGB[col] = m ? m.slice(0, 3).map(Number) : [0, 0, 0];
-  }
-  const mix = (c2, k) => 'rgb(' + base.map((v, i) => Math.round(v + (c2[i] - v) * k)).join(',') + ')',
+function streaks(ctx, qs, col, ink) {
+  const base = rgbOf(col),
     LT = ink ? [110, 108, 104] : [255, 253, 244],
     DK = ink ? [0, 0, 0] : [14, 8, 30],
-    PAPER = [245, 243, 238];
-  let sd = 0;
-  for (let i = 0; i < col.length; i++) sd = (sd * 31 + col.charCodeAt(i)) % 997;
-  const n = qs.length,
-    lx = -0.6,
-    ly = -0.8,
-    bins = new Map(),
-    P = (A, B, f) => [A[0] + (B[0] - A[0]) * f, A[1] + (B[1] - A[1]) * f];
-  const put = (key, style, a, q, f0a, f1a, f0b, f1b) => {
-    let e = bins.get(key);
-    if (!e) bins.set(key, (e = { style, a, p: new Path2D() }));
-    const s0 = P(q[0], q[3], f0a),
-      s1 = P(q[1], q[2], f0b),
-      s2 = P(q[1], q[2], f1b),
-      s3 = P(q[0], q[3], f1a);
-    e.p.moveTo(s0[0], s0[1]);
-    e.p.lineTo(s1[0], s1[1]);
-    e.p.lineTo(s2[0], s2[1]);
-    e.p.lineTo(s3[0], s3[1]);
-    e.p.closePath();
+    mix = (to, k) =>
+      `rgb(${Math.round(base[0] + (to[0] - base[0]) * k)},${Math.round(base[1] + (to[1] - base[1]) * k)},${Math.round(base[2] + (to[2] - base[2]) * k)})`;
+  let seed = 0;
+  for (let i = 0; i < col.length; i++) seed = (seed * 31 + col.charCodeAt(i)) % 997;
+  // each kind of fill takes the colour it is first given (so a stripe keeps the richness the brush had where it began)
+  const fills = new Array(KINDS),
+    order = [];
+  const open = (kind, style, alpha) => {
+    order.push((fills[kind] = { style, alpha, path: new Path2D() }));
+    return fills[kind];
   };
-  const stripes = [
-    [0.18, 0.2, LT, ink ? 0.2 : 0.32],
-    [0.5, 0.14, DK, ink ? 0.35 : 0.24],
-    [0.68, 0.16, LT, ink ? 0.14 : 0.22],
-  ];
+  const n = qs.length;
   for (let i = 0; i < n; i++) {
     const q = qs[i].q;
     if (q.length !== 4) continue;
     const t = n > 1 ? i / (n - 1) : 0,
-      ph = i * 0.045 + sd,
+      ph = i * 0.045 + seed,
       ph2 = ph + 0.045,
       load = 1 - smooth(clamp(t / 0.18, 0, 1));
     const ex = q[0][0] - q[3][0],
       ey = q[0][1] - q[3][1],
       el = Math.hypot(ex, ey) || 1,
-      d = (ex * lx + ey * ly) / el;
+      d = (ex * LIGHT_X + ey * LIGHT_Y) / el;
     // 1 + 3: ridges, lit or shaded by which way the edge faces; heavier while the brush is loaded
-    for (const side of [0, 1]) {
-      const ds = side ? -d : d,
-        lv = Math.round(ds * 2);
+    for (let side = 0; side < 2; side++) {
+      const lv = Math.round((side ? -d : d) * 2);
       if (!lv) continue;
       const ew = (0.1 + 0.05 * Math.sin(ph * 1.3 + side * 2)) * (1 + 0.7 * load),
-        ew2 = (0.1 + 0.05 * Math.sin(ph2 * 1.3 + side * 2)) * (1 + 0.7 * load);
-      const st = lv > 0 ? mix(LT, ((ink ? 0.22 : 0.5) * lv) / 2) : mix(DK, ((ink ? 0.5 : 0.32) * -lv) / 2);
-      side ? put('r1' + lv, st, 0.85, q, 1 - ew, 1, 1 - ew2, 1) : put('r0' + lv, st, 0.85, q, 0, ew, 0, ew2);
+        ew2 = (0.1 + 0.05 * Math.sin(ph2 * 1.3 + side * 2)) * (1 + 0.7 * load),
+        kind = RIDGE + side * 4 + (lv > 0 ? lv + 1 : lv + 2);
+      const fill =
+        fills[kind] ||
+        open(kind, lv > 0 ? mix(LT, ((ink ? 0.22 : 0.5) * lv) / 2) : mix(DK, ((ink ? 0.5 : 0.32) * -lv) / 2), 0.85);
+      if (side) strip(fill.path, q, 1 - ew, 1, 1 - ew2, 1);
+      else strip(fill.path, q, 0, ew, 0, ew2);
     }
     // 2: brush-mixed stripes that drift across the stroke and swell and thin
-    stripes.forEach(([f, w, tc, k], j) => {
-      const u = ph * (0.7 + 0.15 * j) + j * 2.1,
+    for (let j = 0; j < STRIPES.length; j++) {
+      const S = STRIPES[j],
+        u = ph * (0.7 + 0.15 * j) + j * 2.1,
         u2 = ph2 * (0.7 + 0.15 * j) + j * 2.1,
         o = 0.07 * Math.sin(u * 0.6),
         o2 = 0.07 * Math.sin(u2 * 0.6),
-        ww = w * (0.5 + 0.5 * Math.sin(u * 1.4)),
-        ww2 = w * (0.5 + 0.5 * Math.sin(u2 * 1.4));
-      if (ww < 0.02) return;
-      const kk = k * (1 + 0.4 * load);
-      put('s' + j, mix(tc, kk), 0.7, q, f + o, f + o + ww, f + o2, f + o2 + ww2);
-    });
+        ww = S.width * (0.5 + 0.5 * Math.sin(u * 1.4)),
+        ww2 = S.width * (0.5 + 0.5 * Math.sin(u2 * 1.4));
+      if (ww < 0.02) continue;
+      const fill =
+        fills[STRIPE + j] ||
+        open(STRIPE + j, mix(S.light ? LT : DK, (ink ? S.inkStrength : S.strength) * (1 + 0.4 * load)), 0.7);
+      strip(fill.path, q, S.at + o, S.at + o + ww, S.at + o2, S.at + o2 + ww2);
+    }
     // 4: running dry: fine paper-coloured gaps that open up along the tail
     if (t > 0.55 && !ink) {
-      const dry = smooth((t - 0.55) / 0.45);
+      const dry = smooth((t - 0.55) / 0.45),
+        level = Math.min(2, Math.floor(dry * 3));
       for (let g = 0; g < 4; g++) {
         const u = ph * 2.3 + g * 1.9;
         if (Math.sin(u) + 0.6 * Math.sin(u * 2.7) < 1.3 - 1.6 * dry) continue;
         const f = 0.22 + g * 0.17 + 0.04 * Math.sin(ph * 0.9 + g),
-          w = 0.025 + 0.03 * dry;
-        put(
-          'd' + Math.min(2, Math.floor(dry * 3)),
-          'rgb(' + PAPER.join(',') + ')',
-          0.25 + 0.25 * Math.min(2, Math.floor(dry * 3)),
-          q,
-          f,
-          f + w,
-          f,
-          f + w
-        );
+          w = 0.025 + 0.03 * dry,
+          fill = fills[GAP + level] || open(GAP + level, PAPER_GAP, 0.25 + 0.25 * level);
+        strip(fill.path, q, f, f + w, f, f + w);
       }
     }
   }
-  for (const e of bins.values()) {
-    cx3.fillStyle = e.style;
-    cx3.globalAlpha = e.a;
-    cx3.fill(e.p);
+  for (const fill of order) {
+    ctx.fillStyle = fill.style;
+    ctx.globalAlpha = fill.alpha;
+    ctx.fill(fill.path);
   }
-  cx3.globalAlpha = 1;
+  ctx.globalAlpha = 1;
 }
 
 // a four-sided quad is lengthened by this much (px) at each end, so that neighbours overlap a hair and no seam shows between them
@@ -217,13 +244,13 @@ function groupQuads(s, quads, topPid) {
 }
 
 /**
- * Paints one group onto the strokes' layer (sctx), through three working layers the size of the page: lcv, its opacity mask (kept
- * inverted: white where there is no paint); lcv3, its colour with the brush's texture; lcv2, the two multiplied together. Only the
- * part of each that the group covers is touched.
+ * Paints one group onto the strokes' layer (sctx), which is a negative of the page while the lines go on. Two working layers the
+ * size of the page are used: lcv, the group's opacity mask (white where its paint is at full strength), and lcv2, its colour with
+ * the brush's texture, multiplied by the mask. Only the box round the group's quads is touched in each.
  */
-function paintGroup(g, sctx, { cvs, TF, lcv, lcv2, lcv3, lc, lc2, lc3 }) {
+function paintGroup(g, sctx, { cvs, TF, lcv, lcv2, lc, lc2 }) {
   const am = g.top ? 2.5 : g.ink ? 1 : 0.86,
-    bk = new Map();
+    levels = new Map();
   let x0 = 1e9,
     y0 = 1e9,
     x1 = -1e9,
@@ -232,9 +259,9 @@ function paintGroup(g, sctx, { cvs, TF, lcv, lcv2, lcv3, lc, lc2, lc3 }) {
   for (const Q of g.qs) {
     const v = Math.round(clamp(Q.a * am, 0, 1) * 85) * 3;
     if (v < 2) continue;
-    let L2 = bk.get(v);
-    if (!L2) bk.set(v, (L2 = []));
-    L2.push(Q.q);
+    let quads = levels.get(v);
+    if (!quads) levels.set(v, (quads = []));
+    quads.push(Q.q);
     for (const p of Q.q) {
       if (p[0] < x0) x0 = p[0];
       if (p[0] > x1) x1 = p[0];
@@ -242,7 +269,7 @@ function paintGroup(g, sctx, { cvs, TF, lcv, lcv2, lcv3, lc, lc2, lc3 }) {
       if (p[1] > y1) y1 = p[1];
     }
   }
-  if (!bk.size) return;
+  if (!levels.size) return;
   const bx0 = Math.max(0, Math.floor(TF.a * x0 + TF.e) - 3),
     by0 = Math.max(0, Math.floor(TF.d * y0 + TF.f) - 3),
     bx1 = Math.min(cvs.width, Math.ceil(TF.a * x1 + TF.e) + 3),
@@ -250,50 +277,46 @@ function paintGroup(g, sctx, { cvs, TF, lcv, lcv2, lcv3, lc, lc2, lc3 }) {
     bw = bx1 - bx0,
     bh = by1 - by0;
   if (bw <= 0 || bh <= 0) return;
-  // inverted mask: white, darken with (1 - alpha)
+
+  // the mask: black, lightened to each quad's strength (where quads overlap, the strongest wins)
   lc.setTransform(1, 0, 0, 1, 0, 0);
   lc.globalAlpha = 1;
   lc.globalCompositeOperation = 'source-over';
-  lc.fillStyle = '#fff';
+  lc.fillStyle = '#000';
   lc.fillRect(bx0, by0, bw, bh);
   lc.setTransform(TF);
-  lc.globalCompositeOperation = 'darken';
-  for (const [v, L2] of bk) {
-    const u = 255 - v;
-    lc.fillStyle = `rgb(${u},${u},${u})`;
+  lc.globalCompositeOperation = 'lighten';
+  for (const [v, quads] of levels) {
+    lc.fillStyle = `rgb(${v},${v},${v})`;
     lc.beginPath();
-    for (const q of L2) addQuad(lc, q);
+    for (const q of quads) addQuad(lc, q);
     lc.fill('nonzero');
   }
   lc.setTransform(1, 0, 0, 1, 0, 0);
-  // colour * alpha
+
+  // the colour, with the brush's texture, times the mask
   lc2.setTransform(1, 0, 0, 1, 0, 0);
   lc2.globalAlpha = 1;
   lc2.globalCompositeOperation = 'source-over';
-  lc2.drawImage(lcv, bx0, by0, bw, bh, bx0, by0, bw, bh);
-  lc2.globalCompositeOperation = 'difference';
-  lc2.fillStyle = '#fff';
-  lc2.fillRect(bx0, by0, bw, bh);
-  lc3.setTransform(1, 0, 0, 1, 0, 0);
-  lc3.globalAlpha = 1;
-  lc3.globalCompositeOperation = 'source-over';
   if (g.grad) {
-    const G = lc3.createLinearGradient(TF.a * g.grad[0] + TF.e, 0, TF.a * g.grad[1] + TF.e, 0);
+    const G = lc2.createLinearGradient(TF.a * g.grad[0] + TF.e, 0, TF.a * g.grad[1] + TF.e, 0);
     G.addColorStop(0, 'rgb(246,174,198)');
     G.addColorStop(1, 'rgb(232,34,44)');
-    lc3.fillStyle = G;
-  } else lc3.fillStyle = g.col;
-  lc3.fillRect(bx0, by0, bw, bh);
-  lc3.setTransform(TF);
-  streaks(lc3, g.qs, g.col, g.ink);
-  lc3.setTransform(1, 0, 0, 1, 0, 0);
+    lc2.fillStyle = G;
+  } else lc2.fillStyle = g.col;
+  lc2.fillRect(bx0, by0, bw, bh);
+  lc2.setTransform(TF);
+  streaks(lc2, g.qs, g.col, g.ink);
+  lc2.setTransform(1, 0, 0, 1, 0, 0);
   lc2.globalCompositeOperation = 'multiply';
-  lc2.drawImage(lcv3, bx0, by0, bw, bh, bx0, by0, bw, bh);
+  lc2.drawImage(lcv, bx0, by0, bw, bh, bx0, by0, bw, bh);
+
+  // onto the negative: page x (1 - mask), then colour x mask
   sctx.setTransform(1, 0, 0, 1, 0, 0);
   sctx.globalAlpha = 1;
-  sctx.globalCompositeOperation = 'multiply';
+  sctx.globalCompositeOperation = 'screen';
   sctx.drawImage(lcv, bx0, by0, bw, bh, bx0, by0, bw, bh);
-  sctx.globalCompositeOperation = 'lighter';
+  sctx.globalCompositeOperation = 'difference';
   sctx.drawImage(lcv2, bx0, by0, bw, bh, bx0, by0, bw, bh);
 }
 
@@ -316,10 +339,11 @@ export function paintQuads(s, ctx, quads, topPid) {
   s.strokeSig = sig;
   if (!reuse) {
     const sctx = scv.getContext('2d');
+    // the paper, as a negative (see the top of this file)
     sctx.setTransform(1, 0, 0, 1, 0, 0);
     sctx.globalCompositeOperation = 'source-over';
     sctx.globalAlpha = 1;
-    sctx.fillStyle = '#f5f3ee';
+    sctx.fillStyle = PAPER_NEGATIVE;
     sctx.fillRect(0, 0, scv.width, scv.height);
     const layer = k => {
       if (!s.layers[k]) s.layers[k] = document.createElement('canvas');
@@ -332,18 +356,12 @@ export function paintQuads(s, ctx, quads, topPid) {
     };
     const lcv = layer('mask'),
       lcv2 = layer('colour'),
-      lcv3 = layer('texture'),
-      tools = {
-        cvs,
-        TF: ctx.getTransform(),
-        lcv,
-        lcv2,
-        lcv3,
-        lc: lcv.getContext('2d'),
-        lc2: lcv2.getContext('2d'),
-        lc3: lcv3.getContext('2d'),
-      };
+      tools = { cvs, TF: ctx.getTransform(), lcv, lcv2, lc: lcv.getContext('2d'), lc2: lcv2.getContext('2d') };
     for (const g of groupQuads(s, quads, topPid)) paintGroup(g, sctx, tools);
+    // and the negative turned back into the page
+    sctx.globalCompositeOperation = 'difference';
+    sctx.fillStyle = '#fff';
+    sctx.fillRect(0, 0, scv.width, scv.height);
     sctx.globalCompositeOperation = 'source-over';
   }
   ctx.save();
