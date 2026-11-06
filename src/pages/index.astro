@@ -1,14 +1,24 @@
 ---
+// Home: the markup the page starts from. home/main.js runs it; home/home.css styles it.
 import Base from '../layouts/Base.astro';
-import Home from '../components/Home.jsx';
+import '../home/home.css';
+
+// each page's name is set a letter to a span, so the letters can go into its dot one at a time
+const letters = name => [...name];
 ---
+
 <Base title="Mark T">
   <Fragment slot="head">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..500&amp;family=JetBrains+Mono:wght@300;400;500&amp;display=swap" />
-    <style is:inline>
-      html,body{margin:0;height:100%;overflow:hidden;background:#f5f3ee}
-      a{color:#141414}a:hover{color:#141414;opacity:.6}
-    </style>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..500&amp;display=swap" />
   </Fragment>
-  <Home client:only="react" />
+  <div class="home">
+    <canvas class="home__canvas"></canvas>
+    <button type="button" class="page" data-page="freediving" aria-label="Freediving"><span class="page__name">{letters('Freediving').map(c => <span>{c}</span>)}</span></button>
+    <button type="button" class="ink" aria-label="Shuffle symbol" title="Shuffle"></button>
+    <button type="button" class="page" data-page="sound" aria-label="Sound"><span class="page__name">{letters('Sound').map(c => <span>{c}</span>)}</span></button>
+    <button type="button" class="page" data-page="library" aria-label="Library"><span class="page__name">{letters('Library').map(c => <span>{c}</span>)}</span></button>
+  </div>
+  <script>
+    import '../home/main.js';
+  </script>
 </Base>

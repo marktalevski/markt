@@ -40,9 +40,6 @@ const { title, noindex } = Astro.props;
         if (w('Papyrus, monospace') === w('monospace') && w('Papyrus, serif') === w('serif')) document.documentElement.classList.add('no-papyrus');
       } catch (e) {}
     </script>
-    <style is:inline>
-      html.no-papyrus [data-lab="home"] { font-family: 'Newsreader', Georgia, serif !important; font-style: italic !important; font-weight: 300 !important; letter-spacing: -0.01em !important; }
-    </style>
   </head>
   <body>
     <script is:inline>
