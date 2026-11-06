@@ -1,9 +1,11 @@
-// The Freediving squid, in pixels, on the Sound deck's screen. She stays on her spot and dances there. squid(mode, t, o) gives her pose for
+// The squid on the deck's screen: the Freediving page's squid, in pixels. She stays on her spot and dances there. squid(mode, t, o) gives her pose for
 // the moment: where her body is on a 22 x 20 grid and how squashed (bx, by, rx, ry), how far each tentacle is swung out (aL, aR, as arms), the
 // arms' shuffle (fL, fR), where she looks (edx), her eyes (open, shut, happy) and mouth, whether she's turned (flip, flipY, rot) and the sparkles
 // round her (fx: notes, stars, Zs, ink, as [x, y, colour] cells on the same grid). squidCells(P, t) turns a pose into lit cells. Modes: idle,
 // sleep and yawn (resting); dance (a piece is playing: o.move and o.mp say which move and how far in); and the little turns a beat pad sets
 // off: wave, jump, ink, jet, happy, spin, yawn. o: { tau: seconds since the mode began, lv: loudness 0..1, ink: the colour for notes and stars }
+import { clamp, smooth } from '../lib/math.js';
+
 export const SQUID_W = 22,
   SQUID_H = 20;
 // the dance's twenty moves, all on the spot, and how many beats each lasts
@@ -83,8 +85,7 @@ const INK = [
     [1, 1],
   ],
   BUB = [[0, 0]];
-const s01 = v => Math.max(0, Math.min(1, v)),
-  sm = v => v * v * (3 - 2 * v);
+const s01 = v => clamp(v, 0, 1);
 
 export function squid(mode, t, o = {}) {
   const tau = o.tau ?? t,
@@ -338,7 +339,7 @@ export function squid(mode, t, o = {}) {
     // upside: turns over, dances a while upside down, tentacles up, and turns back
     else if (mv === 'upside') {
       const n = SQUID_MOVES.upside,
-        k = sm(s01(mp / 0.6)) * sm(s01((n - mp) / 0.6));
+        k = smooth(s01(mp / 0.6)) * smooth(s01((n - mp) / 0.6));
       rot = Math.PI * k;
       by -= up * 0.8;
       aL = aR = 0.6;
@@ -347,7 +348,7 @@ export function squid(mode, t, o = {}) {
     // spin360: two whole turns on the spot, lifting a little
     else if (mv === 'spin360') {
       const n = SQUID_MOVES.spin360;
-      rot = sm(s01(mp / n)) * Math.PI * 4;
+      rot = smooth(s01(mp / n)) * Math.PI * 4;
       by -= Math.sin((mp / n) * Math.PI) * 2;
       eyes = 'happy';
     }

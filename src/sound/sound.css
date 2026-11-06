@@ -1,0 +1,220 @@
+/* Sound: one canvas (the ground, the album's photo, the wave and the deck) with real elements laid over the deck's controls, so they
+   can be clicked, focused and read out. controls.js and clock.js put each one in its place every frame; this is how they look. */
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  /* the paper colour the other pages hand over on, so nothing flashes before the canvas draws */
+  background: #f5f3ee;
+}
+/* sideways drags are the page's own (they move the playhead on a phone), not the browser's; up and down and pinching still work */
+body {
+  touch-action: pan-y pinch-zoom;
+}
+
+.sound {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  color: #0c0c0c;
+  background: #dfdfdc;
+  font-family: 'JetBrains Mono', monospace;
+  -webkit-font-smoothing: antialiased;
+}
+.sound__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+/* the two layers of elements over the canvas: the beat pads that are the menu, and the rest of the deck */
+.pads,
+.controls {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+
+/* ---- hit areas: nothing to see (the canvas draws the controls). They wait off screen until the first frame places them */
+.hit {
+  position: absolute;
+  left: -200px;
+  top: 0;
+  pointer-events: auto;
+  cursor: pointer;
+}
+button.hit {
+  border: 0;
+  padding: 0;
+  background: none;
+}
+.hit--pad {
+  display: block;
+  border-radius: 5px;
+}
+.hit--pad[aria-current='page'] {
+  cursor: default;
+}
+.hit--cpad {
+  border-radius: 4px;
+}
+.hit--cpad[aria-disabled='true'] {
+  cursor: default;
+}
+.hit--round {
+  border-radius: 50%;
+}
+/* things that are turned or slid: the page takes the drag itself */
+.hit--turn {
+  cursor: grab;
+  touch-action: none;
+}
+.hit--fader {
+  cursor: ns-resize;
+  touch-action: none;
+}
+/* the full-screen key shows its own hover and pressed states in the drawing: no browser focus ring on top */
+.hit--full:focus,
+.hit--full:focus-visible {
+  outline: none;
+}
+
+/* ---- the album clock: the album names rolling through a tall display, round a flip counter */
+.clock {
+  position: absolute;
+  left: -200px;
+  top: 0;
+  width: 80px;
+  height: 200px;
+  overflow: hidden;
+  border-radius: 5px;
+  pointer-events: auto;
+  transform-origin: 0 0;
+}
+.clock__name {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translate(-50%, -50%);
+  max-width: 74px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0;
+  border: 0;
+  padding: 2px 3px;
+  border-radius: 3px;
+  background: none;
+  cursor: pointer;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #5d8a92;
+  will-change: transform, opacity;
+}
+.clock__name.is-current {
+  font-size: 9px;
+  color: var(--accent-text, #7fe9f7);
+  text-shadow: 0 0 6px var(--accent-glow, rgba(0, 229, 255, 0.6));
+}
+.counter {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  margin-left: -32px;
+  margin-top: -42px;
+  width: 64px;
+  height: 84px;
+  perspective: 320px;
+  font-family: Michroma, sans-serif;
+  font-size: 26px;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  color: var(--accent, #00e5ff);
+  text-shadow:
+    0 0 8px var(--accent-halo, rgba(0, 229, 255, 0.75)),
+    1px 0 0 var(--accent, #ff2bd6);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  border-radius: 6px;
+}
+/* each half of the counter shows the top or the bottom of a number the full height of the counter */
+.counter__half {
+  position: absolute;
+  overflow: hidden;
+}
+.counter__half--top {
+  inset: 0 0 50% 0;
+  border-radius: 6px 6px 0 0;
+  background: #161616;
+}
+.counter__half--bottom {
+  inset: 50% 0 0 0;
+  border-radius: 0 0 6px 6px;
+  background: #111111;
+}
+.counter__number {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 84px;
+  display: grid;
+  place-items: center;
+}
+.counter__half--bottom .counter__number {
+  top: -42px;
+}
+/* the two flaps that turn on the hinge when the number changes (see clock.js) */
+.counter__flap {
+  backface-visibility: hidden;
+  visibility: hidden;
+}
+.counter__flap.counter__half--top {
+  transform-origin: 50% 100%;
+}
+.counter__flap.counter__half--bottom {
+  transform-origin: 50% 0;
+}
+.counter__hinge {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  margin-top: -0.5px;
+  background: #000000;
+}
+
+/* ---- leaving full screen: a pill centred at the bottom, the deck's dark glass with a lit edge; bright while the mouse moves, faint
+   while it is still */
+.exit {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  height: 32px;
+  padding: 0 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(0, 229, 255, 0.75);
+  background: #17121f;
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.35);
+  color: #7fe9f7;
+  font-family: Michroma, sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  cursor: pointer;
+  transition: opacity 0.4s;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.exit__dot {
+  opacity: 0.55;
+}

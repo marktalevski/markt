@@ -16,3 +16,19 @@ export function h(tag, props, ...children) {
   el.append(...children.flat().filter(c => c != null && c !== false && c !== ''));
   return el;
 }
+
+/**
+ * Follows a press that has just begun: `move(event)` on every move of the pointer, then `end()` when it lifts (or the browser takes
+ * the pointer away).
+ */
+export function followDrag(move, end) {
+  const stop = () => {
+    removeEventListener('pointermove', move);
+    removeEventListener('pointerup', stop);
+    removeEventListener('pointercancel', stop);
+    end();
+  };
+  addEventListener('pointermove', move);
+  addEventListener('pointerup', stop);
+  addEventListener('pointercancel', stop);
+}

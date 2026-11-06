@@ -2,7 +2,7 @@
 // The logic class is the design's own code; View is its template as JSX.
 import React from 'react';
 import { DCLogic, page, sty, BASE } from '../lib/dc.js';
-import { deckGeo, padOf } from '../lib/deck.js';
+import { deckGeo, padOf } from '../lib/deck-layout.js';
 import { navAt, NAV_Y, handNavFrom, leaveTo } from '../lib/nav.js';
 import { ropeX, waveY, surfaceY, cubicAt } from '../lib/rope.js';
 import { LEAVE_PACE } from '../lib/pace.js';

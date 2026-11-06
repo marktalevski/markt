@@ -1,20 +1,21 @@
-// The Sound page's DJ deck (after a Pioneer Opus-Quad): a controller running edge to edge and off the bottom of the screen, so only its top shows.
-// Left deck: a jog wheel that scrubs, with the volume fader and play / pause beside it. Middle: the album clock (a flip counter in a tall display, the album names rolling round it), the main
-// screen (now playing over the album's track list). Right deck: six numbered knobs (a combination
-// lock, for something to come) in a row under the beat pads, square, four wide and two tall: the four pages, three for the pages still to come
-// (orange, green, purple) and one spare. The menu dots fly into the pads.
-// It lives here so Home can drop its dots straight onto the pads when it hands over to Sound.
-export const DECK_KEYS = ['home', 'freediving', 'sound', 'library', 'c4', 'c5', 'c6'];
-const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+// The Sound page's DJ deck: where everything on it sits. (After a Pioneer Opus-Quad.) A controller running edge to edge and off the
+// bottom of the screen, so only its top shows.
+//   Left deck: a jog wheel that scrubs, with play / pause and the volume fader in a column beside it.
+//   Middle: the album clock (a flip counter in a tall display, the album names rolling round it) and the main screen (now playing,
+//   over the album's track list).
+//   Right deck: the beat pads, square, four wide and two tall (the four pages, then three for the pages still to come and one
+//   spare), over a row of six numbered knobs (a combination lock, for something to come).
+// The menu's dots fly into the pads. The layout lives here, not with the Sound page, because Home drops its dots straight onto the pads
+// when it hands over to Sound.
+import { clamp } from './math.js';
+import { DOT_KEYS } from './nav.js';
 
 // the deck needs about this much width; on a narrower screen (a phone) it is laid out at this width and the whole thing scaled down to fit,
 // rather than squeezing its three panels into each other. deckScale is that factor (1 on wider screens)
 const DECK_MIN_W = 920;
-// a phone held upright gets a deck of its own instead (deckPhone): taller, the screen and pads big enough to use
+/** A phone held upright gets a deck of its own instead (deckPhone): taller, the screen and pads big enough to use. */
 export const isPhone = (W, H) => W < 640 && H >= W * 1.15;
 export const deckScale = (W, H) => (isPhone(W, H ?? Infinity) ? 1 : Math.min(1, W / DECK_MIN_W));
-// the deck where it is on screen (what pointer handling, hit areas and the other pages use)
-// (asked for several times a frame and on every pointer move, so the last size's layout is kept; nothing writes into it)
 const scaled = (v, s) =>
   typeof v === 'number'
     ? v * s
@@ -24,6 +25,10 @@ const scaled = (v, s) =>
         ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, scaled(x, s)]))
         : v;
 let geoMemo = null;
+/**
+ * The deck where it is on a screen W x H (what pointer handling, hit areas and the other pages use). It is asked for several times a
+ * frame and on every pointer move, so the last size's layout is kept; nothing may write into it.
+ */
 export function deckGeo(W, H) {
   if (geoMemo && geoMemo.W === W && geoMemo.H === H) return geoMemo.G;
   const s = deckScale(W, H),
@@ -31,7 +36,11 @@ export function deckGeo(W, H) {
   geoMemo = { W, H, G };
   return G;
 }
-// the deck at its own size (what the drawing uses, under a scale of deckScale(W)): W and H are the screen's, divided by deckScale
+/**
+ * The deck at its own size (what the drawing uses, under a scale of deckScale): W and H are the screen's, divided by deckScale.
+ * Rectangles are [x, y, w, h]; circles [x, y, r]. x0, y0, x1, y1, w, h: the whole deck; mx0, mx1: the middle section's sides;
+ * kc: the width each knob gets; vol: the fader's track (x, from y0 to y1), lo and hi: the ends of its travel.
+ */
 export function deckGeoV(W, H) {
   if (isPhone(W, H)) return deckPhone(W, H);
   const hV = Math.round(clamp(H * 0.4, 220, 330)),
@@ -98,9 +107,9 @@ export function deckGeoV(W, H) {
     hi: vol.y1 - 8,
   };
 }
-// where each menu dot lands: the centre of its beat pad
+/** Where menu dot k lands: the centre of its beat pad. */
 export const padOf = (G, k) => {
-  const i = DECK_KEYS.indexOf(k === 'ink' ? 'home' : k),
+  const i = DOT_KEYS.indexOf(k === 'ink' ? 'home' : k),
     p = i < 4 ? G.pads[i] : G.cpads[i - 4];
   return [p[0] + p[2] / 2, p[1] + p[3] / 2];
 };
@@ -158,4 +167,21 @@ function deckPhone(W, H) {
     hi: vol.y1 - 8,
     phone: true,
   };
+}
+
+// ---- the main screen
+
+/** The screen's top strip (now playing, and the squid's stage) is this much taller than its text needs, so the squid has room to dance. */
+export const stripExtra = G => (G.phone ? 16 : 30);
+
+/** The squid's pixel size on the screen: as big as the strip allows. */
+export const squidPixel = G => (G.phone || G.scr[2] < 320 ? 2.5 : 3);
+
+/** The track list on the screen: where each of its n rows sits (shared by the drawing and the row buttons over it). */
+export function rowsOf(G, n) {
+  const [sx, sy, sw, sh] = G.scr,
+    ex = stripExtra(G),
+    top = sy + 66 + ex,
+    rh = clamp((sh - 70 - ex) / Math.max(1, n), 15, 44);
+  return Array.from({ length: n }, (_, k) => [sx + 4, top + k * rh, sw - 8, rh]);
 }

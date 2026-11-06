@@ -1,17 +1,55 @@
 ---
+// Sound: the markup the page starts from. sound/main.js runs it; sound/sound.css styles it. Apart from the canvas, everything here is
+// a control of the deck the canvas draws: an element over each one, so it can be clicked, focused and read out.
 import Base from '../layouts/Base.astro';
-import Sound from '../components/Sound.jsx';
+import { BASE } from '../lib/base.js';
+import { albums, pad2 } from '../sound/albums.js';
+import '../sound/sound.css';
+
+// the beat pads that are the site's pages (the menu, on this page): links, so they open in a new tab too
+const PAGES = [
+  { key: 'home', label: 'Home', href: BASE + '?from=dive' },
+  { key: 'freediving', label: 'Freediving', href: BASE + 'freediving/' },
+  { key: 'sound', label: 'Sound', href: BASE + 'sound/' },
+  { key: 'library', label: 'Library', href: BASE + 'library/' },
+];
+// and the pads for the pages still to come
+const SOON = ['Orange', 'Green', 'Purple'];
+const SIX = [0, 1, 2, 3, 4, 5];
 ---
+
 <Base title="Sound · Mark T">
   <Fragment slot="head">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Michroma&amp;family=Hanken+Grotesk:wght@400;500&amp;family=JetBrains+Mono:wght@300;400;500&amp;display=swap" />
-    <style is:inline>
-      /* the paper colour the other pages hand over on, so nothing flashes before the canvas draws */
-      html,body{margin:0;height:100%;overflow:hidden;background:#f5f3ee}
-      /* sideways drags are the page's own (they move the playhead on a phone), not the browser's; up and down and pinching still work */
-      body{touch-action:pan-y pinch-zoom}
-      a{color:inherit}a:hover{color:inherit;opacity:.6}nav a:hover{opacity:1}
-    </style>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Michroma&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" />
   </Fragment>
-  <Sound client:only="react" />
+  <div class="sound">
+    <canvas class="sound__canvas"></canvas>
+    <nav class="pads" aria-label="Pages">
+      {PAGES.map(p => <a class="hit hit--pad" href={p.href} data-navk={p.key} aria-label={p.label} aria-current={p.key === 'sound' ? 'page' : undefined} />)}
+    </nav>
+    <div class="controls" role="group" aria-label="Deck">
+      <div class="clock">
+        {albums.map((a, i) => <button type="button" class="clock__name" data-wi={i} aria-label={`Album ${pad2(i + 1)}: ${a.title}`}>{a.title}</button>)}
+        <div class="counter" aria-hidden="true">
+          <div class="counter__half counter__half--top"><div class="counter__number" data-shows="to">01</div></div>
+          <div class="counter__half counter__half--bottom"><div class="counter__number" data-shows="from">01</div></div>
+          <div class="counter__half counter__half--top counter__flap"><div class="counter__number" data-shows="from">01</div></div>
+          <div class="counter__half counter__half--bottom counter__flap"><div class="counter__number" data-shows="to">01</div></div>
+          <div class="counter__hinge"></div>
+        </div>
+      </div>
+      <div class="hit hit--round hit--turn" data-deck="jog" role="slider" aria-label="Jog wheel: drag round to scrub" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
+      {SOON.map((name, i) => <button type="button" class="hit hit--cpad" data-cpad={i} aria-disabled="true" aria-label={`${name} page: coming soon`} />)}
+      <button type="button" class="hit hit--cpad" data-cpad="3" aria-label="Kick drum"></button>
+      <button type="button" class="hit hit--round hit--full" data-deck="full" aria-label="Full screen: only the wave" title="Full screen (F)"></button>
+      <button type="button" class="hit hit--round" data-deck="play" aria-label="Play"></button>
+      {SIX.map(i => <div class="hit hit--round hit--turn" data-knob={i} role="slider" aria-label={`Knob ${i + 1}`} aria-valuemin="0" aria-valuemax="9" aria-valuenow="0" />)}
+      <div class="hit hit--fader" data-deck="vol" role="slider" aria-label="Volume" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"></div>
+      {SIX.map(k => <button type="button" class="hit" data-row={k} aria-label={`Play piece ${k + 1}`} />)}
+    </div>
+    <button type="button" class="exit" data-full-exit aria-label="Leave full screen" title="Leave full screen (Esc)"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 1v4H1M9 1v4h4M5 13V9H1M9 13V9h4"></path></svg>EXIT<span class="exit__dot">·</span>ESC</button>
+  </div>
+  <script>
+    import '../sound/main.js';
+  </script>
 </Base>
