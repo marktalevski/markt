@@ -15,22 +15,11 @@ export default {
 
   /** The black line. */
   ink({ strokes }) {
-    // sunny side up, seen at a slight angle: wobbly white with a thickness edge underneath, a domed yolk with a shine and a soft shadow
-    const wob = EGG_WOB,
-      white = Array.from({ length: 91 }, (_, q) => {
-        const a = Math.PI * 0.55 + (q / 90) * Math.PI * 2.03;
-        return [...eggWhite(a, 1), 1];
-      });
-    const edge = [];
-    for (let q = 0; q <= 40; q++) {
-      const a = Math.PI * 0.18 + (q / 40) * Math.PI * 0.64,
-        rr = wob(a);
-      edge.push([
-        Math.cos(a) * 1.3 * rr * 0.97,
-        0.02 + Math.sin(a) * 0.86 * rr + 0.1,
-        0.6 + 0.3 * Math.sin((Math.PI * q) / 40),
-      ]);
-    }
+    // sunny side up, seen at a slight angle: the wobbly white, then a domed yolk and the shine on it
+    const white = Array.from({ length: 91 }, (_, q) => {
+      const a = Math.PI * 0.55 + (q / 90) * Math.PI * 2.03;
+      return [...eggWhite(a, 1), 1];
+    });
     const Y = [0.18, -0.12],
       yolk = Array.from({ length: 61 }, (_, q) => {
         const a = -Math.PI * 0.6 + (q / 60) * Math.PI * 2.02;
@@ -52,6 +41,9 @@ export default {
       if (k) list.push(link(seq[k - 1][seq[k - 1].length - 1], q[0]));
       list.push(q);
     });
+    // the brush's last move is an unseen one, off the yolk and back to where the white's outline closes: the black dot comes to
+    // rest there, on the egg's edge, and not on the yolk
+    list.push(link(shine[shine.length - 1], white[white.length - 1]));
     strokes(list);
     return [0, 1.25];
   },

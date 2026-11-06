@@ -2,7 +2,8 @@
 // with the width, strength and depth the brush has at each point; paint.js lays them on the paper.
 //
 // A quad is { q: its corners, a: its strength (0..1), z: its depth (lines nearer the eye are painted later), col: its colour, pid:
-// which line it belongs to, ink: whether that is the black line }.
+// which line it belongs to, ink: whether that is the black line, onSymbol: whether it is part of the line's stretch on the symbol
+// (and not of its way there: flying in, or coming over from the last symbol) }.
 import { clamp, easeInOut, smooth } from '../lib/math.js';
 import { lerpPt, smooth1 } from './curves.js';
 import { fadeAt } from './fade.js';
@@ -48,7 +49,8 @@ function brushAlong(s, P, { tr, h, cut, tEnd, fin, hasCP }, T, gone) {
     as = [],
     zs = [],
     ss = [],
-    dry = [];
+    dry = [],
+    on = []; // (whether each point is on the line's stretch of the symbol)
   for (let i = 0; i < P.pts.length; i++) {
     // the tip (and a retreating tail) sit exactly where they should, between stored points, so slow motion glides instead of hopping a point at a time
     let sv = P.s[i],
@@ -141,9 +143,10 @@ function brushAlong(s, P, { tr, h, cut, tEnd, fin, hasCP }, T, gone) {
     zs.push(z);
     ss.push(sv);
     dry.push(dr);
+    on.push(i >= P.arc0);
     if (tipEnd) break;
   }
-  return { pts, ws, as, zs, ss, dry };
+  return { pts, ws, as, zs, ss, dry, on };
 }
 
 /**
@@ -245,7 +248,7 @@ function soften(s, P, tr, { pts, ws, as, ss, dry }) {
 }
 
 /** The finished stroke as quads: a round cap at each end, and a piece between each pair of points (more where the ink line's strength changes quickly). */
-function ribbon(quads, { pts, ws, as, zs, dry }, N2, L, pid) {
+function ribbon(quads, { pts, ws, as, zs, dry, on }, N2, L, pid) {
   const n = pts.length,
     col = `rgb(${L.col[0]},${L.col[1]},${L.col[2]})`;
   const quad = (i0, o0, i1, o1, hw0, hw1, a, z) => {
@@ -261,6 +264,7 @@ function ribbon(quads, { pts, ws, as, zs, dry }, N2, L, pid) {
       col,
       pid,
       ink: !!L.keep,
+      onSymbol: on[i0] && on[i1],
       q: [
         [c0[0] - n0[0] * hw0, c0[1] - n0[1] * hw0],
         [c1[0] - n1[0] * hw1, c1[1] - n1[1] * hw1],
@@ -278,7 +282,7 @@ function ribbon(quads, { pts, ws, as, zs, dry }, N2, L, pid) {
       const an = (k3 / 12) * 6.2832;
       q.push([c[0] + Math.cos(an) * r, c[1] + Math.sin(an) * r]);
     }
-    quads.push({ z: zs[ci], a: as[ci] * (1 - dry[ci] * 0.9), col, pid, ink: !!L.keep, q });
+    quads.push({ z: zs[ci], a: as[ci] * (1 - dry[ci] * 0.9), col, pid, ink: !!L.keep, onSymbol: on[ci], q });
   };
   cap(0);
   cap(n - 1);
@@ -314,6 +318,7 @@ function ribbon(quads, { pts, ws, as, zs, dry }, N2, L, pid) {
             col,
             pid,
             ink: !!L.keep,
+            onSymbol: on[i] && on[i + 1],
             q: [lp(L0, L1, u0), lp(L0, L1, u1), lp(R0, R1, u1), lp(R0, R1, u0)],
           });
         }

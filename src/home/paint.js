@@ -187,7 +187,8 @@ function signature(quads) {
 function groupQuads(s, quads, topPid) {
   const groups = new Map();
   // spring's red brushes the cherry petals: they take blossom pink, every other one paler, and the twig out to the Sound dot stays red.
-  // Each colour is its own paint group, all over the other lines
+  // Each colour is its own paint group, all over the other lines. (That goes for the red line's stretch on the symbol. On its way
+  // there, flying in or coming over from the last symbol, it crosses where the petals will be, and is simply a red line)
   const bloomR = s.blooms && s.blooms.length && topPid != null ? s.geo.R : 0;
   for (const Q of quads) {
     let k = Q.pid ?? 'u',
@@ -198,16 +199,17 @@ function groupQuads(s, quads, topPid) {
     if (bloomR && k === topPid && Q.a < 0.2) continue;
     if (k === topPid) {
       top = 10;
-      if (bloomR) {
+      if (bloomR && Q.onSymbol) {
         const m = Q.q[2] || Q.q[0],
           qx = (Q.q[0][0] + m[0]) / 2,
           qy = (Q.q[0][1] + m[1]) / 2;
         let d = 1e9;
         for (const b of s.blooms) d = Math.min(d, Math.hypot(b[0] - qx, b[1] - qy));
         d /= bloomR;
-        // just past a petal's rim is only the brush's unseen move leaving it: drop that wash (the twig, beyond the last petal, stays)
+        // past a petal's rim there are only the brush's unseen moves from one petal to the next: none of that is painted (the twig,
+        // beyond the last petal, is)
         const twigX = s.blooms[s.blooms.length - 1][0] + bloomR * 0.05;
-        if (d > 0.074 && d < 0.2 && qx < twigX) continue;
+        if (d > 0.074 && qx < twigX) continue;
         // the twig flows out of the last petal: one paint group whose fill is a gradient, the petal's pink deepening to Sound's red
         if (d >= 0.074 && qx >= twigX) {
           k = topPid + ':t';
