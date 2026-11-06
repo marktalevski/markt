@@ -25,4 +25,6 @@ export default defineConfig({
   base: '/markt',
   trailingSlash: 'always',
   integrations: [react(), editorLocalOnly],
+  // CSS is shipped as written: minifiers round colours' transparency (rgba(…, .06) becomes #…0f), which shifts painted textures by a shade
+  vite: { build: { cssMinify: false } },
 });

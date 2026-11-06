@@ -1,0 +1,41 @@
+---
+// The page menu in the top-right corner: a dot for each page with its name under it, then the three small dots for pages still to
+// come. `current` is the page it is on; with `currentLabel` that page's own dot is a button (Freediving's takes you back to the
+// surface) rather than a link. Styled by styles/menu.css, wired up by lib/menu.js.
+import '../styles/menu.css';
+import { BASE } from '../lib/base.js';
+import { DOT_CSS } from '../lib/nav.js';
+
+interface Props {
+  current: 'freediving' | 'library';
+  currentLabel?: string;
+}
+const { current, currentLabel } = Astro.props;
+const PAGES = [
+  ['home', 'Home', BASE + '?from=dive'],
+  ['freediving', 'Freediving', BASE + 'freediving/'],
+  ['sound', 'Sound', BASE + 'sound/'],
+  ['library', 'Library', BASE + 'library/'],
+];
+---
+
+<nav aria-label="Pages" class="menu">
+  {
+    PAGES.map(([key, name, href]) => {
+      const inner = (
+        <>
+          <span data-navdot="1" class="menu__dot" />
+          <span class="menu__name-box"><span lang="en" aria-hidden="true" class="menu__name">{name}</span></span>
+        </>
+      );
+      return key === current && currentLabel ? (
+        <button type="button" class="menu__item" aria-current="page" aria-label={currentLabel} data-navk={key} style={`--dot:${DOT_CSS[key]}`}>{inner}</button>
+      ) : (
+        <a class="menu__item" href={href} aria-label={name} aria-current={key === current ? 'page' : undefined} data-navk={key} style={`--dot:${DOT_CSS[key]}`}>{inner}</a>
+      );
+    })
+  }
+  <span aria-hidden="true" class="menu__more">
+    {['c4', 'c5', 'c6'].map(key => <span data-navk={key} class="menu__small" style={`--dot:${DOT_CSS[key]}`}><span data-navdot="1" /></span>)}
+  </span>
+</nav>

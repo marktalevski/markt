@@ -1,22 +1,25 @@
 ---
+// The Library: the markup the page starts from. library/main.js fills in the books and the text and runs it; library/library.css styles it.
 import Base from '../layouts/Base.astro';
-import Library from '../components/Library.jsx';
+import PageMenu from '../components/PageMenu.astro';
+import '../library/library.css';
+import { DOT_KEYS, DOT_CSS, dotRadius } from '../lib/nav.js';
 ---
+
 <Base title="Library · Mark T">
   <Fragment slot="head">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&amp;family=Geist:wght@300..700&amp;family=Geist+Mono:wght@400;500&amp;display=swap" />
-    <style is:inline>
-      html,body{margin:0;height:100%;overflow:hidden;background:#fafafa}
-      a{color:#111}a:hover{color:#111;opacity:.6}nav a:hover{opacity:1}
-      @keyframes steamRise{0%{transform:translateY(10px) scaleY(.8);opacity:0}35%{opacity:1}100%{transform:translateY(-18px) scaleY(1.05);opacity:0}}
-      /* the reading column scrolls without a scrollbar: the colour line beside it shows where you are */
-      [data-read]::-webkit-scrollbar{display:none}
-      /* a book slides out a little under the pointer (the one being read is already out, and stays put) */
-      [data-book]:not([data-upright]):hover{transform:translateX(min(var(--tx), -12px)) !important;filter:brightness(1.06)}
-      /* on a phone's shelf the books stand upright, and lift up out of the row instead */
-      [data-upright]:hover{transform:translate(-50%, -50%) rotate(-90deg) translateX(max(var(--tx), 8px)) !important;filter:brightness(1.06)}
-      [data-shelf]::-webkit-scrollbar{display:none}
-    </style>
   </Fragment>
-  <Library client:only="react" />
+  <div class="library">
+    <div class="reading" data-read="1"><div class="reading__text"></div></div>
+    <div class="rail" data-rail="1"><span class="rail__marker" aria-hidden="true"></span></div>
+    <div data-books></div>
+    {DOT_KEYS.map(key => <span class="fly-dot" data-fly={key} data-navdot="1" aria-hidden="true" style={`--dot:${DOT_CSS[key]};--d:${2 * dotRadius(key)}px`} />)}
+    <div class="library__fade" aria-hidden="true"></div>
+  </div>
+  <PageMenu current="library" />
+  <template id="mug"><span class="mug" aria-hidden="true" data-mug="1"><span class="mug__steam"></span><span class="mug__steam"></span><span class="mug__steam"></span><span class="mug__cup"><span class="mug__handle"></span><span class="mug__body"></span><span class="mug__shine"></span><span class="mug__torii"><span></span><span></span><span></span><span></span><span></span></span></span></span></template>
+  <script>
+    import '../library/main.js';
+  </script>
 </Base>

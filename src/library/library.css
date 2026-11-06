@@ -1,0 +1,656 @@
+/* The Library: a reading column on the left, a line beside it showing where you are, and the books in the bottom-right corner (or on
+   a shelf along the bottom of a narrow screen). main.js sets the sizes as custom properties on .library. */
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #fafafa;
+}
+a {
+  color: #111;
+}
+a:hover {
+  color: #111;
+  opacity: 0.6;
+}
+nav a:hover {
+  opacity: 1;
+}
+
+.library {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #fafafa;
+  color: #111;
+  font-family: 'Geist', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  --rule: #111; /* the open book's colour */
+}
+.menu {
+  position: fixed;
+  z-index: 130;
+  color: #111;
+}
+
+/* ---- the reading column. It scrolls without a scrollbar (the line beside it shows where you are) and fades out top and bottom */
+.reading {
+  --mask: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 var(--fade-top),
+    #000 calc(100% - var(--fade-bottom)),
+    transparent 100%
+  );
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -webkit-mask-image: var(--mask);
+  mask-image: var(--mask);
+}
+.reading::-webkit-scrollbar {
+  display: none;
+}
+.reading__text {
+  width: var(--col-w);
+  margin-left: var(--col-l);
+  box-sizing: border-box;
+  padding: var(--pad-top) 0 var(--pad-bottom) 28px;
+}
+
+/* the blocks of a book's text (reading.js) */
+.block {
+  font-style: normal;
+  font-weight: 400;
+  text-wrap: pretty;
+  white-space: pre-wrap;
+}
+.block--title {
+  margin: 0 0 0.35em;
+  font-family: 'Geist', sans-serif;
+  font-size: var(--fs-title);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.045em;
+  color: #111;
+}
+.block--heading {
+  margin: 2.2em 0 0.6em;
+  font-family: 'Geist', sans-serif;
+  font-size: var(--fs-heading);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+  color: #111;
+}
+.block--meta {
+  margin: 0 0 1.3em;
+  font-family: 'Geist Mono', monospace;
+  font-size: var(--fs-meta);
+  line-height: 1.4;
+  letter-spacing: 0.08em;
+  color: #8c8c8c;
+}
+.block--para,
+.block--para-italic {
+  margin: 0 0 1em;
+  font-family: 'Newsreader', Georgia, serif;
+  font-size: var(--fs);
+  line-height: 1.7;
+  letter-spacing: 0;
+  color: #2b2b2b;
+}
+.block--para-italic {
+  font-style: italic;
+}
+.block--line {
+  margin: 0 0 0.55em;
+  font-family: 'Newsreader', Georgia, serif;
+  font-size: var(--fs);
+  line-height: 1.55;
+  letter-spacing: 0;
+  color: #2b2b2b;
+}
+.block--quote {
+  margin: 1.6em 0 0.4em;
+  font-family: 'Newsreader', Georgia, serif;
+  font-size: var(--fs-quote);
+  font-style: italic;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  color: #111;
+}
+.block--photo {
+  display: block;
+  max-width: 100%;
+  max-height: 70vh;
+  width: auto;
+  height: auto;
+  margin: 0.2em 0 1.4em;
+  border-radius: 3px;
+}
+
+/* ---- the line beside the text, in the open book's colour: a ring at each section to jump to, and a dot that follows your place */
+.rail {
+  position: absolute;
+  left: var(--col-l);
+  top: 28px;
+  height: var(--rail-h);
+  width: 3px;
+  border-radius: 2px;
+  background: var(--rule);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+.rail.is-on {
+  opacity: 1;
+}
+.rail__notch {
+  position: absolute;
+  left: -6px;
+  width: 15px;
+  height: 15px;
+  margin-top: -7.5px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+/* (the first is the book's title: no ring for it) */
+.rail__notch--title {
+  opacity: 0;
+  pointer-events: none;
+}
+.rail__notch > span {
+  display: block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #fafafa;
+  box-shadow: 0 0 0 1.5px var(--rule);
+}
+.rail__marker {
+  position: absolute;
+  left: -5.5px;
+  top: 0;
+  width: 14px;
+  height: 14px;
+  margin-top: -7px;
+  border-radius: 50%;
+  background: var(--rule);
+  box-shadow: 0 0 0 3px #fafafa;
+  pointer-events: none;
+}
+
+/* ---- the books. Wide screens: lying in a stack in the corner, the open one slid out to the left */
+.stack {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: var(--stack-w);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0;
+}
+.book {
+  position: relative;
+  width: var(--len);
+  height: var(--thick);
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  cursor: pointer;
+  z-index: 1;
+  background: #888;
+  transform: translateX(var(--tx));
+  transition:
+    transform 0.35s cubic-bezier(0.3, 1.3, 0.5, 1),
+    filter 0.35s ease;
+}
+.book.is-open {
+  z-index: 3;
+}
+/* a book slides out a little under the pointer (the one being read is already out, and stays put) */
+.book:not(.book--upright):hover {
+  transform: translateX(min(var(--tx), -12px));
+  filter: brightness(1.06);
+}
+/* narrow screens: standing upright on a shelf along the bottom, one row that scrolls sideways, the open one lifted up out of it */
+.shelf {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 152px;
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  padding: 0 16px 0;
+  box-sizing: border-box;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.shelf::-webkit-scrollbar {
+  display: none;
+}
+.shelf__slot {
+  position: relative;
+  flex: none;
+}
+.book--upright {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) rotate(-90deg) translateX(var(--tx));
+}
+.book--upright:hover {
+  transform: translate(-50%, -50%) rotate(-90deg) translateX(max(var(--tx), 8px));
+  filter: brightness(1.06);
+}
+/* (a smaller mug stands at the end of the shelf) */
+.shelf__mug {
+  position: relative;
+  flex: none;
+  width: 76px;
+  height: 0;
+  align-self: flex-end;
+  margin-left: 6px;
+}
+.shelf__mug > span {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  transform: scale(0.62);
+  transform-origin: 100% 100%;
+}
+.shelf__mug > span > span {
+  position: relative;
+  display: block;
+  width: 96px;
+  height: 0;
+}
+.shelf__mug .mug {
+  right: 0;
+}
+
+/* each kind of book: its cover colour and the shape of its corners */
+.book[data-kind='bujo'] {
+  background: #3f5fae;
+  border-radius: 2px 4px 4px 2px;
+}
+.book[data-kind='readings'] {
+  background: #d4573f;
+  border-radius: 6px 3px 5px 4px / 4px 6px 3px 5px;
+}
+.book[data-kind='quotes'] {
+  background: #7f63ad;
+  border-radius: 1px;
+}
+.book[data-kind='pillow'] {
+  background: #e39440;
+  border-radius: 10px 4px 4px 10px;
+}
+.book[data-kind='musings'] {
+  background: #5d9a63;
+  border-radius: 3px 9px 4px 8px / 6px 3px 7px 4px;
+}
+
+/* ---- a spine's painting (spines.js): soft brush streaks, then its kind's pattern and label */
+.spine {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+}
+.spine > span {
+  position: absolute;
+}
+.spine__streaks {
+  inset: 0;
+  background: repeating-linear-gradient(
+    91deg,
+    rgba(255, 255, 255, 0.06) 0 3px,
+    rgba(255, 255, 255, 0) 3px 9px,
+    rgba(0, 0, 0, 0.05) 9px 11px,
+    rgba(0, 0, 0, 0) 11px 21px
+  );
+}
+.spine__label {
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: 'Geist', sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+/* bullet journal: dotted paper, a gold band at each end, the title on a cream label */
+.spine--bujo .spine__dots {
+  inset: 0;
+  background: radial-gradient(circle, rgba(244, 236, 220, 0.55) 0 1.3px, transparent 1.8px) 0 0 / 9px 9px;
+}
+.spine--bujo .spine__band-left {
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 18px;
+  background: #e9b949;
+  border-radius: inherit;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.spine--bujo .spine__band-right {
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  background: #e9b949;
+}
+.spine--bujo .spine__label {
+  left: 28px;
+  padding: 2px 9px 3px;
+  border-radius: 2px;
+  font-size: var(--spine-fs);
+  color: #1e2a4f;
+  background: #f4ecdc;
+}
+/* short readings: cross-hatched cloth, the title on a framed plate, a ring */
+.spine--readings .spine__hatch {
+  inset: 0;
+  background:
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.07) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.06) 0 1px, transparent 1px 4px);
+}
+.spine--readings .spine__plate {
+  left: 22%;
+  right: 8%;
+  top: 0;
+  bottom: 0;
+  background: #f2d3b0;
+  border-left: 3px double #8f2f1f;
+  border-right: 3px double #8f2f1f;
+}
+.spine--readings .spine__label {
+  left: calc(22% + 10px);
+  color: #7a2414;
+  font-family: 'Newsreader', serif;
+  font-style: italic;
+  font-weight: 500;
+  font-size: calc(var(--spine-fs) + 2px);
+}
+.spine--readings .spine__ring {
+  left: 10px;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin-top: -7px;
+  border: 2px solid #f2d3b0;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+/* quotes: gold pinstripes, the title in quotation marks, two gold bars */
+.spine--quotes .spine__stripes {
+  inset: 0;
+  background: repeating-linear-gradient(
+    115deg,
+    rgba(240, 201, 74, 0) 0 8px,
+    rgba(240, 201, 74, 0.22) 8px 10px,
+    rgba(240, 201, 74, 0) 10px 16px
+  );
+}
+.spine--quotes .spine__label {
+  left: 14px;
+  color: #f6e7b8;
+  font-family: 'Newsreader', serif;
+  font-weight: 600;
+  font-size: calc(var(--spine-fs) + 3px);
+  letter-spacing: 0.02em;
+}
+.spine--quotes .spine__bar {
+  right: 14px;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  background: #f0c94a;
+}
+.spine--quotes .spine__bar--faint {
+  right: 20px;
+  opacity: 0.6;
+}
+/* pillow book: fish-scale waves, the title on a blue pill, a small triangle */
+.spine--pillow .spine__scales {
+  inset: 0;
+  background: radial-gradient(
+      circle at 50% 100%,
+      rgba(255, 240, 215, 0) 0 5px,
+      rgba(255, 240, 215, 0.35) 5px 6.5px,
+      rgba(255, 240, 215, 0) 7px
+    )
+    0 0 / 14px 9px;
+}
+.spine--pillow .spine__label {
+  right: 12px;
+  padding: 2px 10px 3px;
+  border-radius: 999px;
+  font-size: var(--spine-fs);
+  color: #fbe6c8;
+  background: #3f5fae;
+}
+.spine--pillow .spine__triangle {
+  left: 12px;
+  top: 50%;
+  width: 0;
+  height: 0;
+  margin-top: -6px;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 12px solid #3f5fae;
+}
+/* musings: a green wash, a folded corner, the title on a leaf-shaped label */
+.spine--musings .spine__wash {
+  inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(ellipse 30% 70% at 20% 30%, #78b07c, rgba(120, 176, 124, 0) 70%),
+    radial-gradient(ellipse 25% 90% at 55% 70%, #3f7a48, rgba(63, 122, 72, 0) 70%),
+    radial-gradient(ellipse 20% 60% at 85% 35%, #8cc08e, rgba(140, 192, 142, 0) 70%);
+}
+.spine--musings .spine__corner {
+  left: 0;
+  top: 0;
+  width: 16px;
+  height: 100%;
+  background:
+    linear-gradient(135deg, #2f5a35 0 50%, transparent 50%) 0 0 / 16px 50% no-repeat,
+    linear-gradient(45deg, #2f5a35 0 50%, transparent 50%) 0 100% / 16px 50% no-repeat;
+}
+.spine--musings .spine__label {
+  left: 28px;
+  padding: 2px 12px 3px;
+  border-radius: 12px 3px 12px 3px;
+  color: #24412a;
+  background: #f4ecdc;
+  font-family: 'Newsreader', serif;
+  font-style: italic;
+  font-weight: 500;
+  font-size: calc(var(--spine-fs) + 2px);
+}
+/* any other kind: just its title */
+.spine--other .spine__label {
+  left: 14px;
+  font-size: var(--spine-fs);
+  color: #fff;
+}
+
+/* ---- the mug on the top book: sticker-style, a torii gate on its front, steam curling up */
+.mug {
+  position: absolute;
+  right: var(--mug-right);
+  bottom: calc(100% + 3px);
+  width: 96px;
+  height: 128px;
+  pointer-events: none;
+}
+.mug span {
+  position: absolute;
+}
+.mug__steam {
+  width: 12px;
+  box-sizing: border-box;
+  border: 3px solid #a99fb6;
+  border-radius: 50%;
+  animation: steamRise 2.6s ease-out infinite;
+}
+.mug__steam:nth-child(1) {
+  left: 14px;
+  top: 4px;
+  height: 36px;
+  border-left-color: transparent;
+  border-bottom-color: transparent;
+}
+.mug__steam:nth-child(2) {
+  left: 29px;
+  top: -4px;
+  height: 42px;
+  border-right-color: transparent;
+  border-top-color: transparent;
+  animation-delay: -0.85s;
+}
+.mug__steam:nth-child(3) {
+  left: 44px;
+  top: 6px;
+  height: 34px;
+  border-left-color: transparent;
+  border-bottom-color: transparent;
+  animation-delay: -1.7s;
+}
+@keyframes steamRise {
+  0% {
+    transform: translateY(10px) scaleY(0.8);
+    opacity: 0;
+  }
+  35% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-18px) scaleY(1.05);
+    opacity: 0;
+  }
+}
+.mug__cup {
+  left: 0;
+  bottom: 0;
+  width: 92px;
+  height: 84px;
+  filter: drop-shadow(3px 0 0 #fff) drop-shadow(-3px 0 0 #fff) drop-shadow(0 3px 0 #fff) drop-shadow(0 -3px 0 #fff)
+    drop-shadow(0 6px 7px rgba(74, 53, 82, 0.2));
+}
+.mug__handle {
+  right: 0;
+  top: 18px;
+  width: 28px;
+  height: 38px;
+  box-sizing: border-box;
+  border: 3.5px solid #4a3552;
+  border-left: 0;
+  border-radius: 0 18px 18px 0;
+}
+.mug__body {
+  left: 0;
+  top: 0;
+  width: 68px;
+  height: 84px;
+  box-sizing: border-box;
+  background: #a8d8c8;
+  border: 3.5px solid #4a3552;
+  border-radius: 7px 7px 20px 20px;
+}
+.mug__shine {
+  left: 4px;
+  top: 4px;
+  width: 60px;
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.45);
+}
+.mug__torii {
+  left: 12px;
+  top: 22px;
+  width: 44px;
+  height: 42px;
+}
+.mug__torii span {
+  box-sizing: border-box;
+  background: #d4573f;
+  border: 2px solid #4a3552;
+}
+.mug__torii span:nth-child(1) {
+  left: 0;
+  top: 0;
+  width: 44px;
+  height: 7px;
+  border-radius: 8px 8px 2px 2px / 6px 6px 2px 2px;
+}
+.mug__torii span:nth-child(2) {
+  left: 4px;
+  top: 8px;
+  width: 36px;
+  height: 5px;
+  border-radius: 1px;
+}
+.mug__torii span:nth-child(3) {
+  left: 19px;
+  top: 6px;
+  width: 6px;
+  height: 8px;
+  border-top: 0;
+  border-bottom: 0;
+}
+.mug__torii span:nth-child(4) {
+  left: 8px;
+  top: 7px;
+  width: 6px;
+  height: 35px;
+  border-radius: 1px 1px 2px 2px;
+}
+.mug__torii span:nth-child(5) {
+  right: 8px;
+  top: 7px;
+  width: 6px;
+  height: 35px;
+  border-radius: 1px 1px 2px 2px;
+}
+
+/* ---- the dots that fly between the menu and the books as the page arrives and leaves (hidden otherwise) */
+.fly-dot {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: var(--d);
+  height: var(--d);
+  border-radius: 50%;
+  background: var(--dot);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 125;
+}
+/* the page fades in from blank paper, unless it arrives under the last page's picture (Base.astro marks that with .covered) */
+.library__fade {
+  position: absolute;
+  inset: 0;
+  z-index: 120;
+  pointer-events: none;
+  background: #fafafa;
+  opacity: 1;
+  transition: opacity 0.45s ease;
+}
+.covered .library__fade {
+  opacity: 0;
+}

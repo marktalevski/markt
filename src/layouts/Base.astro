@@ -63,7 +63,7 @@ const { title, noindex } = Astro.props;
         const j = JSON.parse(sessionStorage.getItem('page-cover') || 'null'); sessionStorage.removeItem('page-cover');
         if (j && Date.now() - j.t < 10000) {
           const i = new Image(); i.id = 'page-cover'; i.alt = ''; i.decoding = 'sync'; i.src = j.src; i.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:2147483000;pointer-events:none;transition:opacity .15s';
-          document.body.appendChild(i);
+          document.body.appendChild(i); document.documentElement.classList.add('covered');   // (pages can style themselves for arriving under the picture)
           let gone = false; const off = () => { if (gone) return; gone = true; i.style.opacity = '0'; setTimeout(() => i.remove(), 200); };
           // a frame after the page's own first frame, so that frame is on screen before the cover lifts off it
           window.__ready = () => requestAnimationFrame(() => requestAnimationFrame(off));

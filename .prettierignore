@@ -1,0 +1,9 @@
+dist/
+.astro/
+node_modules/
+Mark-T-Website/
+public/
+src/data/
+package-lock.json
+*.astro
+*.md
