@@ -7,6 +7,9 @@ export const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 /** Eases in and out between 0 and 1 (smoothstep). x must already be within 0..1. */
 export const smooth = x => x * x * (3 - 2 * x);
 
+/** A gentler ease in and out than smooth (smootherstep): it starts and stops with no jolt at all. x within 0..1. */
+export const smoother = x => x * x * x * (x * (x * 6 - 15) + 10);
+
 /** Eases in and out along a cosine. */
 export const easeInOut = k => 0.5 - 0.5 * Math.cos(Math.PI * k);
 
@@ -22,13 +25,18 @@ export const cubicAt = (A, B, C, D, u) => {
   return [a * A[0] + b * B[0] + c * C[0] + d * D[0], a * A[1] + b * B[1] + c * C[1] + d * D[1]];
 };
 
-/** A repeatable random number generator (mulberry32): the same seed always gives the same run of numbers in 0..1. */
-export const rng = seed => () => {
-  seed |= 0;
-  seed = (seed + 0x6d2b79f5) | 0;
-  let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+/**
+ * A repeatable random number generator (mulberry32): the same seed always gives the same run of numbers in 0..1.
+ * `skip` starts it that many numbers into its run.
+ */
+export const rng = (seed, skip = 0) => {
+  seed = (seed + Math.imul(skip, 0x6d2b79f5)) | 0;
+  return () => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 };
 
 /**

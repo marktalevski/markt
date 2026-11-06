@@ -1,19 +1,27 @@
 ---
+// Freediving: the markup the page starts from. freediving/main.js builds the entries and runs it; freediving/freediving.css styles it.
 import Base from '../layouts/Base.astro';
-import Freediving from '../components/Freediving.jsx';
+import PageMenu from '../components/PageMenu.astro';
+import '../freediving/freediving.css';
 ---
+
 <Base title="Freediving · Mark T">
   <Fragment slot="head">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;600&amp;display=swap" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..500&amp;family=JetBrains+Mono:wght@300;400;500&amp;display=swap" />
-    <style is:inline>
-      html,body{margin:0;height:100%;overflow:hidden;background:#f5f3ee;overscroll-behavior:none}
-      a{color:inherit}a:hover{color:inherit;opacity:.6}nav a:hover{opacity:1}
-      @keyframes tlFade{from{opacity:0}to{opacity:1}}
-      @keyframes tlIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-      @keyframes tlR{from{opacity:0;transform:translateX(-14px)}to{opacity:1;transform:none}}
-      [data-scroll]::-webkit-scrollbar{width:3px}[data-scroll]::-webkit-scrollbar-thumb{background:currentColor}
-    </style>
   </Fragment>
-  <Freediving client:only="react" />
+  <div class="freediving">
+    <canvas class="freediving__water"></canvas>
+    <canvas class="freediving__surface"></canvas>
+    <div class="world"></div>
+    <PageMenu current="freediving" currentLabel="Freediving, current page, back to the surface" />
+    <div class="chrome">
+      <div class="chrome__box">
+        <div class="chrome__depth">0.0 m</div>
+        <div class="chrome__counter"></div>
+      </div>
+    </div>
+  </div>
+  <script>
+    import '../freediving/main.js';
+  </script>
 </Base>

@@ -44,13 +44,6 @@ const { title, noindex } = Astro.props;
       html.no-papyrus [data-lab="home"] { font-family: 'Newsreader', Georgia, serif !important; font-style: italic !important; font-weight: 300 !important; letter-spacing: -0.01em !important; }
       /* keys whose canvas drawing shows their own hover / pressed state: no browser focus ring on top */
       [data-noring]:focus, [data-noring]:focus-visible { outline: none !important; }
-      html.no-papyrus [data-lab="nav"] { font-family: 'Newsreader', Georgia, serif !important; font-weight: 600 !important; }
-      /* narrow screens: the page menu's vertical labels are smaller and the menu shorter, so it doesn't take the top of a phone screen */
-      @media (max-width: 719px) {
-        nav[aria-label="Pages"] > [data-navk] { height: 108px !important; }
-        nav[aria-label="Pages"] > [data-navk] > span:last-child { height: 72px !important; }
-        nav[aria-label="Pages"] > [data-navk] > span:last-child > span { font-size: 14px !important; }
-      }
     </style>
   </head>
   <body>

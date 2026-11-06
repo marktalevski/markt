@@ -1,0 +1,240 @@
+/* Freediving: two canvases (the water with the rope, and the surface lines above it), the entries laid over them, the page menu and a
+   depth read-out. layout.js moves the entries every frame; this is how they look. */
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #f5f3ee;
+  overscroll-behavior: none;
+}
+a {
+  color: inherit;
+}
+a:hover {
+  color: inherit;
+  opacity: 0.6;
+}
+nav a:hover {
+  opacity: 1;
+}
+
+.freediving {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  color: #141414;
+  background: #f5f3ee;
+  font-family: 'Newsreader', Georgia, serif;
+  -webkit-font-smoothing: antialiased;
+  touch-action: none;
+  user-select: none;
+}
+.freediving canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.menu {
+  position: absolute;
+  z-index: 5;
+}
+
+/* ---- the entries. .world is the point where the rope meets the surface; each entry hangs from it at its depth */
+.world {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  will-change: transform;
+}
+.entry {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+/* its dot on the rope (in a larger area to click) */
+.entry__hit {
+  position: absolute;
+  left: -14px;
+  top: -14px;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.entry__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: currentColor;
+}
+/* its title and depth beside the dot */
+.entry__block {
+  position: absolute;
+  left: 30px;
+  top: -15px;
+  width: 300px;
+}
+.entry__label {
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: max-content;
+  max-width: 300px;
+}
+.entry__title {
+  font-size: 24px;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  text-wrap: pretty;
+}
+.entry__meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ---- an open entry's card, off to the right of its title and joined to it by a thin line (layout.js sizes the line) */
+.entry__conn {
+  position: absolute;
+  top: 14px;
+  left: 300px;
+  width: 48px;
+  height: 1px;
+  background: currentColor;
+  transform-origin: left center;
+  animation: cardLine 0.4s both;
+}
+.card {
+  position: absolute;
+  left: 348px;
+  top: 2px;
+  margin-top: 0px;
+  width: var(--card-w);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-height: var(--card-max-h);
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  padding: 0 12px 0 28px;
+  border-left: 1px solid currentColor;
+  box-sizing: border-box;
+  user-select: text;
+  animation: cardIn 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.card::-webkit-scrollbar {
+  width: 3px;
+}
+.card::-webkit-scrollbar-thumb {
+  background: currentColor;
+}
+/* on a narrow screen the card opens under the title instead, the width of the screen, and there is no line */
+.is-narrow .entry__conn {
+  display: none;
+}
+.is-narrow .card {
+  position: relative;
+  left: 0px;
+  top: 0px;
+  margin-top: 14px;
+}
+@keyframes cardLine {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes cardIn {
+  from {
+    opacity: 0;
+    transform: translateX(-14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.card__photo {
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  max-height: 440px;
+  background-size: cover;
+  background-position: center;
+  filter: grayscale(1);
+}
+.card__short {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.4;
+  text-wrap: pretty;
+  max-width: 40ch;
+}
+.card__para {
+  margin: 0;
+  font-size: 17.5px;
+  line-height: 1.65;
+  text-wrap: pretty;
+  max-width: 62ch;
+}
+.card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.card__tags > span {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  padding: 3px 9px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+}
+.card__link {
+  align-self: flex-start;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  border-bottom: 1px solid currentColor;
+  padding-bottom: 2px;
+}
+
+/* ---- the depth read-out, bottom right */
+.chrome {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+}
+.chrome__box {
+  position: absolute;
+  right: 120px;
+  bottom: 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.chrome__depth {
+  font-size: 28px;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.chrome__counter {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
