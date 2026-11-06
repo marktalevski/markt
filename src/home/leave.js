@@ -169,173 +169,178 @@ export function exitsToFreediving(s) {
 }
 
 /**
- * The exit strokes as paint, for this frame (added to made.quads; see strokes.js). G: seconds into leaving. Also notes where each
- * stroke's head is (s.exitHeads), which is drawn as its dot.
+ * One exit stroke as paint (see strokes.js for quads). X: the stroke (from exitsToFreediving); G: seconds into leaving. The stroke
+ * flies like the lines do, lies on the paper where it draws its feature (a surface line, the buoy's coil, the flag), and then lifts
+ * off towards its dot in the menu; its tail is taken up behind it. Also notes where its head is (s.exitHeads), drawn as its dot.
  */
-export function exitQuads(s, made, G, W, H) {
-  const { quads, inkPid } = made,
-    LX = ropeX(W),
-    SY = surfaceY(H);
-  let pidc = made.pidc;
-  s.exitHeads = [];
-  if (G != null && s.exits)
-    for (const X of s.exits) {
-      const pid = X.ink && inkPid != null ? inkPid : 'x' + ++pidc;
-      const all = X.pts.slice(),
-        sw = X.pts.length - 1,
-        sl = [0];
-      for (let i = 1; i < all.length; i++)
-        sl[i] = sl[i - 1] + Math.hypot(all[i][0] - all[i - 1][0], all[i][1] - all[i - 1][1]);
-      const len = sl[all.length - 1],
-        swL = sl[sw],
-        kx = clamp((G - X.d) / (X.dur || 1.5), 0, 1);
-      if (kx <= 0 && !X.h0) continue;
-      const h0 = X.h0 || 0,
-        nC = X.circ ? X.circ.length : 0,
-        s0 = nC ? sl[nC - 1] : 0,
-        TLx = h0 ? h0 + 60 + (460 - h0 - 60) * smooth(kx) : 460;
-      const hh =
-          h0 +
-          (len - h0) *
-            (X.f0 != null ? 0.65 * easeInOut(kx) + 0.35 * (1 - Math.pow(1 - kx, 2)) : 1 - Math.pow(1 - kx, 2.2)),
-        col = `rgb(${X.col[0]},${X.col[1]},${X.col[2]})`;
-      const P2 = [],
-        W2 = [],
-        A2 = [],
-        Z2 = [],
-        I2 = [];
-      if (X.f0 != null && X.tA == null && hh >= sl[X.f0]) X.tA = G;
-      for (let i = 0; i < all.length; i++) {
-        let sv = sl[i],
-          pt = all[i],
-          tipEnd = false;
-        const inF = X.f0 != null && i >= X.f0 && i <= X.f1,
-          tailCut = len * smooth(clamp((G - X.d - (X.dur || 1.5) + 0.1) / 0.7, 0, 1));
-        if (sv > hh) {
-          if (!i || sl[i - 1] >= hh) break;
-          pt = lerpPt(all[i - 1], pt, (hh - sl[i - 1]) / (sv - sl[i - 1]));
-          sv = hh;
-          tipEnd = true;
-        }
-        if (!inF && sv < tailCut) {
-          const s1 = sl[i + 1];
-          if (s1 == null || s1 <= tailCut) continue;
-          pt = lerpPt(pt, all[i + 1], (tailCut - sv) / (s1 - sv));
-          sv = tailCut;
-        }
-        const behind = hh - sv,
-          onW = X.f0 != null ? inF : i >= sw,
-          onC = i < nC,
-          u = clamp((sv - s0) / (swL - s0), 0, 1);
-        const z =
-          onW || onC ? 0.05 : Math.min(X.f0 != null ? 0.3 : 9, -0.7 + 1.9 * Math.pow(Math.sin(Math.PI * u), 1.2));
-        const sc = Math.pow(3.4, z),
-          tip = Math.sqrt(clamp(behind / 26, 0.04, 1)),
-          blend =
-            X.f0 != null
-              ? onW
-                ? 1
-                : smooth(clamp(1 - Math.min(Math.abs(i - X.f0), Math.abs(i - X.f1)) / 10, 0, 1))
-              : smooth(clamp((sv - swL + 160) / 160, 0, 1));
-        const w =
-          (X.w * sc * (1 - blend) + X.tw * (0.84 + 0.16 * Math.sin(sv * 0.045)) * blend) *
-          tip *
-          Math.sqrt(clamp(sv / 60, 0.1, 1));
-        let a = onW ? X.ta : clamp(1 - behind / TLx, 0, 1) * (0.5 + 0.5 * clamp((z + 1) / 2, 0, 1));
-        if (!onW && blend > 0) a = a * (1 - blend) + X.ta * blend * clamp(1 - behind / TLx, 0.4, 1);
-        if (X.ink && !onW) a = Math.min(1, a * 1.1);
-        if (onC && X.circW && X.circW[i] < 0.2) a = 0;
-        P2.push(pt);
-        W2.push(w);
-        A2.push(a);
-        Z2.push(z + (onW ? -2 : 0));
-        I2.push(i);
-        if (tipEnd) break;
-      }
-      const n2 = P2.length;
-      for (let i = 0; i < n2 - 1; i++) {
-        if (I2[i + 1] !== I2[i] + 1 || A2[i] <= 0 || A2[i + 1] <= 0) continue;
-        // angle each end from its true neighbours only: across an erased stretch the next kept point can be far away (the dot), which would twist the end
-        const q0 = P2[i],
-          q1 = P2[i + 1],
-          q2 = i + 2 < n2 && I2[i + 2] === I2[i + 1] + 1 ? P2[i + 2] : q1,
-          pr = i > 0 && I2[i - 1] === I2[i] - 1 ? P2[i - 1] : q0;
-        const t0x = q1[0] - pr[0],
-          t0y = q1[1] - pr[1],
-          l0 = Math.hypot(t0x, t0y) || 1,
-          t1x = q2[0] - q0[0],
-          t1y = q2[1] - q0[1],
-          l1 = Math.hypot(t1x, t1y) || 1;
-        const n0 = [-t0y / l0, t0x / l0],
-          n1 = [-t1y / l1, t1x / l1],
-          h0b = W2[i] / 2,
-          h1b = W2[i + 1] / 2;
+function exitStroke(s, X, pid, quads, G, W, LX, SY) {
+  const all = X.pts.slice(),
+    sw = X.pts.length - 1,
+    sl = [0];
+  for (let i = 1; i < all.length; i++)
+    sl[i] = sl[i - 1] + Math.hypot(all[i][0] - all[i - 1][0], all[i][1] - all[i - 1][1]);
+  const len = sl[all.length - 1],
+    swL = sl[sw],
+    kx = clamp((G - X.d) / (X.dur || 1.5), 0, 1);
+  if (kx <= 0 && !X.h0) return;
+  const h0 = X.h0 || 0,
+    nC = X.circ ? X.circ.length : 0,
+    s0 = nC ? sl[nC - 1] : 0,
+    TLx = h0 ? h0 + 60 + (460 - h0 - 60) * smooth(kx) : 460;
+  const hh =
+      h0 +
+      (len - h0) * (X.f0 != null ? 0.65 * easeInOut(kx) + 0.35 * (1 - Math.pow(1 - kx, 2)) : 1 - Math.pow(1 - kx, 2.2)),
+    col = `rgb(${X.col[0]},${X.col[1]},${X.col[2]})`;
+  const P2 = [],
+    W2 = [],
+    A2 = [],
+    Z2 = [],
+    I2 = [];
+  if (X.f0 != null && X.tA == null && hh >= sl[X.f0]) X.tA = G;
+  for (let i = 0; i < all.length; i++) {
+    let sv = sl[i],
+      pt = all[i],
+      tipEnd = false;
+    const inF = X.f0 != null && i >= X.f0 && i <= X.f1,
+      tailCut = len * smooth(clamp((G - X.d - (X.dur || 1.5) + 0.1) / 0.7, 0, 1));
+    if (sv > hh) {
+      if (!i || sl[i - 1] >= hh) break;
+      pt = lerpPt(all[i - 1], pt, (hh - sl[i - 1]) / (sv - sl[i - 1]));
+      sv = hh;
+      tipEnd = true;
+    }
+    if (!inF && sv < tailCut) {
+      const s1 = sl[i + 1];
+      if (s1 == null || s1 <= tailCut) continue;
+      pt = lerpPt(pt, all[i + 1], (tailCut - sv) / (s1 - sv));
+      sv = tailCut;
+    }
+    const behind = hh - sv,
+      onW = X.f0 != null ? inF : i >= sw,
+      onC = i < nC,
+      u = clamp((sv - s0) / (swL - s0), 0, 1);
+    const z = onW || onC ? 0.05 : Math.min(X.f0 != null ? 0.3 : 9, -0.7 + 1.9 * Math.pow(Math.sin(Math.PI * u), 1.2));
+    const sc = Math.pow(3.4, z),
+      tip = Math.sqrt(clamp(behind / 26, 0.04, 1)),
+      blend =
+        X.f0 != null
+          ? onW
+            ? 1
+            : smooth(clamp(1 - Math.min(Math.abs(i - X.f0), Math.abs(i - X.f1)) / 10, 0, 1))
+          : smooth(clamp((sv - swL + 160) / 160, 0, 1));
+    const w =
+      (X.w * sc * (1 - blend) + X.tw * (0.84 + 0.16 * Math.sin(sv * 0.045)) * blend) *
+      tip *
+      Math.sqrt(clamp(sv / 60, 0.1, 1));
+    let a = onW ? X.ta : clamp(1 - behind / TLx, 0, 1) * (0.5 + 0.5 * clamp((z + 1) / 2, 0, 1));
+    if (!onW && blend > 0) a = a * (1 - blend) + X.ta * blend * clamp(1 - behind / TLx, 0.4, 1);
+    if (X.ink && !onW) a = Math.min(1, a * 1.1);
+    if (onC && X.circW && X.circW[i] < 0.2) a = 0;
+    P2.push(pt);
+    W2.push(w);
+    A2.push(a);
+    Z2.push(z + (onW ? -2 : 0));
+    I2.push(i);
+    if (tipEnd) break;
+  }
+  const n2 = P2.length;
+  for (let i = 0; i < n2 - 1; i++) {
+    if (I2[i + 1] !== I2[i] + 1 || A2[i] <= 0 || A2[i + 1] <= 0) continue;
+    // angle each end from its true neighbours only: across an erased stretch the next kept point can be far away (the dot), which would twist the end
+    const q0 = P2[i],
+      q1 = P2[i + 1],
+      q2 = i + 2 < n2 && I2[i + 2] === I2[i + 1] + 1 ? P2[i + 2] : q1,
+      pr = i > 0 && I2[i - 1] === I2[i] - 1 ? P2[i - 1] : q0;
+    const t0x = q1[0] - pr[0],
+      t0y = q1[1] - pr[1],
+      l0 = Math.hypot(t0x, t0y) || 1,
+      t1x = q2[0] - q0[0],
+      t1y = q2[1] - q0[1],
+      l1 = Math.hypot(t1x, t1y) || 1;
+    const n0 = [-t0y / l0, t0x / l0],
+      n1 = [-t1y / l1, t1x / l1],
+      h0b = W2[i] / 2,
+      h1b = W2[i + 1] / 2;
+    quads.push({
+      z: (Z2[i] + Z2[i + 1]) / 2 + (X.ink ? 0.02 : 0),
+      a: (A2[i] + A2[i + 1]) / 2,
+      col,
+      rgb: X.col,
+      pid,
+      sub: 0,
+      mul: !X.ink,
+      q: [
+        [q0[0] - n0[0] * h0b, q0[1] - n0[1] * h0b],
+        [q1[0] - n1[0] * h1b, q1[1] - n1[1] * h1b],
+        [q1[0] + n1[0] * h1b, q1[1] + n1[1] * h1b],
+        [q0[0] + n0[0] * h0b, q0[1] + n0[1] * h0b],
+      ],
+    });
+  }
+  // once a surface line has lifted off its right end towards its dot, the surface carries on out past the right edge, as on the Freediving page
+  if (X.k <= 2 && X.f1 != null) {
+    if (X.tB == null && hh >= sl[X.f1] + 40) X.tB = G;
+    if (X.tB != null) {
+      const e0 = all[X.f1],
+        xr = e0[0] + (W + 20 - e0[0]) * smooth(clamp((G - X.tB) / 0.5, 0, 1)),
+        ep = [e0];
+      for (let x = Math.ceil((e0[0] + 1) / 9) * 9; x < xr; x += 9) ep.push([x, SY + waveY(x - LX, X.k, 0)]);
+      if (xr > e0[0] + 1) ep.push([xr, SY + waveY(xr - LX, X.k, 0)]);
+      // width keeps the line's own rhythm, measured along the stroke, so the join doesn't show
+      let se = sl[X.f1];
+      for (let i = 0; i < ep.length - 1; i++) {
+        const q0 = ep[i],
+          q1 = ep[i + 1],
+          dd = Math.hypot(q1[0] - q0[0], q1[1] - q0[1]) || 1,
+          nx = -(q1[1] - q0[1]) / dd,
+          ny = (q1[0] - q0[0]) / dd,
+          tipR = Math.sqrt(clamp((xr - q1[0]) / 26, 0.04, 1)),
+          hw0 = (X.tw * (0.84 + 0.16 * Math.sin(se * 0.045))) / 2,
+          hw1 = ((X.tw * (0.84 + 0.16 * Math.sin((se += dd) * 0.045))) / 2) * (xr >= W + 19 ? 1 : tipR);
         quads.push({
-          z: (Z2[i] + Z2[i + 1]) / 2 + (X.ink ? 0.02 : 0),
-          a: (A2[i] + A2[i + 1]) / 2,
+          z: -1.95 + (X.ink ? 0.02 : 0),
+          a: X.ta,
           col,
           rgb: X.col,
           pid,
           sub: 0,
           mul: !X.ink,
           q: [
-            [q0[0] - n0[0] * h0b, q0[1] - n0[1] * h0b],
-            [q1[0] - n1[0] * h1b, q1[1] - n1[1] * h1b],
-            [q1[0] + n1[0] * h1b, q1[1] + n1[1] * h1b],
-            [q0[0] + n0[0] * h0b, q0[1] + n0[1] * h0b],
+            [q0[0] - nx * hw0, q0[1] - ny * hw0],
+            [q1[0] - nx * hw1, q1[1] - ny * hw1],
+            [q1[0] + nx * hw1, q1[1] + ny * hw1],
+            [q0[0] + nx * hw0, q0[1] + ny * hw0],
           ],
         });
       }
-      // once a surface line has lifted off its right end towards its dot, the surface carries on out past the right edge, as on the Freediving page
-      if (X.k <= 2 && X.f1 != null) {
-        if (X.tB == null && hh >= sl[X.f1] + 40) X.tB = G;
-        if (X.tB != null) {
-          const e0 = all[X.f1],
-            xr = e0[0] + (W + 20 - e0[0]) * smooth(clamp((G - X.tB) / 0.5, 0, 1)),
-            ep = [e0];
-          for (let x = Math.ceil((e0[0] + 1) / 9) * 9; x < xr; x += 9) ep.push([x, SY + waveY(x - LX, X.k, 0)]);
-          if (xr > e0[0] + 1) ep.push([xr, SY + waveY(xr - LX, X.k, 0)]);
-          // width keeps the line's own rhythm, measured along the stroke, so the join doesn't show
-          let se = sl[X.f1];
-          for (let i = 0; i < ep.length - 1; i++) {
-            const q0 = ep[i],
-              q1 = ep[i + 1],
-              dd = Math.hypot(q1[0] - q0[0], q1[1] - q0[1]) || 1,
-              nx = -(q1[1] - q0[1]) / dd,
-              ny = (q1[0] - q0[0]) / dd,
-              tipR = Math.sqrt(clamp((xr - q1[0]) / 26, 0.04, 1)),
-              hw0 = (X.tw * (0.84 + 0.16 * Math.sin(se * 0.045))) / 2,
-              hw1 = ((X.tw * (0.84 + 0.16 * Math.sin((se += dd) * 0.045))) / 2) * (xr >= W + 19 ? 1 : tipR);
-            quads.push({
-              z: -1.95 + (X.ink ? 0.02 : 0),
-              a: X.ta,
-              col,
-              rgb: X.col,
-              pid,
-              sub: 0,
-              mul: !X.ink,
-              q: [
-                [q0[0] - nx * hw0, q0[1] - ny * hw0],
-                [q1[0] - nx * hw1, q1[1] - ny * hw1],
-                [q1[0] + nx * hw1, q1[1] + ny * hw1],
-                [q0[0] + nx * hw0, q0[1] + ny * hw0],
-              ],
-            });
-          }
-        }
-      }
-      // both blues share the Freediving dot: as they arrive they take on its own blue, so they merge into one dot instead of flickering between two
-      const hc =
-        X.k === 1 || X.k === 2
-          ? `rgb(${X.col.map((v, j) => Math.round(v + ([24, 88, 224][j] - v) * smooth(clamp((kx - 0.8) / 0.2, 0, 1)))).join(',')})`
-          : col;
-      if (P2.length) {
-        const hp = P2[P2.length - 1],
-          dk = smooth(clamp((G - X.d - (X.dur || 1.5) + 0.1) / 0.7, 0, 1));
-        s.exitHeads = s.exitHeads || [];
-        s.exitHeads.push({ p: hp, col: hc, r: (X.ink ? 8 : 7) + ((X.k === 3 ? 5.5 : 8) - (X.ink ? 8 : 7)) * dk });
-      }
     }
+  }
+  // both blues share the Freediving dot: as they arrive they take on its own blue, so they merge into one dot instead of flickering between two
+  const hc =
+    X.k === 1 || X.k === 2
+      ? `rgb(${X.col.map((v, j) => Math.round(v + ([24, 88, 224][j] - v) * smooth(clamp((kx - 0.8) / 0.2, 0, 1)))).join(',')})`
+      : col;
+  if (P2.length) {
+    const hp = P2[P2.length - 1],
+      dk = smooth(clamp((G - X.d - (X.dur || 1.5) + 0.1) / 0.7, 0, 1));
+    s.exitHeads = s.exitHeads || [];
+    s.exitHeads.push({ p: hp, col: hc, r: (X.ink ? 8 : 7) + ((X.k === 3 ? 5.5 : 8) - (X.ink ? 8 : 7)) * dk });
+  }
+}
+
+/**
+ * The exit strokes as paint, for this frame, added to made.quads. G: seconds into leaving (null when the page isn't leaving, or is
+ * leaving for Sound or the Library, which have no exit strokes).
+ */
+export function exitQuads(s, made, G, W, H) {
+  const LX = ropeX(W),
+    SY = surfaceY(H);
+  let pidc = made.pidc;
+  s.exitHeads = [];
+  if (G == null || !s.exits) return;
+  // (the black exit stroke carries on from the ink line, so it is painted as part of it)
+  for (const X of s.exits)
+    exitStroke(s, X, X.ink && made.inkPid != null ? made.inkPid : 'x' + ++pidc, made.quads, G, W, LX, SY);
 }
 
 /**

@@ -114,12 +114,31 @@ function streaks(cx3, qs, col, ink) {
   cx3.globalAlpha = 1;
 }
 
-/**
- * Paints the quads onto ctx. topPid: the line painted last, over the rest (spring's red, which brushes the blossoms). The finished
- * strokes are kept on a layer of their own (s.strokeLayer), and reused as they are when nothing has moved since the last frame.
- */
-export function paintQuads(s, ctx, quads, topPid) {
-  // signature of every piece of paint: if a slow-moving tip were missed, the frame would be reused and the tip would hop when it was noticed
+// a four-sided quad is lengthened by this much (px) at each end, so that neighbours overlap a hair and no seam shows between them
+const EXT = 0.5;
+/** Adds a quad to the path being built on c2. */
+function addQuad(c2, q) {
+  if (q.length === 4) {
+    const mx0 = (q[0][0] + q[3][0]) / 2,
+      my0 = (q[0][1] + q[3][1]) / 2,
+      mx1 = (q[1][0] + q[2][0]) / 2,
+      my1 = (q[1][1] + q[2][1]) / 2,
+      l = Math.hypot(mx1 - mx0, my1 - my0) || 1,
+      ex = ((mx1 - mx0) / l) * EXT,
+      ey = ((my1 - my0) / l) * EXT;
+    c2.moveTo(q[0][0] - ex, q[0][1] - ey);
+    c2.lineTo(q[1][0] + ex, q[1][1] + ey);
+    c2.lineTo(q[2][0] + ex, q[2][1] + ey);
+    c2.lineTo(q[3][0] - ex, q[3][1] - ey);
+  } else {
+    c2.moveTo(q[0][0], q[0][1]);
+    for (let k3 = 1; k3 < q.length; k3++) c2.lineTo(q[k3][0], q[k3][1]);
+  }
+  c2.closePath();
+}
+
+/** A number that changes whenever any piece of the frame's paint does (even a slow-moving tip by an eighth of a pixel). */
+function signature(quads) {
   let sig = quads.length;
   for (let i = 0; i < quads.length; i++) {
     const Q = quads[i];
@@ -131,24 +150,14 @@ export function paintQuads(s, ctx, quads, topPid) {
         Math.round(Q.q[2][0] * 8) * 11) %
       2147483647;
   }
-  const cvs0 = ctx.canvas;
-  if (!s.strokeLayer) s.strokeLayer = document.createElement('canvas');
-  const scv = s.strokeLayer;
-  const sizeOk = scv.width === cvs0.width && scv.height === cvs0.height;
-  if (!sizeOk) {
-    scv.width = cvs0.width;
-    scv.height = cvs0.height;
-  }
-  const reuse = sizeOk && s.strokeSig === sig;
-  s.strokeSig = sig;
-  const sctx = scv.getContext('2d');
-  if (!reuse) {
-    sctx.setTransform(1, 0, 0, 1, 0, 0);
-    sctx.globalCompositeOperation = 'source-over';
-    sctx.globalAlpha = 1;
-    sctx.fillStyle = '#f5f3ee';
-    sctx.fillRect(0, 0, scv.width, scv.height);
-  }
+  return sig;
+}
+
+/**
+ * Sorts a frame's quads into the groups they are painted in, bottom to top: one group per line (the ink first, the others by their
+ * depth), each { col, ink, top, qs: its quads, grad }.
+ */
+function groupQuads(s, quads, topPid) {
   const groups = new Map();
   // spring's red brushes the cherry petals: they take blossom pink, every other one paler, and the twig out to the Sound dot stays red.
   // Each colour is its own paint group, all over the other lines
@@ -204,12 +213,115 @@ export function paintQuads(s, ctx, quads, topPid) {
     g.zs += Q.z;
     g.n++;
   }
-  const GL = reuse
-    ? []
-    : [...groups.values()].sort((a, b) => (a.ink ? -10 : a.top || a.zs / a.n) - (b.ink ? -10 : b.top || b.zs / b.n));
-  // each line: an opacity mask built with max-blending (overlaps keep the strongest value, slight overlaps hide joins), then page = page*(1-m) + colour*m — exact translucency, no levels, no seams
-  const cvs = ctx.canvas,
-    mkC = k => {
+  return [...groups.values()].sort((a, b) => (a.ink ? -10 : a.top || a.zs / a.n) - (b.ink ? -10 : b.top || b.zs / b.n));
+}
+
+/**
+ * Paints one group onto the strokes' layer (sctx), through three working layers the size of the page: lcv, its opacity mask (kept
+ * inverted: white where there is no paint); lcv3, its colour with the brush's texture; lcv2, the two multiplied together. Only the
+ * part of each that the group covers is touched.
+ */
+function paintGroup(g, sctx, { cvs, TF, lcv, lcv2, lcv3, lc, lc2, lc3 }) {
+  const am = g.top ? 2.5 : g.ink ? 1 : 0.86,
+    bk = new Map();
+  let x0 = 1e9,
+    y0 = 1e9,
+    x1 = -1e9,
+    y1 = -1e9;
+  // opacity in 85 levels (steps of 3/255): finer is invisible, and every distinct level costs a fill
+  for (const Q of g.qs) {
+    const v = Math.round(clamp(Q.a * am, 0, 1) * 85) * 3;
+    if (v < 2) continue;
+    let L2 = bk.get(v);
+    if (!L2) bk.set(v, (L2 = []));
+    L2.push(Q.q);
+    for (const p of Q.q) {
+      if (p[0] < x0) x0 = p[0];
+      if (p[0] > x1) x1 = p[0];
+      if (p[1] < y0) y0 = p[1];
+      if (p[1] > y1) y1 = p[1];
+    }
+  }
+  if (!bk.size) return;
+  const bx0 = Math.max(0, Math.floor(TF.a * x0 + TF.e) - 3),
+    by0 = Math.max(0, Math.floor(TF.d * y0 + TF.f) - 3),
+    bx1 = Math.min(cvs.width, Math.ceil(TF.a * x1 + TF.e) + 3),
+    by1 = Math.min(cvs.height, Math.ceil(TF.d * y1 + TF.f) + 3),
+    bw = bx1 - bx0,
+    bh = by1 - by0;
+  if (bw <= 0 || bh <= 0) return;
+  // inverted mask: white, darken with (1 - alpha)
+  lc.setTransform(1, 0, 0, 1, 0, 0);
+  lc.globalAlpha = 1;
+  lc.globalCompositeOperation = 'source-over';
+  lc.fillStyle = '#fff';
+  lc.fillRect(bx0, by0, bw, bh);
+  lc.setTransform(TF);
+  lc.globalCompositeOperation = 'darken';
+  for (const [v, L2] of bk) {
+    const u = 255 - v;
+    lc.fillStyle = `rgb(${u},${u},${u})`;
+    lc.beginPath();
+    for (const q of L2) addQuad(lc, q);
+    lc.fill('nonzero');
+  }
+  lc.setTransform(1, 0, 0, 1, 0, 0);
+  // colour * alpha
+  lc2.setTransform(1, 0, 0, 1, 0, 0);
+  lc2.globalAlpha = 1;
+  lc2.globalCompositeOperation = 'source-over';
+  lc2.drawImage(lcv, bx0, by0, bw, bh, bx0, by0, bw, bh);
+  lc2.globalCompositeOperation = 'difference';
+  lc2.fillStyle = '#fff';
+  lc2.fillRect(bx0, by0, bw, bh);
+  lc3.setTransform(1, 0, 0, 1, 0, 0);
+  lc3.globalAlpha = 1;
+  lc3.globalCompositeOperation = 'source-over';
+  if (g.grad) {
+    const G = lc3.createLinearGradient(TF.a * g.grad[0] + TF.e, 0, TF.a * g.grad[1] + TF.e, 0);
+    G.addColorStop(0, 'rgb(246,174,198)');
+    G.addColorStop(1, 'rgb(232,34,44)');
+    lc3.fillStyle = G;
+  } else lc3.fillStyle = g.col;
+  lc3.fillRect(bx0, by0, bw, bh);
+  lc3.setTransform(TF);
+  streaks(lc3, g.qs, g.col, g.ink);
+  lc3.setTransform(1, 0, 0, 1, 0, 0);
+  lc2.globalCompositeOperation = 'multiply';
+  lc2.drawImage(lcv3, bx0, by0, bw, bh, bx0, by0, bw, bh);
+  sctx.setTransform(1, 0, 0, 1, 0, 0);
+  sctx.globalAlpha = 1;
+  sctx.globalCompositeOperation = 'multiply';
+  sctx.drawImage(lcv, bx0, by0, bw, bh, bx0, by0, bw, bh);
+  sctx.globalCompositeOperation = 'lighter';
+  sctx.drawImage(lcv2, bx0, by0, bw, bh, bx0, by0, bw, bh);
+}
+
+/**
+ * Paints the quads onto ctx. topPid: the line painted last, over the rest (spring's red, which brushes the blossoms). The finished
+ * strokes are kept on a layer of their own (s.strokeLayer), and reused as they are when nothing has moved since the last frame.
+ */
+export function paintQuads(s, ctx, quads, topPid) {
+  // (if a slow-moving tip were missed, the last frame would be reused and the tip would hop when it was noticed: see signature)
+  const sig = signature(quads),
+    cvs = ctx.canvas;
+  if (!s.strokeLayer) s.strokeLayer = document.createElement('canvas');
+  const scv = s.strokeLayer,
+    sizeOk = scv.width === cvs.width && scv.height === cvs.height;
+  if (!sizeOk) {
+    scv.width = cvs.width;
+    scv.height = cvs.height;
+  }
+  const reuse = sizeOk && s.strokeSig === sig;
+  s.strokeSig = sig;
+  if (!reuse) {
+    const sctx = scv.getContext('2d');
+    sctx.setTransform(1, 0, 0, 1, 0, 0);
+    sctx.globalCompositeOperation = 'source-over';
+    sctx.globalAlpha = 1;
+    sctx.fillStyle = '#f5f3ee';
+    sctx.fillRect(0, 0, scv.width, scv.height);
+    const layer = k => {
       if (!s.layers[k]) s.layers[k] = document.createElement('canvas');
       const c = s.layers[k];
       if (c.width !== cvs.width || c.height !== cvs.height) {
@@ -218,109 +330,22 @@ export function paintQuads(s, ctx, quads, topPid) {
       }
       return c;
     };
-  const lcv = mkC('mask'),
-    lcv2 = mkC('colour'),
-    lcv3 = mkC('texture'),
-    lc = lcv.getContext('2d'),
-    lc2 = lcv2.getContext('2d'),
-    lc3 = lcv3.getContext('2d'),
-    TF = ctx.getTransform(),
-    EXT = 0.5;
-  const addQ = (c2, q) => {
-    if (q.length === 4) {
-      const mx0 = (q[0][0] + q[3][0]) / 2,
-        my0 = (q[0][1] + q[3][1]) / 2,
-        mx1 = (q[1][0] + q[2][0]) / 2,
-        my1 = (q[1][1] + q[2][1]) / 2,
-        l = Math.hypot(mx1 - mx0, my1 - my0) || 1,
-        ex = ((mx1 - mx0) / l) * EXT,
-        ey = ((my1 - my0) / l) * EXT;
-      c2.moveTo(q[0][0] - ex, q[0][1] - ey);
-      c2.lineTo(q[1][0] + ex, q[1][1] + ey);
-      c2.lineTo(q[2][0] + ex, q[2][1] + ey);
-      c2.lineTo(q[3][0] - ex, q[3][1] - ey);
-    } else {
-      c2.moveTo(q[0][0], q[0][1]);
-      for (let k3 = 1; k3 < q.length; k3++) c2.lineTo(q[k3][0], q[k3][1]);
-    }
-    c2.closePath();
-  };
-  for (const g of GL) {
-    const am = g.top ? 2.5 : g.ink ? 1 : 0.86,
-      bk = new Map();
-    let x0 = 1e9,
-      y0 = 1e9,
-      x1 = -1e9,
-      y1 = -1e9;
-    // opacity in 85 levels (steps of 3/255): finer is invisible, and every distinct level costs a fill
-    for (const Q of g.qs) {
-      const v = Math.round(clamp(Q.a * am, 0, 1) * 85) * 3;
-      if (v < 2) continue;
-      let L2 = bk.get(v);
-      if (!L2) bk.set(v, (L2 = []));
-      L2.push(Q.q);
-      for (const p of Q.q) {
-        if (p[0] < x0) x0 = p[0];
-        if (p[0] > x1) x1 = p[0];
-        if (p[1] < y0) y0 = p[1];
-        if (p[1] > y1) y1 = p[1];
-      }
-    }
-    if (!bk.size) continue;
-    const bx0 = Math.max(0, Math.floor(TF.a * x0 + TF.e) - 3),
-      by0 = Math.max(0, Math.floor(TF.d * y0 + TF.f) - 3),
-      bx1 = Math.min(cvs.width, Math.ceil(TF.a * x1 + TF.e) + 3),
-      by1 = Math.min(cvs.height, Math.ceil(TF.d * y1 + TF.f) + 3),
-      bw = bx1 - bx0,
-      bh = by1 - by0;
-    if (bw <= 0 || bh <= 0) continue;
-    // inverted mask: white, darken with (1 - alpha)
-    lc.setTransform(1, 0, 0, 1, 0, 0);
-    lc.globalAlpha = 1;
-    lc.globalCompositeOperation = 'source-over';
-    lc.fillStyle = '#fff';
-    lc.fillRect(bx0, by0, bw, bh);
-    lc.setTransform(TF);
-    lc.globalCompositeOperation = 'darken';
-    for (const [v, L2] of bk) {
-      const u = 255 - v;
-      lc.fillStyle = `rgb(${u},${u},${u})`;
-      lc.beginPath();
-      for (const q of L2) addQ(lc, q);
-      lc.fill('nonzero');
-    }
-    lc.setTransform(1, 0, 0, 1, 0, 0);
-    // colour * alpha
-    lc2.setTransform(1, 0, 0, 1, 0, 0);
-    lc2.globalAlpha = 1;
-    lc2.globalCompositeOperation = 'source-over';
-    lc2.drawImage(lcv, bx0, by0, bw, bh, bx0, by0, bw, bh);
-    lc2.globalCompositeOperation = 'difference';
-    lc2.fillStyle = '#fff';
-    lc2.fillRect(bx0, by0, bw, bh);
-    lc3.setTransform(1, 0, 0, 1, 0, 0);
-    lc3.globalAlpha = 1;
-    lc3.globalCompositeOperation = 'source-over';
-    if (g.grad) {
-      const G = lc3.createLinearGradient(TF.a * g.grad[0] + TF.e, 0, TF.a * g.grad[1] + TF.e, 0);
-      G.addColorStop(0, 'rgb(246,174,198)');
-      G.addColorStop(1, 'rgb(232,34,44)');
-      lc3.fillStyle = G;
-    } else lc3.fillStyle = g.col;
-    lc3.fillRect(bx0, by0, bw, bh);
-    lc3.setTransform(TF);
-    streaks(lc3, g.qs, g.col, g.ink);
-    lc3.setTransform(1, 0, 0, 1, 0, 0);
-    lc2.globalCompositeOperation = 'multiply';
-    lc2.drawImage(lcv3, bx0, by0, bw, bh, bx0, by0, bw, bh);
-    sctx.setTransform(1, 0, 0, 1, 0, 0);
-    sctx.globalAlpha = 1;
-    sctx.globalCompositeOperation = 'multiply';
-    sctx.drawImage(lcv, bx0, by0, bw, bh, bx0, by0, bw, bh);
-    sctx.globalCompositeOperation = 'lighter';
-    sctx.drawImage(lcv2, bx0, by0, bw, bh, bx0, by0, bw, bh);
+    const lcv = layer('mask'),
+      lcv2 = layer('colour'),
+      lcv3 = layer('texture'),
+      tools = {
+        cvs,
+        TF: ctx.getTransform(),
+        lcv,
+        lcv2,
+        lcv3,
+        lc: lcv.getContext('2d'),
+        lc2: lcv2.getContext('2d'),
+        lc3: lcv3.getContext('2d'),
+      };
+    for (const g of groupQuads(s, quads, topPid)) paintGroup(g, sctx, tools);
+    sctx.globalCompositeOperation = 'source-over';
   }
-  sctx.globalCompositeOperation = 'source-over';
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalCompositeOperation = 'source-over';
