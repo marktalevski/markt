@@ -3,7 +3,9 @@
 //
 // It sits bottom left. Each bar is one frame, its height how long the frame took; red ones took more than 1.5 frames (a stutter you
 // could see). The line under the bars: the screen's rate, the stutters on this page (counted once the meter has been up a second,
-// after the page's arrival has settled behind the cover), and the slowest of the frames shown.
+// after the page's arrival has settled behind the cover), and the slowest of the frames shown. If the page has settled at an easier
+// pace for this device (see loop.js), the top right corner says which: "1/2" is a frame for every second one of the screen's, and
+// "x0.7" is canvases drawn with 0.7 of the pixels each way.
 
 const WIDTH = 196,
   HEIGHT = 52; // the meter's size, in CSS pixels
@@ -65,6 +67,15 @@ export function startFpsMeter() {
     const rate = Math.round(1000 / usual),
       slowest = Math.round(sorted[sorted.length - 1] || 0);
     ctx.fillText(`${rate} Hz  ${stutters} stutters  max ${slowest} ms`, PAD, HEIGHT - 7);
+    const pace = window.__pace && window.__pace();
+    if (pace && (pace.every > 1 || pace.pixels < 1)) {
+      const note = [pace.every > 1 ? '1/' + pace.every : '', pace.pixels < 1 ? 'x' + pace.pixels : '']
+        .filter(Boolean)
+        .join(' ');
+      ctx.textAlign = 'right';
+      ctx.fillText(note, WIDTH - PAD, PAD + 9);
+      ctx.textAlign = 'left';
+    }
   };
   requestAnimationFrame(tick);
 }

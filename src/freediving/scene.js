@@ -1,5 +1,6 @@
 // One frame of the dive, painted in order: paper, the water (with its light, snow and bubbles), the surface lines, the rope with the
 // buoy, the orange line and the squid, and the paper's grain over everything.
+import { pixelScale } from '../lib/loop.js';
 import { clamp, smooth } from '../lib/math.js';
 import { navDotEl } from '../lib/nav.js';
 import { ropeX, surfaceY, waveY } from '../lib/surface.js';
@@ -25,7 +26,7 @@ export function drawFrame(s) {
   const cv = s.canvas,
     W = innerWidth,
     H = innerHeight,
-    dpr = Math.min(2, devicePixelRatio || 1);
+    dpr = pixelScale();
   if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) {
     cv.width = Math.round(W * dpr);
     cv.height = Math.round(H * dpr);

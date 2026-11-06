@@ -1,5 +1,6 @@
 // One frame of Home: the lines as far as they have been drawn (strokes.js, paint.js), then the dots at their ends, the pages' labels,
 // and the paper's grain over everything.
+import { pixelScale } from '../lib/loop.js';
 import { clamp, smooth } from '../lib/math.js';
 import { fadeAt } from './fade.js';
 import { LABEL, labelFx, labelPulse, placeLabel } from './labels.js';
@@ -34,7 +35,7 @@ export function drawFrame(s) {
   const cv = s.canvas,
     W = innerWidth,
     H = innerHeight,
-    dpr = Math.min(2, devicePixelRatio || 1);
+    dpr = pixelScale();
   if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) {
     cv.width = Math.round(W * dpr);
     cv.height = Math.round(H * dpr);

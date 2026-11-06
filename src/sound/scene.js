@@ -1,5 +1,6 @@
 // One frame of the page, painted in order: the grey ground, the album's photo, static while the page tunes in, scanlines, the wave
 // and its playhead, and the deck over the bottom.
+import { pixelScale } from '../lib/loop.js';
 import { clamp, smooth } from '../lib/math.js';
 import { grainTile } from '../lib/paper.js';
 import { drawDeck } from './deck/index.js';
@@ -34,7 +35,7 @@ export function drawFrame(s, dt) {
   const cv = s.canvas,
     W = innerWidth,
     H = innerHeight,
-    dpr = Math.min(2, devicePixelRatio || 1);
+    dpr = pixelScale();
   if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) {
     cv.width = Math.round(W * dpr);
     cv.height = Math.round(H * dpr);

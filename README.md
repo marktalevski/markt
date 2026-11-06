@@ -19,7 +19,7 @@ Each page is plain markup, a stylesheet and a handful of small JavaScript module
 
 - `src/pages/`: one `.astro` file per page, holding the markup the page starts from.
 - `src/home/`, `src/freediving/`, `src/sound/`, `src/library/`: each page's stylesheet and modules. `main.js` is the page's state and what a visitor can do on it; the other files are named for what they work out or paint (`layout.js`, `scene.js` and so on), and each starts with a comment saying what it is for.
-- `src/lib/`: what the pages share. The frame loop (`loop.js`), the menu and the hand-off of its dots from page to page (`menu.js`, `nav.js`), the picture that covers the moment between two pages (`cover.js`), the paper grain (`paper.js`), the deck's layout (`deck-layout.js`), and small helpers.
+- `src/lib/`: what the pages share. The frame loop, which also keeps the frames even on a device that can't keep up (`loop.js`), the menu and the hand-off of its dots from page to page (`menu.js`, `nav.js`), the picture that covers the moment between two pages (`cover.js`), the paper grain (`paper.js`), the deck's layout (`deck-layout.js`), and small helpers.
 - `src/layouts/Base.astro`, `src/components/PageMenu.astro`, `src/styles/menu.css`: the shell every page sits in, and the menu.
 - `src/data/`: the site's content. `site.json` holds the dive log's entries and the Library's books, `sound.json` the albums. Both are built into the pages.
 - `public/`: photos (`images/`) and sound files (`audio/`), published as they are.
@@ -42,7 +42,7 @@ The editor (`src/editor/`) is the one part written in React. Its helper on the d
 ## Tools for working on the site
 
 - **Symbol picker**: under `npm run dev`, Home shows a list of its symbols down the left. Click one to paint it, or step through them with ← and →; H hides the list (`src/dev/symbol-picker.js`).
-- **Frame meter**: add `?fps` to the end of any page's address, on the published site too, to see how long each frame takes on that device. It stays on from page to page; `?fps=0` turns it off (`src/lib/fps-meter.js`).
+- **Frame meter**: add `?fps` to the end of any page's address, on the published site too, to see how long each frame takes on that device. It stays on from page to page; `?fps=0` turns it off (`src/lib/fps-meter.js`). If the page has settled at an easier pace for the device, its top right corner says which: `1/2` is a frame for every second frame of the screen, `x0.7` is canvases drawn with 0.7 of the pixels each way.
 - `npm run lint` checks the code (ESLint and Prettier), and `npm run format` tidies its formatting.
 
 ## Design files

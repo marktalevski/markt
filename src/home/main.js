@@ -5,7 +5,7 @@
 // lines as paint in strokes.js and paint.js, the frame in scene.js, and the ways out in leave.js.
 import { BASE } from '../lib/base.js';
 import { leaveTo, pageReady } from '../lib/cover.js';
-import { startLoop } from '../lib/loop.js';
+import { atFullSharpness, startLoop } from '../lib/loop.js';
 import { handNavFrom, takeNavFrom } from '../lib/nav.js';
 import { LEAVE_PACE } from '../lib/pace.js';
 import { paperGrain } from '../lib/paper.js';
@@ -131,7 +131,9 @@ class Home {
     if (still && this.stillSig === sig) return;
     this.stillSig = still ? sig : null;
 
-    drawFrame(this);
+    // (the frame that stays up is drawn at full sharpness, even on a device that draws the moving ones with fewer pixels)
+    if (still) atFullSharpness(() => drawFrame(this));
+    else drawFrame(this);
     if (!this.ready) {
       this.ready = true;
       pageReady();
